@@ -1,4 +1,5 @@
-const { bootstrapTestApp, resetDb } = require('../../helpers/test-app');
+export {};
+const { bootstrapTestApp, resetDb } = require('../helpers/test-app');
 
 describe('Reviews cursor pagination integration', () => {
   let app, prisma, httpServer;

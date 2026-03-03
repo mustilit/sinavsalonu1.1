@@ -10,8 +10,16 @@ import { ListMarketplaceTestsUseCase } from '../../../application/use-cases/List
 import { GetTestUseCase } from '../../../application/use-cases/GetTestUseCase';
 import { PublishTestUseCase } from '../../../application/use-cases/PublishTestUseCase';
 import { UnpublishTestUseCase } from '../../../application/use-cases/UnpublishTestUseCase';
+import { UpdateTestUseCase } from '../../../application/use-cases/UpdateTestUseCase';
+import { UpdateQuestionUseCase } from '../../../application/use-cases/UpdateQuestionUseCase';
+import { UpdateOptionUseCase } from '../../../application/use-cases/UpdateOptionUseCase';
 import { PrismaExamRepository } from '../../../infrastructure/repositories/PrismaExamRepository';
 import { PrismaAuditLogRepository } from '../../../infrastructure/repositories/PrismaAuditLogRepository';
+import { PrismaUserRepository } from '../../../infrastructure/repositories/PrismaUserRepository';
+import { PrismaAttemptRepository } from '../../../infrastructure/repositories/PrismaAttemptRepository';
+import { PrismaExamTypeRepository } from '../../../infrastructure/repositories/PrismaExamTypeRepository';
+import { PrismaTopicRepository } from '../../../infrastructure/repositories/PrismaTopicRepository';
+import { EXAM_TYPE_REPO, TOPIC_REPO, USER_REPO } from '../../../application/constants';
 
 @Module({
   imports: [PrismaModule],
@@ -23,29 +31,62 @@ import { PrismaAuditLogRepository } from '../../../infrastructure/repositories/P
       provide: AppTestPublishService,
       useClass: TestPublishProvider,
     },
+    { provide: EXAM_TYPE_REPO, useClass: PrismaExamTypeRepository },
+    { provide: TOPIC_REPO, useClass: PrismaTopicRepository },
+    PrismaExamRepository,
+    PrismaAuditLogRepository,
     {
       provide: CreateTestUseCase,
-      useFactory: () => new CreateTestUseCase(new PrismaExamRepository()),
+      useFactory: (examRepo: PrismaExamRepository, examTypeRepo: PrismaExamTypeRepository, topicRepo: PrismaTopicRepository) =>
+        new CreateTestUseCase(examRepo, examTypeRepo, topicRepo),
+      inject: [PrismaExamRepository, EXAM_TYPE_REPO, TOPIC_REPO],
     },
     {
       provide: CreateQuestionUseCase,
-      useFactory: () => new CreateQuestionUseCase(new PrismaExamRepository()),
+      useFactory: (examRepo: PrismaExamRepository) => new CreateQuestionUseCase(examRepo),
+      inject: [PrismaExamRepository],
     },
     {
       provide: ListMarketplaceTestsUseCase,
-      useFactory: () => new ListMarketplaceTestsUseCase(new PrismaExamRepository()),
+      useFactory: (examRepo: PrismaExamRepository) => new ListMarketplaceTestsUseCase(examRepo),
+      inject: [PrismaExamRepository],
     },
     {
       provide: GetTestUseCase,
-      useFactory: () => new GetTestUseCase(new PrismaExamRepository()),
+      useFactory: (examRepo: PrismaExamRepository) => new GetTestUseCase(examRepo),
+      inject: [PrismaExamRepository],
     },
     {
       provide: PublishTestUseCase,
-      useFactory: () => new PublishTestUseCase(new PrismaExamRepository(), new PrismaAuditLogRepository()),
+      useFactory: (examRepo: PrismaExamRepository, auditRepo: PrismaAuditLogRepository, userRepo: PrismaUserRepository) =>
+        new PublishTestUseCase(examRepo, auditRepo, userRepo),
+      inject: [PrismaExamRepository, PrismaAuditLogRepository, USER_REPO],
     },
+    { provide: USER_REPO, useClass: PrismaUserRepository },
     {
       provide: UnpublishTestUseCase,
-      useFactory: () => new UnpublishTestUseCase(new PrismaExamRepository(), new PrismaAuditLogRepository()),
+      useFactory: (examRepo: PrismaExamRepository, auditRepo: PrismaAuditLogRepository) =>
+        new UnpublishTestUseCase(examRepo, auditRepo),
+      inject: [PrismaExamRepository, PrismaAuditLogRepository],
+    },
+    PrismaAttemptRepository,
+    {
+      provide: UpdateTestUseCase,
+      useFactory: (examRepo: PrismaExamRepository, auditRepo: PrismaAuditLogRepository, userRepo: PrismaUserRepository) =>
+        new UpdateTestUseCase(examRepo, auditRepo, userRepo),
+      inject: [PrismaExamRepository, PrismaAuditLogRepository, USER_REPO],
+    },
+    {
+      provide: UpdateQuestionUseCase,
+      useFactory: (examRepo: PrismaExamRepository, userRepo: PrismaUserRepository, attemptRepo: PrismaAttemptRepository) =>
+        new UpdateQuestionUseCase(examRepo, userRepo, attemptRepo),
+      inject: [PrismaExamRepository, USER_REPO, PrismaAttemptRepository],
+    },
+    {
+      provide: UpdateOptionUseCase,
+      useFactory: (examRepo: PrismaExamRepository, userRepo: PrismaUserRepository, attemptRepo: PrismaAttemptRepository) =>
+        new UpdateOptionUseCase(examRepo, userRepo, attemptRepo),
+      inject: [PrismaExamRepository, USER_REPO, PrismaAttemptRepository],
     },
   ],
   exports: [TestsService],

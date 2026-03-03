@@ -1,100 +1,81 @@
 import { IExamRepository } from '../../domain/interfaces/IExamRepository';
 import { ReviewAggregationService } from '../services/ReviewAggregationService';
+import { AppError } from '../errors/AppError';
 
-type Filters = {
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SORT_VALUES = ['newest', 'priceAsc', 'priceDesc'] as const;
+
+export type ListMarketplaceFilters = {
   examTypeId?: string;
-  isTimed?: boolean;
-  minPriceCents?: number;
+  topicId?: string;
+  educatorId?: string;
   maxPriceCents?: number;
+  minRating?: number;
+  sort?: (typeof SORT_VALUES)[number];
   page?: number;
   limit?: number;
-  sortBy?: 'NEWEST' | 'PRICE' | 'RATING' | 'POPULARITY';
-  sortDir?: 'asc' | 'desc';
-  minRating?: number;
 };
 
 export class ListMarketplaceTestsUseCase {
   private agg = new ReviewAggregationService();
   constructor(private readonly examRepository: IExamRepository) {}
 
-  async execute(filters?: Filters) {
+  async execute(filters?: ListMarketplaceFilters) {
+    if (filters?.examTypeId && !UUID_REGEX.test(filters.examTypeId)) {
+      throw new AppError('INVALID_UUID', 'Invalid examTypeId', 400);
+    }
+    if (filters?.topicId && !UUID_REGEX.test(filters.topicId)) {
+      throw new AppError('INVALID_UUID', 'Invalid topicId', 400);
+    }
+    if (filters?.educatorId && !UUID_REGEX.test(filters.educatorId)) {
+      throw new AppError('INVALID_UUID', 'Invalid educatorId', 400);
+    }
+    if (filters?.sort && !SORT_VALUES.includes(filters.sort as any)) {
+      throw new AppError('INVALID_SORT', 'sort must be one of: newest, priceAsc, priceDesc', 400);
+    }
+
     const limit = Math.min(50, Math.max(1, filters?.limit ?? 20));
     const page = Math.max(1, filters?.page ?? 1);
+    const sort = filters?.sort ?? 'newest';
 
-    const sortBy = filters?.sortBy ?? 'NEWEST';
-    const sortDir = filters?.sortDir ?? 'desc';
-
-    // For RATING sort or minRating filter, fetch larger pool then process in-memory
-    const fetchLimit = 200; // cap
-    const repoSortMap: any = {
-      NEWEST: 'publishedAt',
-      PRICE: 'price',
-      POPULARITY: 'publishedAt',
-    };
-
-    const repoSort = sortBy === 'RATING' ? 'publishedAt' : repoSortMap[sortBy] ?? 'publishedAt';
+    const sortBy = sort === 'newest' ? 'publishedAt' : 'priceCents';
+    const order = sort === 'priceAsc' ? 'asc' : 'desc';
 
     const res = await this.examRepository.findPublished({
       examTypeId: filters?.examTypeId,
-      isTimed: filters?.isTimed,
-      minPriceCents: filters?.minPriceCents,
+      topicId: filters?.topicId,
+      educatorId: filters?.educatorId,
       maxPriceCents: filters?.maxPriceCents,
-      page: 1,
-      limit: fetchLimit,
-      sortBy: repoSort as any,
-      order: sortDir as any,
+      minRating: filters?.minRating,
+      page,
+      limit,
+      sortBy,
+      order,
     });
 
-    let items = res.items;
-
-    // enrich with rating aggregates
+    const items = res.items;
     const ids = items.map((t) => t.id);
     const aggs = await this.agg.getAggregatesForTestIds(ids);
-    const enriched = items.map((t) => ({ ...t, ratingAvg: aggs[t.id]?.avg ?? null, ratingCount: aggs[t.id]?.count ?? 0 }));
+    const enriched = items.map((t) => ({
+      ...t,
+      ratingAvg: aggs[t.id]?.avg ?? null,
+      ratingCount: aggs[t.id]?.count ?? 0,
+    }));
 
-    // apply minRating filter if provided
-    let filtered = enriched;
-    if (typeof filters?.minRating === 'number') {
-      filtered = enriched.filter((t) => (t.ratingAvg ?? 0) >= (filters!.minRating ?? 0));
-    }
-
-    // sort in-memory when sorting by RATING, otherwise use repo ordering
-    if (sortBy === 'RATING') {
-      filtered.sort((a: any, b: any) => {
-        const ra = a.ratingAvg ?? 0;
-        const rb = b.ratingAvg ?? 0;
-        if (ra === rb) {
-          const ca = a.ratingCount ?? 0;
-          const cb = b.ratingCount ?? 0;
-          if (ca === cb) {
-            // tie-break by publishedAt desc
-            return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
-          }
-          return cb - ca;
-        }
-        return sortDir === 'asc' ? ra - rb : rb - ra;
-      });
-    }
-
-    const total = filtered.length;
-    const start = (page - 1) * limit;
-    const pageItems = filtered.slice(start, start + limit);
-
-    // map minimal summary
-    const summaries = pageItems.map((t: any) => ({
+    const summaries = enriched.map((t: any) => ({
       id: t.id,
       title: t.title,
       educatorId: t.educatorId,
-      examTypeId: (t as any).examTypeId ?? null,
-      priceCents: (t as any).priceCents ?? null,
-      currency: (t as any).currency ?? 'TRY',
+      examTypeId: t.examTypeId ?? null,
+      topicId: t.topicId ?? null,
+      priceCents: t.priceCents ?? null,
+      currency: t.currency ?? 'TRY',
       isTimed: t.isTimed,
       questionCount: t.questionCount ?? 0,
       ratingAvg: t.ratingAvg ?? null,
       ratingCount: t.ratingCount ?? 0,
     }));
 
-    return { items: summaries, meta: { total, page, limit } };
+    return { items: summaries, meta: { total: res.total, page, limit } };
   }
 }
-

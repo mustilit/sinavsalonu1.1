@@ -27,6 +27,7 @@ export class TestAttemptService {
       candidateId,
       startedAt: new Date(),
       completedAt: null,
+      status: 'IN_PROGRESS',
     };
 
     return this.attemptRepository.create(attempt);

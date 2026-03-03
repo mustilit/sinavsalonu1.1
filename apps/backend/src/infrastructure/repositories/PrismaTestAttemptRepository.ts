@@ -34,6 +34,7 @@ export class PrismaTestAttemptRepository implements ITestAttemptRepository {
     candidateId: string;
     startedAt: Date;
     completedAt: Date | null;
+    status?: string;
   }): TestAttempt {
     return {
       id: row.id,
@@ -41,6 +42,7 @@ export class PrismaTestAttemptRepository implements ITestAttemptRepository {
       candidateId: row.candidateId,
       startedAt: row.startedAt,
       completedAt: row.completedAt,
+      status: (row.status as TestAttempt['status']) ?? 'IN_PROGRESS',
     };
   }
 }

@@ -1,4 +1,5 @@
-const { bootstrapTestApp, resetDb, resetRedis } = require('../../helpers/test-app');
+export {};
+const { bootstrapTestApp, resetDb, resetRedis } = require('../helpers/test-app');
 const IORedis = require('ioredis');
 
 describe('Home cache invalidation integration', () => {
@@ -26,8 +27,10 @@ describe('Home cache invalidation integration', () => {
     if (!redisUrl) return; // skip if no redis in env
     const redis = new IORedis(redisUrl);
 
-    // seed educator, candidate, follow
-    const educator = await prisma.user.create({ data: { email: 'ed@example.com', username: 'ed', passwordHash: 'x', role: 'EDUCATOR' } });
+    // seed educator (approved + active for publish), candidate, follow
+    const educator = await prisma.user.create({
+      data: { email: 'ed@example.com', username: 'ed', passwordHash: 'x', role: 'EDUCATOR', status: 'ACTIVE', educatorApprovedAt: new Date() },
+    });
     const candidate = await prisma.user.create({ data: { email: 'c1@example.com', username: 'c1', passwordHash: 'x', role: 'CANDIDATE' } });
     await prisma.follow.create({ data: { followerId: candidate.id, followType: 'EDUCATOR', educatorId: educator.id } });
 
@@ -55,11 +58,12 @@ describe('Home cache invalidation integration', () => {
     let v = await redis.get(key);
     expect(v).toBe('dummy');
 
-    // publish via use-case
+    // publish via use-case (userRepo required for educator enforcement)
     const { PublishTestUseCase } = require('../../src/application/use-cases/PublishTestUseCase');
     const { PrismaExamRepository } = require('../../src/infrastructure/repositories/PrismaExamRepository');
     const { PrismaAuditLogRepository } = require('../../src/infrastructure/repositories/PrismaAuditLogRepository');
-    const publishUc = new PublishTestUseCase(new PrismaExamRepository(), new PrismaAuditLogRepository());
+    const { PrismaUserRepository } = require('../../src/infrastructure/repositories/PrismaUserRepository');
+    const publishUc = new PublishTestUseCase(new PrismaExamRepository(), new PrismaAuditLogRepository(), new PrismaUserRepository());
     await publishUc.execute(test.id, educator.id);
 
     // key should be gone

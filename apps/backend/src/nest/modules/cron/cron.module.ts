@@ -5,7 +5,7 @@ import { PrismaNotificationPreferenceRepository } from '../../../infrastructure/
 import { PrismaFollowRepository } from '../../../infrastructure/repositories/PrismaFollowRepository';
 import { PrismaUserRepository } from '../../../infrastructure/repositories/PrismaUserRepository';
 import { PrismaObjectionRepository } from '../../../infrastructure/repositories/PrismaObjectionRepository';
-import { MockEmailProvider } from '../../../infrastructure/services/MockEmailProvider';
+import { QueueService } from '../../../infrastructure/queue/queue.service';
 import { SendWeeklyFollowDigestUseCase } from '../../../application/use-cases/SendWeeklyFollowDigestUseCase';
 import { SendMonthlyInactiveReminderUseCase } from '../../../application/use-cases/SendMonthlyInactiveReminderUseCase';
 import { EscalateOverdueObjectionsUseCase } from '../../../application/use-cases/EscalateOverdueObjectionsUseCase';
@@ -20,18 +20,18 @@ import { PrismaAuditLogRepository } from '../../../infrastructure/repositories/P
     PrismaUserRepository,
     PrismaObjectionRepository,
     PrismaAuditLogRepository,
-    MockEmailProvider,
+    QueueService,
     {
       provide: SendWeeklyFollowDigestUseCase,
-      useFactory: (f: PrismaFollowRepository, p: PrismaNotificationPreferenceRepository, e: MockEmailProvider, a: PrismaAuditLogRepository) =>
-        new SendWeeklyFollowDigestUseCase(f, p, e, a),
-      inject: [PrismaFollowRepository, PrismaNotificationPreferenceRepository, MockEmailProvider, PrismaAuditLogRepository],
+      useFactory: (f: PrismaFollowRepository, p: PrismaNotificationPreferenceRepository, q: QueueService, a: PrismaAuditLogRepository) =>
+        new SendWeeklyFollowDigestUseCase(f, p, q, a),
+      inject: [PrismaFollowRepository, PrismaNotificationPreferenceRepository, QueueService, PrismaAuditLogRepository],
     },
     {
       provide: SendMonthlyInactiveReminderUseCase,
-      useFactory: (u: PrismaUserRepository, p: PrismaNotificationPreferenceRepository, e: MockEmailProvider, a: PrismaAuditLogRepository) =>
-        new SendMonthlyInactiveReminderUseCase(u, p, e, a),
-      inject: [PrismaUserRepository, PrismaNotificationPreferenceRepository, MockEmailProvider, PrismaAuditLogRepository],
+      useFactory: (u: PrismaUserRepository, p: PrismaNotificationPreferenceRepository, q: QueueService, a: PrismaAuditLogRepository) =>
+        new SendMonthlyInactiveReminderUseCase(u, p, q, a),
+      inject: [PrismaUserRepository, PrismaNotificationPreferenceRepository, QueueService, PrismaAuditLogRepository],
     },
     {
       provide: EscalateOverdueObjectionsUseCase,

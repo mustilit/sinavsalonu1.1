@@ -15,6 +15,12 @@ export class PurchaseUseCase {
   async execute(testId: string, candidateId: string, discountCode?: string) {
     if (!testId || !candidateId) throw new BadRequestException({ code: 'INVALID_INPUT', message: 'Missing testId or candidateId' });
 
+    // FR-Y-05: Satın alma geçici durdurma - purchasesEnabled kontrolü
+    const settings = await this.prisma.adminSettings.findFirst({ where: { id: 1 } });
+    if (settings && !settings.purchasesEnabled) {
+      throw new BadRequestException({ code: 'PURCHASES_DISABLED', message: 'Purchases are temporarily suspended' });
+    }
+
     // Pre-checks: ensure test exists and is published, and candidate is ACTIVE
     const test = await this.prisma.examTest.findUnique({ where: { id: testId } });
     if (!test) throw new BadRequestException({ code: 'TEST_NOT_FOUND', message: 'Test not found' });
@@ -27,7 +33,14 @@ export class PurchaseUseCase {
       throw new BadRequestException({ code: 'CANDIDATE_NOT_ACTIVE', message: 'Candidate not active' });
     }
 
-    const baseAmountCents = (test as any).priceCents ?? 0;
+    const now = new Date();
+    let baseAmountCents = (test as any).priceCents ?? 0;
+    const campaignPrice = (test as any).campaignPriceCents;
+    const campaignFrom = (test as any).campaignValidFrom;
+    const campaignUntil = (test as any).campaignValidUntil;
+    if (typeof campaignPrice === 'number' && campaignFrom && campaignUntil && now >= campaignFrom && now <= campaignUntil) {
+      baseAmountCents = campaignPrice;
+    }
     let finalAmountCents = baseAmountCents;
     let discountApplied: any = null;
 
@@ -40,7 +53,6 @@ export class PurchaseUseCase {
         },
       });
       if (!disc) throw new BadRequestException({ code: 'DISCOUNT_NOT_FOUND', message: 'Discount not found' });
-      const now = new Date();
       if (disc.validFrom && disc.validFrom > now) throw new BadRequestException({ code: 'DISCOUNT_NOT_STARTED', message: 'Discount not started' });
       if (disc.validUntil && disc.validUntil < now) throw new BadRequestException({ code: 'DISCOUNT_EXPIRED', message: 'Discount expired' });
       if (disc.maxUses && disc.usedCount >= disc.maxUses) throw new BadRequestException({ code: 'DISCOUNT_MAXED_OUT', message: 'Discount usage limit reached' });

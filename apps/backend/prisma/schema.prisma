@@ -17,6 +17,12 @@ enum UserRole {
   CANDIDATE
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_EDUCATOR_APPROVAL
+}
+
 enum AttemptStatus {
   IN_PROGRESS
   SUBMITTED
@@ -44,10 +50,13 @@ enum AuditAction {
   PRICE_CHANGED
   OBJECTION_CREATED
   OBJECTION_ANSWERED
+  EDUCATOR_APPROVED
   EDUCATOR_SUSPENDED
+  EDUCATOR_UNSUSPENDED
   DISCOUNT_CREATED
   REVIEW_CREATED
   SUBMIT_ATTEMPT
+  SUBMIT_ANSWER
   NOTIFICATIONS_DISABLED
   EMAIL_SENT
   OBJECTION_ESCALATED
@@ -55,6 +64,27 @@ enum AuditAction {
   REFUND_APPROVED
   REFUND_REJECTED
   REVIEW_UPSERTED
+  EXAMTYPE_CREATED
+  TOPIC_CREATED
+  CONTRACT_ACCEPTED
+  EDUCATOR_PROFILE_UPDATED
+  EXAMTYPE_UPDATED
+  EXAMTYPE_DELETED
+  TOPIC_UPDATED
+  TOPIC_DELETED
+  CSP_VIOLATION
+  SUSPICIOUS_RATE_LIMIT
+}
+
+enum ObjectionStatus {
+  OPEN
+  ANSWERED
+  ESCALATED
+}
+
+enum ContractType {
+  CANDIDATE
+  EDUCATOR
 }
 
 // --- Marketplace / Exam domain ---
@@ -64,12 +94,13 @@ model User {
   email        String   @unique
   username     String   @unique
   passwordHash String
-  role         UserRole @default(CANDIDATE)
-  status       String   @default("ACTIVE")
-  lastLoginAt  DateTime?
-  metadata     Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role                 UserRole   @default(CANDIDATE)
+  status               UserStatus @default(ACTIVE)
+  educatorApprovedAt   DateTime?
+  lastLoginAt          DateTime?
+  metadata             Json?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
 
   examTests ExamTest[]    @relation("educatorTests")
   purchases Purchase[]    @relation("userPurchases")
@@ -77,8 +108,22 @@ model User {
   notificationPreferences NotificationPreference[]
   createdDiscountCodes DiscountCode[] @relation("DiscountCodeCreatedBy")
   reportedObjections Objection[] @relation("ObjectionReporter")
+  contractAcceptances ContractAcceptance[]
+  userPreference     UserPreference?
+  adPurchases       AdPurchase[] @relation("educatorAdPurchases")
 
   @@map("users")
+}
+
+model UserPreference {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  preferences Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("user_preferences")
 }
 
 model ExamType {
@@ -122,6 +167,9 @@ model ExamTest {
   isTimed     Boolean    @default(false)
   duration    Int? // minutes
   priceCents  Int? // price in cents (stage1 nullable)
+  campaignPriceCents Int? // FR-E-04: süreli kampanya fiyatı
+  campaignValidFrom  DateTime? // kampanya başlangıç
+  campaignValidUntil DateTime? // kampanya bitiş
   currency    String? @default("TRY")
   questionCount Int? // nullable for backfill in stage1
   hasSolutions Boolean @default(false)
@@ -138,6 +186,7 @@ model ExamTest {
   topic    Topic?     @relation(fields: [topicId], references: [id], onDelete: SetNull)
   educator User?      @relation("educatorTests", fields: [educatorId], references: [id], onDelete: SetNull)
   Purchase Purchase[]
+  adPurchases AdPurchase[]
 
   @@index([publishedAt])
   @@map("exam_tests")
@@ -307,15 +356,18 @@ model DiscountCode {
   @@map("discount_codes")
 }
 
+// Not: answerText, escalatedAt, ObjectionStatus için migrate ayrı çalıştırılacak (objection_answer_sla_status).
 model Objection {
-  id         String   @id @default(uuid())
-  attemptId  String
-  questionId String
-  reporterId String
-  reason     String
-  status     String   @default("OPEN") // OPEN, ANSWERED, ESCALATED, CLOSED
-  createdAt  DateTime @default(now())
-  answeredAt DateTime?
+  id          String         @id @default(uuid())
+  attemptId   String
+  questionId  String
+  reporterId  String
+  reason      String
+  status      ObjectionStatus @default(OPEN)
+  answerText  String?
+  createdAt   DateTime       @default(now())
+  answeredAt  DateTime?
+  escalatedAt DateTime?
 
   attempt   TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   question  ExamQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
@@ -363,6 +415,41 @@ model Review {
   @@map("reviews")
 }
 
+// --- Contracts (type başına tek active uygulama katmanında enforce edilir)
+model Contract {
+  id          String       @id @default(uuid()) @db.Uuid
+  type        ContractType
+  version     Int
+  title       String
+  content     String       @db.Text
+  isActive    Boolean      @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  acceptances ContractAcceptance[]
+
+  @@unique([type, version])
+  @@map("contracts")
+}
+
+model ContractAcceptance {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   // TEXT, users.id ile aynı tip (FK uyumu)
+  contractId String   @db.Uuid
+  acceptedAt DateTime @default(now())
+  ip         String?
+  userAgent  String?
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contractId])
+  @@index([contractId])
+  @@index([userId])
+  @@map("contract_acceptances")
+}
+
 model AdminSettings {
   id                 Int     @id @default(1)
   commissionPercent  Int     @default(20) // percent
@@ -372,13 +459,62 @@ model AdminSettings {
   @@map("admin_settings")
 }
 
+// Site / şirket bilgileri — ana sayfa ve footer, admin tarafından düzenlenir
+model SiteSettings {
+  id                 Int      @id @default(1)
+  siteName            String?  // "Dal" / "Sınav Salonu"
+  heroTitle           String?  // "Sınavlara Güvenle Hazırlan"
+  heroSubtitle        String?
+  searchPlaceholder   String?
+  statTests           String?  // "10.000+ Test"
+  statEducators       String?  // "500+ Eğitici"
+  statCandidates      String?  // "100.000+ Aday"
+  statSuccessRate     String?  // "%85 Başarı Oranı"
+  footerDescription   String?
+  companyName         String?
+  contactEmail        String?
+  contactPhone        String?
+  address             String?
+  linkAbout           String?  // Hakkımızda URL
+  linkPrivacy         String?  // Gizlilik politikası
+  linkContact         String?
+  linkPartnership     String?  // İş ortaklığı
+  linkSupport         String?  // Yardım ve destek
+  copyrightText       String?  // "© 2024 Dal. Tüm hakları saklıdır."
+  updatedAt           DateTime @updatedAt
+  @@map("site_settings")
+}
+
 model AdPackage {
-  id        String   @id @default(uuid())
-  name      String
+  id           String   @id @default(uuid())
+  name         String
   durationDays Int
-  impressions Int
-  priceCents  Int
-  currency    String @default("TRY")
-  createdAt DateTime @default(now())
+  impressions  Int
+  priceCents   Int
+  currency     String   @default("TRY")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  purchases AdPurchase[]
   @@map("ad_packages")
+}
+
+model AdPurchase {
+  id                 String   @id @default(uuid())
+  educatorId         String
+  adPackageId       String
+  testId             String
+  validUntil         DateTime
+  impressionsRemaining Int    @default(0)
+  createdAt          DateTime @default(now())
+
+  educator User     @relation("educatorAdPurchases", fields: [educatorId], references: [id], onDelete: Cascade)
+  adPackage AdPackage @relation(fields: [adPackageId], references: [id], onDelete: Cascade)
+  test     ExamTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@index([educatorId])
+  @@index([testId])
+  @@index([validUntil])
+  @@map("ad_purchases")
 }

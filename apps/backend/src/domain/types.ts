@@ -1,4 +1,9 @@
-export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'DELETED';
+export type UserStatus =
+  | 'ACTIVE'
+  | 'INACTIVE'
+  | 'DELETED'
+  | 'SUSPENDED'
+  | 'PENDING_EDUCATOR_APPROVAL';
 
 export type UserRole = 'ADMIN' | 'EDUCATOR' | 'CANDIDATE';
 
@@ -9,6 +14,10 @@ export type PurchaseStatus = 'ACTIVE' | 'REFUNDED' | 'EXPIRED';
 
 export type ReviewStatus = 'pending' | 'in_progress' | 'completed';
 
+export type ObjectionStatus = 'OPEN' | 'ANSWERED' | 'ESCALATED';
+
+export type ContractType = 'CANDIDATE' | 'EDUCATOR';
+
 export type Severity = 'info' | 'warning' | 'error';
 
 export type SuggestionCategory =
@@ -18,6 +27,7 @@ export type SuggestionCategory =
   | 'best_practice'
   | 'refactoring';
 
+/** Çekirdek aksiyonlar: Prisma AuditAction enum + uygulama tarafı alias'ları (DB'ye yazarken map edilir) */
 export type AuditAction =
   | 'PURCHASE'
   | 'SUBMIT_ANSWER'
@@ -25,15 +35,23 @@ export type AuditAction =
   | 'TEST_PUBLISHED'
   | 'TEST_UNPUBLISHED'
   | 'PRICE_CHANGED'
+  | 'PRICE_CHANGE'
+  | 'REFUND'
   | 'REFUND_REQUESTED'
   | 'REFUND_RESOLVED'
+  | 'REFUND_APPROVED'
+  | 'REFUND_REJECTED'
   | 'OBJECTION_CREATED'
   | 'OBJECTION_ANSWERED'
   | 'DISCOUNT_CREATED'
   | 'REVIEW_CREATED'
-  | 'EDUCATOR_SUSPENDED';
+  | 'EDUCATOR_APPROVED'
+  | 'EDUCATOR_SUSPENDED'
+  | 'EDUCATOR_UNSUSPENDED'
+  | 'PUBLISH'
+  | 'UNPUBLISH';
 
-// extended audit actions
+/** Uygulama genişletmeleri; DB'ye yazarken Prisma enum ile eşleşmeyenler map edilir */
 export type ExtendedAuditAction =
   | AuditAction
   | 'NOTIFICATIONS_DISABLED'
@@ -41,7 +59,15 @@ export type ExtendedAuditAction =
   | 'OBJECTION_ESCALATED'
   | 'EMAIL_FAILED'
   | 'SUSPICIOUS_RATE_LIMIT'
-  | 'CSP_VIOLATION';
+  | 'CSP_VIOLATION'
+  | 'EXAMTYPE_CREATED'
+  | 'TOPIC_CREATED'
+  | 'CONTRACT_ACCEPTED'
+  | 'EDUCATOR_PROFILE_UPDATED'
+  | 'EXAMTYPE_UPDATED'
+  | 'EXAMTYPE_DELETED'
+  | 'TOPIC_UPDATED'
+  | 'TOPIC_DELETED';
 
 export type Money = {
   cents: number;
@@ -62,5 +88,27 @@ export type AdminSettings = {
   commissionPercent: number;
   vatPercent: number;
   purchasesEnabled: boolean;
+};
+
+export type SiteSettings = {
+  siteName: string | null;
+  heroTitle: string | null;
+  heroSubtitle: string | null;
+  searchPlaceholder: string | null;
+  statTests: string | null;
+  statEducators: string | null;
+  statCandidates: string | null;
+  statSuccessRate: string | null;
+  footerDescription: string | null;
+  companyName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  address: string | null;
+  linkAbout: string | null;
+  linkPrivacy: string | null;
+  linkContact: string | null;
+  linkPartnership: string | null;
+  linkSupport: string | null;
+  copyrightText: string | null;
 };
 

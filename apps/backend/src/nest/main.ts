@@ -37,16 +37,22 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   // Global exception filter for consistent error format
   app.useGlobalFilters(new HttpExceptionFilter());
-  // Swagger / OpenAPI (non-production)
-  if (process.env.NODE_ENV !== 'production') {
-    const config = new DocumentBuilder()
-      .setTitle('Dal API')
-      .setDescription('Marketplace exam platform API')
-      .setVersion('1.0')
-      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')
-      .build();
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, document, { swaggerOptions: { persistAuthorization: true } });
+  // Swagger / OpenAPI - tsx ile emitDecoratorMetadata uyumsuzluğu nedeniyle devre dışı
+  // Dökümantasyon için: npm run build && npm run start ile çalıştırın veya SWAGGER_ENABLED=1 deneyin
+  if (process.env.NODE_ENV !== 'production' && process.env.SWAGGER_ENABLED === '1') {
+    try {
+      const config = new DocumentBuilder()
+        .setTitle('Dal API')
+        .setDescription('Marketplace exam platform API')
+        .setVersion('1.0')
+        .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')
+        .build();
+      const document = SwaggerModule.createDocument(app, config);
+      SwaggerModule.setup('docs', app, document, { swaggerOptions: { persistAuthorization: true } });
+      console.log('📚 Swagger docs: /docs');
+    } catch (err) {
+      console.warn('⚠️ Swagger atlandı:', (err as Error)?.message || err);
+    }
   }
   const reflector = app.get(Reflector);
   const jwtService = new JwtService();
@@ -63,8 +69,9 @@ async function bootstrap() {
     optionsSuccessStatus: 204,
   });
 
-  await app.listen(process.env.PORT ? Number(process.env.PORT) : 3000);
-  console.log(`🚀 Dal API çalışıyor: http://localhost:${process.env.PORT ? Number(process.env.PORT) : 3000}`);
+  const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+  await app.listen(port, '0.0.0.0');
+  console.log(`🚀 Dal API çalışıyor: http://localhost:${port}`);
 }
 
 bootstrap();

@@ -47,6 +47,22 @@ export class PrismaAttemptRepository implements IAttemptRepository {
     const c = await prisma.testAttempt.count({ where: { testId, candidateId, status: 'SUBMITTED', score: { not: null } as any } as any });
     return c > 0;
   }
+
+  async hasAnyAttempt(testId: string, candidateId: string): Promise<boolean> {
+    const c = await prisma.testAttempt.count({ where: { testId, candidateId } });
+    return c > 0;
+  }
+
+  async hasAnswersForQuestion(questionId: string): Promise<boolean> {
+    const c = await prisma.attemptAnswer.count({ where: { questionId } });
+    return c > 0;
+  }
+
+  async hasAnswersForOption(optionId: string): Promise<boolean> {
+    const c = await prisma.attemptAnswer.count({ where: { selectedOptionId: optionId } });
+    return c > 0;
+  }
+
   async markTimeout(attemptId: string, data: { score: number; submittedAt: Date; completedAt: Date }): Promise<TestAttempt> {
     const row = await prisma.testAttempt.update({
       where: { id: attemptId },

@@ -13,18 +13,18 @@ export class GetEducatorPageUseCase {
 
     const { items: tests, total } = await this.examsRepo.listPublishedByEducator({ educatorId, examTypeId: opts?.examTypeId, page, limit, sortBy: opts?.sortBy === 'PRICE' ? 'price' : opts?.sortBy === 'NEWEST' ? 'publishedAt' : 'publishedAt', order: opts?.sortDir ?? 'desc' });
 
-    const testIds = tests.map((t) => t.id);
+    const testIds = tests.map((t: { id: string }) => t.id);
     const statsRows = await this.statsRepo.findManyByTestIds(testIds);
-    const statsMap: Record<string, any> = {};
+    const statsMap: Record<string, { ratingAvg?: number; ratingCount?: number; testId?: string }> = {};
     for (const s of statsRows) statsMap[s.testId] = s;
 
-    let eduAgg = {};
-    const missingIds = testIds.filter((id) => !statsMap[id]);
+    let eduAgg: Record<string, { avg?: number; count?: number }> = {};
+    const missingIds = testIds.filter((id: string) => !statsMap[id]);
     if (missingIds.length) {
       eduAgg = await this.reviewAgg.getAggregatesForTestIds(testIds);
     }
 
-    const ratingData = { ratingAvg: null, ratingCount: 0 };
+    const ratingData: { ratingAvg: number | null; ratingCount: number } = { ratingAvg: null, ratingCount: 0 };
     // compute educator aggregates from reviews
     {
       let sum = 0;

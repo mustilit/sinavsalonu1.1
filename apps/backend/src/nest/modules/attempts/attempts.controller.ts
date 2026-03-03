@@ -6,9 +6,9 @@ import { GetAttemptStateUseCase } from '../../../application/use-cases/GetAttemp
 import { TimeoutAttemptUseCase } from '../../../application/use-cases/TimeoutAttemptUseCase';
 import { GetAttemptResultUseCase } from '../../../application/use-cases/GetAttemptResultUseCase';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiConflictResponse, ApiUnauthorizedResponse, ApiForbiddenResponse } from '@nestjs/swagger';
-import { AttemptStateResponseDto } from '../dto/attempt-state.response.dto';
-import { AttemptResultResponseDto } from '../dto/attempt-result.response.dto';
-import { QuestionSolutionResponseDto } from '../dto/question-solution.response.dto';
+import { AttemptStateResponseDto } from '../../controllers/dto/attempt-state.response.dto';
+import { AttemptResultResponseDto } from '../../controllers/dto/attempt-result.response.dto';
+import { QuestionSolutionResponseDto } from '../../controllers/dto/question-solution.response.dto';
 import { ErrorEnvelopeSchema } from '../../swagger/error-envelope';
 import { Public } from '../../decorators/public.decorator';
 import { Roles } from '../../decorators/roles.decorator';
@@ -29,10 +29,9 @@ export class AttemptsController {
 
   @Post(':attemptId/answers')
   @Roles('CANDIDATE')
-  async submitAnswer(@Param('attemptId') attemptId: string, @Body() body: { questionId: string; optionId: string }, @Req() req: Request) {
+  async submitAnswer(@Param('attemptId') attemptId: string, @Body() body: { questionId: string; optionId?: string }, @Req() req: Request) {
     const actorId = (req as any).user?.id;
-    // ensure actor owns attempt (use-case will validate)
-    return this.submitAnswerUC.execute(attemptId, body.questionId, body.optionId, actorId as any);
+    return this.submitAnswerUC.execute(attemptId, body.questionId, body.optionId ?? undefined, actorId as any);
   }
 
   @Post(':attemptId/finish')
@@ -73,7 +72,7 @@ export class AttemptsController {
   async timeout(@Param('attemptId') attemptId: string, @Req() req: Request) {
     const candidateId = (req as any).user?.id;
     // controller-level check not required, use-case validates time remaining
-    return this.timeoutUC.execute(attemptId, candidateId);
+    return this.timeoutUC!.execute(attemptId, candidateId);
   }
 
   @Get(':attemptId/result')

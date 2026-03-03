@@ -1,6 +1,7 @@
+export {};
 const request = require('supertest');
 const { PrismaClient } = require('@prisma/client');
-const { bootstrapTestApp } = require('../../helpers/test-app');
+const { bootstrapTestApp } = require('../helpers/test-app');
 
 let app, httpServer, prisma, jwtService;
 
@@ -15,7 +16,7 @@ describe('DLQ admin audit endpoint', () => {
   }, 30000);
 
   beforeEach(async () => {
-    const { resetDb } = require('../../helpers/test-app');
+    const { resetDb } = require('../helpers/test-app');
     await resetDb(prisma);
     await prisma.user.deleteMany({ where: { email: 'admin@example.com' } }).catch(() => {});
     const admin = await prisma.user.create({ data: { email: 'admin@example.com', username: 'admin', passwordHash: 'x', role: 'ADMIN' } });

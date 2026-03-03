@@ -1,51 +1,48 @@
-import { IsOptional, IsString, IsBoolean, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsIn } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ListMarketplaceTestsDto {
+  @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsString()
-  examTypeId!: string;
+  examTypeId?: string;
 
-  @IsOptional()
-  @Transform(({ value }) => {
-    if (value === undefined || value === null) return undefined;
-    if (typeof value === 'boolean') return value;
-    const v = String(value).toLowerCase();
-    return v === 'true' ? true : v === 'false' ? false : undefined;
-  })
-  @IsBoolean()
-  isTimed!: boolean;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  minPriceCents!: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  maxPriceCents!: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  page!: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  limit!: number;
-
+  @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsString()
-  sortBy!: string;
+  topicId?: string;
 
+  @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsString()
-  order!: string;
+  educatorId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  maxPriceCents?: number;
+
+  @ApiPropertyOptional({ description: 'Minimum rating (1-5)' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   minRating?: number;
-}
 
+  @ApiPropertyOptional({ enum: ['newest', 'priceAsc', 'priceDesc'] })
+  @IsOptional()
+  @IsString()
+  @IsIn(['newest', 'priceAsc', 'priceDesc'])
+  sort?: 'newest' | 'priceAsc' | 'priceDesc';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  limit?: number;
+}

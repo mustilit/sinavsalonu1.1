@@ -1,4 +1,5 @@
-const { bootstrapTestApp } = require('../../helpers/test-app');
+export {};
+const { bootstrapTestApp } = require('../helpers/test-app');
 const { PrismaObjectionRepository } = require('../../src/infrastructure/repositories/PrismaObjectionRepository');
 
 describe('PrismaObjectionRepository.countByTestAndCandidate integration', () => {
@@ -14,7 +15,7 @@ describe('PrismaObjectionRepository.countByTestAndCandidate integration', () => 
   }, 30000);
 
   beforeEach(async () => {
-    const { resetDb } = require('../../helpers/test-app');
+    const { resetDb } = require('../helpers/test-app');
     await resetDb(prisma);
   });
 

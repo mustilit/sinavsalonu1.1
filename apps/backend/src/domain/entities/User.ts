@@ -11,6 +11,7 @@ export interface User {
   passwordHash: string;
   role: UserRole;
   status: UserStatus;
+  educatorApprovedAt?: Date | null;
   metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;

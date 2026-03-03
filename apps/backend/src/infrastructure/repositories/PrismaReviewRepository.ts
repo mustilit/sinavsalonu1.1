@@ -25,7 +25,7 @@ export class PrismaReviewRepository implements IReviewRepository {
     return this.toDomain(created);
   }
 
-  async listReviewsForTest(testId: string, limit = 20, cursor?: string): Promise<ReviewRecord[]> {
+  async listReviewsForTest(testId: string, limit = 20, cursor?: string): Promise<{ items: ReviewRecord[]; nextCursor?: string }> {
     const take = Math.min(50, Math.max(1, limit || 20));
     const findOpts: any = {
       where: { testId },

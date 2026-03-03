@@ -33,7 +33,7 @@ export class ReviewsController {
 
   @Post('tests/:id/reviews')
   @Roles('CANDIDATE')
-  @Throttle(5, 60)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiBearerAuth('bearer')
   @ApiOkResponse({ type: ReviewUpsertResponseDto })
   @ApiErrorResponses()

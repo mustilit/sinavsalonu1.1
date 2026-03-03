@@ -37,9 +37,11 @@ describe('Publish/Unpublish UseCases', () => {
   it('publishes when rules satisfied and logs audit', async () => {
     const repo = new FakeExamRepo();
     const audit = new FakeAuditRepo();
-    const test = { id: 't1', title: 'T', questions: [{ id: 'q1', options: [{ id: 'o1', isCorrect: true }, { id: 'o2' }] }, { id: 'q2', options: [{ id: 'o3', isCorrect: true }, { id: 'o4' } }, { id: 'q3', options: [{ id: 'o5', isCorrect: true }, { id: 'o6' }] }, { id: 'q4', options: [{ id: 'o7', isCorrect: true }, { id: 'o8' }] }, { id: 'q5', options: [{ id: 'o9', isCorrect: true }, { id: 'o10' }] }], educatorId: 'e1' };
+    const approvedEducator = { id: 'e1', role: 'EDUCATOR', status: 'ACTIVE', educatorApprovedAt: new Date() };
+    const userRepo = { findById: async (id: string) => (id === 'e1' ? approvedEducator : null) };
+    const test = { id: 't1', title: 'T', educatorId: 'e1', examTypeId: 'et1', questions: [{ id: 'q1', options: [{ id: 'o1', isCorrect: true }, { id: 'o2' }] }, { id: 'q2', options: [{ id: 'o3', isCorrect: true }, { id: 'o4' }] }, { id: 'q3', options: [{ id: 'o5', isCorrect: true }, { id: 'o6' }] }, { id: 'q4', options: [{ id: 'o7', isCorrect: true }, { id: 'o8' }] }, { id: 'q5', options: [{ id: 'o9', isCorrect: true }, { id: 'o10' }] }] };
     repo.seed(test);
-    const uc = new PublishTestUseCase(repo as any, audit as any);
+    const uc = new PublishTestUseCase(repo as any, audit as any, userRepo as any);
     const published = await uc.execute('t1', 'e1');
     expect(published.publishedAt).toBeTruthy();
     expect(audit.created.length).toBe(1);

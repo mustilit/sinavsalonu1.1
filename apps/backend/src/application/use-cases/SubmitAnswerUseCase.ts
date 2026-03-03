@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient, AuditAction } from '@prisma/client';
 
 export class SubmitAnswerUseCase {
   constructor(private readonly prisma: PrismaClient) {}
@@ -32,7 +32,7 @@ export class SubmitAnswerUseCase {
           this.prisma.attemptAnswer.deleteMany({ where: { attemptId, questionId } }),
           this.prisma.auditLog.create({
             data: {
-              action: 'SUBMIT_ANSWER',
+              action: 'SUBMIT_ANSWER' as AuditAction,
               entityType: 'AttemptAnswer',
               entityId: attemptId,
               actorId: actorId ?? null,
@@ -63,7 +63,7 @@ export class SubmitAnswerUseCase {
         // create audit log (best-effort)
         this.prisma.auditLog.create({
           data: {
-            action: 'SUBMIT_ANSWER',
+            action: 'SUBMIT_ANSWER' as AuditAction,
             entityType: 'AttemptAnswer',
             entityId: attemptId,
             actorId: actorId ?? null,

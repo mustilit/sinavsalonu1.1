@@ -11,7 +11,6 @@ export class JwtAuthGuard implements CanActivate {
     const handler = context.getHandler();
     const cls = context.getClass();
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [handler, cls]);
-    console.log('[JwtAuthGuard] handler=', handler?.name || '(anonymous)', 'class=', cls?.name, 'isPublic=', isPublic);
     if (isPublic) return true;
 
     const req = context.switchToHttp().getRequest();
@@ -22,7 +21,7 @@ export class JwtAuthGuard implements CanActivate {
     const token = auth.slice(7);
     try {
       const payload = this.jwtService.verify(token);
-      req.user = payload;
+      req.user = { ...payload, id: payload.sub };
       return true;
     } catch {
       throw new UnauthorizedException('Invalid token');

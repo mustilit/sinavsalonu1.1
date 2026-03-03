@@ -8,11 +8,11 @@
  * - Publish (PUBLISH)
  * - Unpublish (UNPUBLISH)
  */
-import { AuditAction } from '../types';
+import { ExtendedAuditAction } from '../types';
 
 export interface AuditLog {
   id: string;
-  action: AuditAction;
+  action: ExtendedAuditAction;
   entityType: string; // "ExamTest", "Product", "Order" vb.
   entityId: string;
   actorId: string | null; // işlemi yapan kullanıcı

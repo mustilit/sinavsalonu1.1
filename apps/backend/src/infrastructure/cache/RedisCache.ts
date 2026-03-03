@@ -1,11 +1,12 @@
-import IORedis from 'ioredis';
+import Redis from 'ioredis';
 
 export class RedisCache {
-  private client?: IORedis.Redis;
+  private client?: Redis;
   constructor() {
+    if (process.env.REDIS_DISABLED === '1') return;
     const url = process.env.REDIS_URL;
     if (url) {
-      this.client = new IORedis(url);
+      this.client = new Redis(url);
     }
   }
 

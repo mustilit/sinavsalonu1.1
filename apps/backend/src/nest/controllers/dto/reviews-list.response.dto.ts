@@ -1,5 +1,5 @@
 export class ListReviewsResponseDto {
-  items: Array<{
+  items!: Array<{
     id: string;
     testRating: number;
     educatorRating?: number;

@@ -1,5 +1,5 @@
 export class ReviewUpsertResponseDto {
-  id: string;
-  ok: boolean;
+  id!: string;
+  ok!: boolean;
 }
 

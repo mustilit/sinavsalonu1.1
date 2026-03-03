@@ -32,6 +32,12 @@ export function makeAttemptRepo(overrides?: {
     hasSubmittedAttempt: async () => {
       throw new Error('not implemented');
     },
+    hasAnyAttempt: async () => false,
+    hasAnswersForQuestion: async () => false,
+    hasAnswersForOption: async () => false,
+    markTimeout: async () => {
+      throw new Error('not implemented');
+    },
   } as unknown as IAttemptRepository;
 }
 

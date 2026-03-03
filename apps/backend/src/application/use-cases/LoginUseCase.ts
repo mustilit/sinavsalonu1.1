@@ -17,13 +17,18 @@ export class LoginUseCase {
   ) {}
 
   async execute(dto: { email: string; password: string }): Promise<LoginResult> {
-    const user = await this.userRepository.findByEmail(dto.email.toLowerCase());
+    const email = dto?.email ? String(dto.email).trim().toLowerCase() : '';
+    const password = dto?.password != null ? String(dto.password) : '';
+    if (!email || !password) {
+      throw new Error('INVALID_CREDENTIALS');
+    }
 
+    const user = await this.userRepository.findByEmail(email);
     if (!user) {
       throw new Error('INVALID_CREDENTIALS');
     }
 
-    const isValid = await this.passwordService.compare(dto.password, user.passwordHash);
+    const isValid = await this.passwordService.compare(password, user.passwordHash);
 
     if (!isValid) {
       throw new Error('INVALID_CREDENTIALS');

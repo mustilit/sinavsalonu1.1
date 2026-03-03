@@ -10,7 +10,7 @@ export class PurchasesController {
 
   @Post(':testId')
   @Roles('CANDIDATE')
-  @Throttle(10, 60)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async purchase(@Param('testId') testId: string, @Body() body: any, @Req() req: Request) {
     // candidateId must come from authenticated JWT only
     const candidateId = (req as any).user?.id;

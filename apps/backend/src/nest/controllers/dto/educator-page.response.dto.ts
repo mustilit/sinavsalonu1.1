@@ -1,5 +1,5 @@
 export class EducatorPageResponseDto {
-  id: string;
+  id!: string;
   name?: string;
   bio?: string;
   stats?: { testsCount?: number; rating?: number };

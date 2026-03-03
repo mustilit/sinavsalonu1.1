@@ -1,4 +1,4 @@
-import { AuditAction } from '../../domain/types';
+import { ExtendedAuditAction } from '../../domain/types';
 import { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository';
 
 /**
@@ -15,7 +15,7 @@ export class AuditLogService {
   constructor(private readonly auditLogRepository: IAuditLogRepository) {}
 
   async log(
-    action: AuditAction,
+    action: ExtendedAuditAction,
     entityType: string,
     entityId: string,
     options?: { actorId?: string | null; metadata?: Record<string, unknown> }

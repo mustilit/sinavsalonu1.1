@@ -22,7 +22,7 @@ export class NotificationsController {
 
   @Public()
   @Get('unsubscribe')
-  @Throttle(10, 60)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOkResponse({ type: UnsubscribeResponseDto })
   @ApiErrorResponses()
   async unsubscribe(@Query('token') token: string) {

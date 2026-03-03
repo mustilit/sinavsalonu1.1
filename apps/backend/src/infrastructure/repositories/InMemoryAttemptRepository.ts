@@ -46,6 +46,21 @@ export class InMemoryAttemptRepository implements IAttemptRepository {
     return false;
   }
 
+  async hasAnyAttempt(testId: string, candidateId: string): Promise<boolean> {
+    for (const a of this.attempts.values()) {
+      if (a.testId === testId && a.candidateId === candidateId) return true;
+    }
+    return false;
+  }
+
+  async hasAnswersForQuestion(_questionId: string): Promise<boolean> {
+    return false;
+  }
+
+  async hasAnswersForOption(_optionId: string): Promise<boolean> {
+    return false;
+  }
+
   async markTimeout(attemptId: string, data: { score: number; submittedAt: Date; completedAt: Date }): Promise<TestAttempt> {
     const existing = this.attempts.get(attemptId);
     if (!existing) throw new Error('ATTEMPT_NOT_FOUND');

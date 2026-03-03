@@ -1,3 +1,4 @@
+export {};
 const request = require('supertest');
 const { seedMinimal } = require('../e2e/helpers/seed');
 const { PrismaClient } = require('@prisma/client');

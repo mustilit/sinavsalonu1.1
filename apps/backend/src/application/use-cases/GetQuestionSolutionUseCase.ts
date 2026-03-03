@@ -17,7 +17,8 @@ export class GetQuestionSolutionUseCase {
 
     const test = await this.examRepo.findById(attempt.testId);
     if (!test) throw new BadRequestException({ code: 'TEST_NOT_FOUND', message: 'Test not found' });
-    if (!test.hasSolutions) throw new BadRequestException({ code: 'SOLUTIONS_DISABLED', message: 'Solutions not enabled for this test' });
+    const hasSolutions = (test as { hasSolutions?: boolean }).hasSolutions ?? false;
+    if (!hasSolutions) throw new BadRequestException({ code: 'SOLUTIONS_DISABLED', message: 'Solutions not enabled for this test' });
 
     // find question in test.questions
     const q = test.questions.find((x: any) => x.id === questionId);

@@ -45,8 +45,19 @@ Hızlı başlangıç (local)
 Not: CI / prod için build -> dist/ altında çalıştırma şekli tercih edilir.
 
 Testler
-- Unit / integration:
-  npm run test
+- Jest + ts-jest ile `.test.ts` ve `.test.js` desteklenir (jest.config.cjs).
+- Genel: `npm run test`
+- Sadece integration: `npm run test:integration` (DB/Redis gerekebilir).
+- Doğrulama (ts-jest): `npm install` sonrası `npm run test:integration` en az bir .test.ts dosyasını compile/transform eder; CI’da güven için kullanın.
+
+Postgres bağlantısı (Windows / host'ta P1001)
+- `.env` içindeki `DATABASE_URL` genelde `postgres:5432` kullanır; bu host adı sadece Docker ağı içinde çözülür. Host makineden `npm test` çalıştırınca "Can't reach database server at postgres:5432" (P1001) alırsınız.
+- Çözüm (önerilen): Testleri container içinde koşturun; böylece `postgres` host'u aynı Docker network'te çözülür.
+  - Tüm testler: `npm run test:in-container`
+  - Sadece contracts: `npm run test:in-container:contracts`
+  - Sadece integration: `npm run test:in-container:integration`
+- Script'lerde varsayılan container adı `docker-backend-1` (Windows uyumluluğu için env kullanılmaz). Farklı ad kullanıyorsanız komutu elle çalıştırın: `docker exec -it <container-adı> sh -c "cd /usr/src/app && npm test -- contracts"`
+- Container içinde testlerin çalışması için image'ın bu repodaki güncel kodu (özellikle `tests/`, `jest.config.cjs`, `**/*.test.ts`) içermesi gerekir. Eski image'larda sadece `tests/*.test.js` varsa contracts/integration testleri bulunamaz; image'ı yeniden build edin.
 
 API dokümantasyonu (Swagger / OpenAPI)
 - Swagger UI (development): /docs (main.ts içinde yalnızca NODE_ENV !== 'production' için aktif)

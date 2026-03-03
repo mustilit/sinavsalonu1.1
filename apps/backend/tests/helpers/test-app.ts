@@ -6,6 +6,8 @@ import { JwtService } from '../../src/infrastructure/services/JwtService';
 
 export async function bootstrapTestApp(): Promise<{ app: INestApplication; httpServer: any; prisma: PrismaClient; jwtService: JwtService }> {
   process.env.NODE_ENV = 'test';
+  process.env.REDIS_DISABLED = '1';
+  process.env.CRON_DISABLED = '1';
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
     providers: [JwtService],
@@ -31,13 +33,22 @@ export async function resetDb(prisma: PrismaClient) {
       "refund_requests",
       "purchases",
       "objections",
+      "reviews",
+      "test_stats",
       "exam_options",
       "exam_questions",
       "exam_tests",
+      "topics",
+      "exam_types",
       "follows",
       "notification_preferences",
       "audit_logs",
-      "users"
+      "contract_acceptances",
+      "contracts",
+      "discount_codes",
+      "user_preferences",
+      "users",
+      "admin_settings"
     RESTART IDENTITY CASCADE;
   `;
   await prisma.$executeRawUnsafe(sql);

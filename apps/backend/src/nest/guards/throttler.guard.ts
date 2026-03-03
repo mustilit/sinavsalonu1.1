@@ -3,12 +3,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 
 @Injectable()
 export class CustomThrottlerGuard extends ThrottlerGuard {
-  protected getTracker(req: ExecutionContext['switchToHttp'] extends any ? any : any) {
-    // kept for type clarity, not used
-    return super['generateKey'];
-  }
-
-  protected override generateKey(context: ExecutionContext): string {
+  protected override generateKey(context: ExecutionContext, tracker: string): string {
     const req = context.switchToHttp().getRequest();
     // prefer authenticated user id when available
     const userId = req.user?.id;

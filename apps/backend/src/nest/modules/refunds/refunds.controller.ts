@@ -1,13 +1,15 @@
-import { Controller, Post, Body, Req, HttpException, HttpStatus, UseGuards, Patch, Param } from '@nestjs/common';
+import { Controller, Post, Body, Req, Patch, Param, HttpException, HttpStatus } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { ApiErrorResponses } from '../../swagger/decorators';
 import { RefundsResponseDto } from './dto/refunds.response.dto';
+import { RequestRefundDto } from './dto/request-refund.dto';
 import { Roles } from '../../decorators/roles.decorator';
-import { CreateRefundRequestUseCase } from '../../../application/use-cases/CreateRefundRequestUseCase';
+import { RequestRefundUseCase } from '../../../application/use-cases/RequestRefundUseCase';
 import { ResolveRefundRequestUseCase } from '../../../application/use-cases/ResolveRefundRequestUseCase';
 import { PrismaRefundRepository } from '../../../infrastructure/repositories/PrismaRefundRepository';
-import { PrismaObjectionRepository } from '../../../infrastructure/repositories/PrismaObjectionRepository';
+import { PrismaPurchaseRepository } from '../../../infrastructure/repositories/PrismaPurchaseRepository';
+import { PrismaAttemptRepository } from '../../../infrastructure/repositories/PrismaAttemptRepository';
 import { PrismaAuditLogRepository } from '../../../infrastructure/repositories/PrismaAuditLogRepository';
 import { Request } from 'express';
 import { QueueService } from '../../../infrastructure/queue/queue.service';
@@ -15,31 +17,27 @@ import { QueueService } from '../../../infrastructure/queue/queue.service';
 @Controller('refunds')
 @ApiTags('Refunds')
 export class RefundsController {
-  private createUc: CreateRefundRequestUseCase;
+  private requestRefundUc: RequestRefundUseCase;
   private resolveUc: ResolveRefundRequestUseCase;
   constructor() {
     const refundRepo = new PrismaRefundRepository();
-    const objectionRepo = new PrismaObjectionRepository();
+    const purchaseRepo = new PrismaPurchaseRepository();
+    const attemptRepo = new PrismaAttemptRepository();
     const auditRepo = new PrismaAuditLogRepository();
     const queueService = new QueueService();
-    this.createUc = new CreateRefundRequestUseCase(refundRepo, objectionRepo, auditRepo);
+    this.requestRefundUc = new RequestRefundUseCase(refundRepo, purchaseRepo, attemptRepo, auditRepo);
     this.resolveUc = new ResolveRefundRequestUseCase(refundRepo, auditRepo, queueService);
   }
 
   @Post()
   @Roles('CANDIDATE')
-  @Throttle(3, 300)
+  @Throttle({ default: { limit: 3, ttl: 300000 } })
   @ApiBearerAuth('bearer')
-  @ApiOkResponse({ type: RefundsResponseDto })
+  @ApiCreatedResponse({ type: RefundsResponseDto })
   @ApiErrorResponses()
-  async create(@Body() body: { purchaseId: string; reason?: string }, @Req() req: Request) {
-    const candidateId = (req as any).user?.id;
-    if (!candidateId) throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
-    try {
-      return await this.createUc.execute(body.purchaseId, candidateId, body.reason);
-    } catch (e: any) {
-      throw e;
-    }
+  async create(@Body() body: RequestRefundDto, @Req() req: Request) {
+    const actorId = (req as any).user?.id;
+    return this.requestRefundUc.execute({ purchaseId: body.purchaseId, reason: body.reason }, actorId);
   }
 
   @Patch('admin/:id')

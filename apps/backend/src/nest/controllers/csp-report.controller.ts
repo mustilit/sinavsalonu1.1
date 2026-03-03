@@ -7,7 +7,7 @@ import { PrismaAuditLogRepository } from '../../infrastructure/repositories/Pris
 export class CspReportController {
   @Post(process.env.CSP_REPORT_ENDPOINT || '/csp-report')
   @Public()
-  @Throttle(10, 60)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(204)
   async report(@Body() body: any) {
     const report = (body && (body['csp-report'] ?? body)) || {};

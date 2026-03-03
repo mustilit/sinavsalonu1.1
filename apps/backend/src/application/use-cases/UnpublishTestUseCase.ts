@@ -23,7 +23,7 @@ export class UnpublishTestUseCase {
 
     try {
       await this.auditLogRepository.create({
-        action: 'UNPUBLISH',
+        action: 'TEST_UNPUBLISHED',
         entityType: 'ExamTest',
         entityId: testId,
         actorId: actorId ?? null,

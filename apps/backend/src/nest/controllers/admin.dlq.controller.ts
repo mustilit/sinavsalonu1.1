@@ -1,20 +1,49 @@
-import { Controller, Get, Query, UseGuards, ParseIntPipe, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { prisma } from '../../infrastructure/database/prisma';
 
+/** FR-Y-04: Hata bilgisi görüntüleme - email hataları ve diğer kritik loglar */
+const ERROR_ACTIONS = ['EMAIL_FAILED', 'CSP_VIOLATION', 'SUSPICIOUS_RATE_LIMIT'] as const;
+
+@ApiExcludeController()
 @Controller('admin/dlq')
 export class AdminDlqController {
   @Get('emails')
   @Roles('ADMIN')
-  async list(@Query('limit', new ParseIntPipe({ optional: true })) limit = 50) {
-    const l = Number(limit) || 50;
-    if (l < 1 || l > 200) throw new BadRequestException('limit must be between 1 and 200');
+  async listEmails(@Query('limit') limit?: string) {
+    const l = Math.min(Math.max(Number(limit) || 50, 1), 200);
     const rows = await prisma.auditLog.findMany({
       where: { action: 'EMAIL_FAILED' as any },
       orderBy: { createdAt: 'desc' },
       take: l,
     });
     return { items: rows.map((r) => ({ id: r.id, createdAt: r.createdAt, metadata: r.metadata, actorId: r.actorId })) };
+  }
+
+  @Get('errors')
+  @Roles('ADMIN')
+  async listErrors(@Query('limit') limit?: string, @Query('action') action?: string) {
+    const l = Math.min(Math.max(Number(limit) || 100, 1), 200);
+    const where: any = action
+      ? { action }
+      : { action: { in: [...ERROR_ACTIONS] } };
+    const rows = await prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: l,
+    });
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        action: r.action,
+        entityType: r.entityType,
+        entityId: r.entityId,
+        actorId: r.actorId,
+        createdAt: r.createdAt,
+        metadata: r.metadata,
+      })),
+    };
   }
 }
 

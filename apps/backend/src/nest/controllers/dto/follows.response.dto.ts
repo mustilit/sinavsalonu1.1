@@ -1,5 +1,5 @@
 export class FollowsResponseDto {
-  ok: boolean;
+  ok!: boolean;
   follows?: Array<{ educatorId?: string; followType?: string; notificationsEnabled?: boolean }>;
 }
 

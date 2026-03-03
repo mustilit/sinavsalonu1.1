@@ -1,4 +1,4 @@
 export class UnsubscribeResponseDto {
-  ok: boolean;
+  ok!: boolean;
 }
 

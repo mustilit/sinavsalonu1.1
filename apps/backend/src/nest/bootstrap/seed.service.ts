@@ -1,9 +1,15 @@
-import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
-import { PrismaService } from '../modules/prisma/prisma.service';
+import { Injectable, OnApplicationBootstrap, Inject } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
+import type { PrismaClient } from '@prisma/client';
+
+/** Demo giriş: eğitici educator@demo.com / aday aday@demo.com — şifre: demo123 */
+const DEMO_PASSWORD_HASH = bcrypt.hashSync('demo123', 12);
+/** Admin: mus.tulu@gmail.com — şifre: adminsinav */
+const ADMIN_PASSWORD_HASH = bcrypt.hashSync('adminsinav', 12);
 
 @Injectable()
 export class SeedService implements OnApplicationBootstrap {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject('PRISMA') private readonly prisma: PrismaClient) {}
 
   async onApplicationBootstrap() {
     try {
@@ -12,66 +18,169 @@ export class SeedService implements OnApplicationBootstrap {
         return;
       }
 
-      const count = await this.prisma.examTest.count();
-      if (count > 0) {
-        console.log('Seed: tests already exist — checking for tests without questions');
-        // find tests that have no questions and seed them (idempotent)
-        const tests = await this.prisma.client.examTest.findMany({ include: { questions: true } });
-        for (const t of tests) {
-          if (!t.questions || t.questions.length === 0) {
-            console.log(`Seeding missing questions for test ${t.id}`);
-            for (let i = 1; i <= 5; i++) {
-              await this.prisma.client.examQuestion.create({
-                data: {
-                  testId: t.id,
-                  content: `Seed Question ${i}`,
-                  order: i,
-                  options: {
-                    create: [
-                      { content: 'Option A', isCorrect: false },
-                      { content: 'Option B', isCorrect: true },
-                    ],
-                  },
-                },
-              });
-            }
-          }
-        }
-        console.log('Seed check complete');
-        return;
+      // AdminSettings
+      try {
+        await this.prisma.adminSettings.upsert({
+          where: { id: 1 },
+          create: { id: 1, commissionPercent: 20, vatPercent: 18, purchasesEnabled: true },
+          update: {},
+        });
+      } catch (e) {
+        console.warn('Seed: admin_settings upsert skipped:', (e as Error).message);
       }
 
-      console.log('Running DEV seed...');
+      await this.seedDemoUsersAndData();
+      await this.ensureTestQuestions();
+    } catch (e) {
+      console.error('Seed error', e);
+    }
+  }
+
+  private async seedDemoUsersAndData() {
+    // Admin her zaman güncellenir (şifre güncellemesi için)
+    await this.prisma.user.upsert({
+      where: { email: 'mus.tulu@gmail.com' },
+      create: {
+        email: 'mus.tulu@gmail.com',
+        username: 'admin_mustulu',
+        passwordHash: ADMIN_PASSWORD_HASH,
+        role: 'ADMIN',
+        status: 'ACTIVE',
+      },
+      update: { passwordHash: ADMIN_PASSWORD_HASH },
+    });
+    console.log('Seed: Admin — mus.tulu@gmail.com (şifre: adminsinav)');
+
+    const existing = await this.prisma.user.findFirst({
+      where: { email: 'educator@demo.com' },
+    });
+    if (existing) {
+      console.log('Seed: demo users already exist');
+      return;
+    }
+
+    console.log('Running DEV seed: demo users + test data...');
+
+    // Sözleşme (eğitici kaydı için)
+    const contract = await this.prisma.contract.upsert({
+      where: { type_version: { type: 'EDUCATOR', version: 1 } },
+      create: {
+        type: 'EDUCATOR',
+        version: 1,
+        title: 'Eğitici Sözleşmesi',
+        content: 'Demo eğitici sözleşmesi metni.',
+        isActive: true,
+        publishedAt: new Date(),
+      },
+      update: { isActive: true },
+    });
+
+    // Demo eğitici (onaylı)
+    const educator = await this.prisma.user.upsert({
+      where: { email: 'educator@demo.com' },
+      create: {
+        email: 'educator@demo.com',
+        username: 'demo_egitici',
+        passwordHash: DEMO_PASSWORD_HASH,
+        role: 'EDUCATOR',
+        status: 'ACTIVE',
+        educatorApprovedAt: new Date(),
+      },
+      update: {},
+    });
+
+    await this.prisma.contractAcceptance.upsert({
+      where: { userId_contractId: { userId: educator.id, contractId: contract.id } },
+      create: { userId: educator.id, contractId: contract.id },
+      update: {},
+    });
+
+    // Demo aday
+    await this.prisma.user.upsert({
+      where: { email: 'aday@demo.com' },
+      create: {
+        email: 'aday@demo.com',
+        username: 'demo_aday',
+        passwordHash: DEMO_PASSWORD_HASH,
+        role: 'CANDIDATE',
+        status: 'ACTIVE',
+      },
+      update: {},
+    });
+
+    // ExamType + Topic
+    const examType = await this.prisma.examType.upsert({
+      where: { slug: 'demo-tyt' },
+      create: { name: 'Demo TYT', slug: 'demo-tyt', description: 'Deneme sınav türü', active: true },
+      update: {},
+    });
+    const topic = await this.prisma.topic.upsert({
+      where: { examTypeId_slug: { examTypeId: examType.id, slug: 'matematik' } },
+      create: { examTypeId: examType.id, name: 'Matematik', slug: 'matematik', active: true },
+      update: {},
+    });
+
+    // Demo test (yayında)
+    const testCount = await this.prisma.examTest.count();
+    if (testCount === 0) {
       const created = await this.prisma.examTest.create({
         data: {
-          title: 'Seed Demo Test',
-          isTimed: false,
-          price: 49.99,
+          title: 'Demo TYT Matematik Denemesi',
+          educatorId: educator.id,
+          examTypeId: examType.id,
+          topicId: topic.id,
+          isTimed: true,
+          duration: 45,
+          priceCents: 1999,
           status: 'PUBLISHED',
           publishedAt: new Date(),
+          questionCount: 5,
         },
       });
-
-      // Create 5 questions with 2 options each (one correct)
       for (let i = 1; i <= 5; i++) {
-        await this.prisma.client.examQuestion.create({
+        await this.prisma.examQuestion.create({
           data: {
             testId: created.id,
-            content: `Seed Question ${i}`,
+            content: `${i}. Demo soru metni — doğru cevap B seçeneğidir.`,
             order: i,
             options: {
               create: [
-                { content: 'Option A', isCorrect: false },
-                { content: 'Option B', isCorrect: true },
+                { content: 'A seçeneği', isCorrect: false },
+                { content: 'B seçeneği', isCorrect: true },
+                { content: 'C seçeneği', isCorrect: false },
+                { content: 'D seçeneği', isCorrect: false },
               ],
             },
           },
         });
       }
+      console.log('Seed: demo test created (5 soru)');
+    }
 
-      console.log('Seed test created with questions');
-    } catch (e) {
-      console.error('Seed error', e);
+    console.log('Seed: Demo — eğitici: educator@demo.com / aday: aday@demo.com (şifre: demo123)');
+  }
+
+  private async ensureTestQuestions() {
+    const tests = await this.prisma.examTest.findMany({ include: { questions: true } });
+    for (const t of tests) {
+      if (!t.questions || t.questions.length === 0) {
+        for (let i = 1; i <= 5; i++) {
+          await this.prisma.examQuestion.create({
+            data: {
+              testId: t.id,
+              content: `Seed Question ${i}`,
+              order: i,
+              options: {
+                create: [
+                  { content: 'Option A', isCorrect: false },
+                  { content: 'Option B', isCorrect: true },
+                ],
+              },
+            },
+          });
+        }
+        console.log(`Seed: added questions for test ${t.id}`);
+      }
     }
   }
 }

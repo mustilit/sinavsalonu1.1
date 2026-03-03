@@ -1,6 +1,7 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { ThrottlerException } from '@nestjs/throttler';
-import { PrismaAuditLogRepository } from '../../../infrastructure/repositories/PrismaAuditLogRepository';
+import { PrismaAuditLogRepository } from '../../infrastructure/repositories/PrismaAuditLogRepository';
+import { AppError } from '../../application/errors/AppError';
 import { Request, Response } from 'express';
 
 @Catch()
@@ -15,7 +16,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let message: string | string[] = 'Internal server error';
     let details: any = undefined;
 
-    if (exception instanceof HttpException) {
+    if (exception instanceof AppError) {
+      status = (exception as AppError).status;
+      code = (exception as AppError).code;
+      message = (exception as AppError).message;
+      details = (exception as AppError).details;
+    } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const resp = exception.getResponse();
       if (typeof resp === 'string') {
@@ -32,8 +38,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     } else if (exception && typeof exception === 'object') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const e = exception as any;
-      if (e.message) message = e.message;
-      details = e;
+      if (e.status != null && e.code != null) {
+        status = Number(e.status);
+        code = e.code;
+        message = e.message ?? message;
+        details = e.details;
+      } else if (e.message) {
+        message = e.message;
+        details = e;
+      }
     } else if (typeof exception === 'string') {
       message = exception;
       code = 'UNKNOWN';

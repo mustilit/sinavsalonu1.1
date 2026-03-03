@@ -1,5 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import { JwtService } from '../../../src/infrastructure/services/JwtService';
+
 const prisma = new PrismaClient();
+const jwtService = new JwtService();
 
 export async function seedMinimal() {
   // clear minimal
@@ -9,11 +12,13 @@ export async function seedMinimal() {
   await prisma.examOption.deleteMany().catch(()=>{});
   await prisma.examQuestion.deleteMany().catch(()=>{});
   await prisma.examTest.deleteMany().catch(()=>{});
+  await prisma.topic.deleteMany().catch(()=>{});
+  await prisma.examType.deleteMany().catch(()=>{});
   await prisma.user.deleteMany().catch(()=>{});
 
   const educator = await prisma.user.create({ data: { email: 'educator@example.com', username: 'educator', passwordHash: 'x', role: 'EDUCATOR' } });
   const candidate = await prisma.user.create({ data: { email: 'candidate@example.com', username: 'candidate', passwordHash: 'x', role: 'CANDIDATE' } });
-  const examType = await prisma.examType.create({ data: { name: 'Sample' } });
+  const examType = await prisma.examType.create({ data: { name: 'Sample', slug: 'sample' } });
   const test = await prisma.examTest.create({
     data: {
       title: 'E2E Test',
@@ -41,6 +46,7 @@ export async function seedMinimal() {
     },
     include: { questions: { include: { options: true } } },
   });
-  return { educator, candidate, test, examType };
+  const candidateToken = jwtService.sign({ sub: candidate.id, email: candidate.email, role: candidate.role });
+  return { educator, candidate, test, examType, candidateToken };
 }
 

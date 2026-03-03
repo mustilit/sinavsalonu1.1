@@ -1,5 +1,5 @@
 export class ListMarketplaceTestsResponseDto {
-  items: Array<{
+  items!: Array<{
     id: string;
     title?: string;
     priceCents?: number;
