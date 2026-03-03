@@ -97,6 +97,7 @@ import { ListEducatorAdPurchasesUseCase } from '../application/use-cases/ListEdu
 import { ListEducatorTestsUseCase } from '../application/use-cases/ListEducatorTestsUseCase';
 import { ListEducatorPurchasesUseCase } from '../application/use-cases/ListEducatorPurchasesUseCase';
 import { DeleteDiscountCodeUseCase } from '../application/use-cases/DeleteDiscountCodeUseCase';
+import { MetricsController } from './controllers/metrics.controller';
 
 @Module({
   imports: [
@@ -153,7 +154,7 @@ import { DeleteDiscountCodeUseCase } from '../application/use-cases/DeleteDiscou
     (require('./modules/refunds/refunds.module').RefundsModule),
     ContractsModule,
   ],
-  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController],
+  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController],
   providers: [
     SeedService,
     { provide: APP_GUARD, useClass: CustomThrottlerGuard },

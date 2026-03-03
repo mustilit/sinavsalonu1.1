@@ -84,6 +84,25 @@ Bu dosya:
 
 Production ortamında port publish etme genellikle bir reverse proxy (NGINX, Traefik vb.) üzerinden yapılır; bu nedenle `docker-compose.prod.yml` doğrudan host port'u publish etmez.
 
+## SaaS Deployment Targets (Önerilen Platformlar)
+
+Bu proje SaaS olacak şekilde tasarlanmıştır ve aşağıdaki ortamlara kolayca deploy edilebilir:
+
+- AWS ECS / Fargate
+- Fly.io
+- Railway
+- Render
+- DigitalOcean App Platform
+
+Genel mimari beklentiler:
+
+- Uygulama container'ları bir **reverse proxy / ingress** arkasında çalışır:
+  - Nginx
+  - Caddy
+  - Traefik
+- SSL termination reverse proxy katmanında yapılır; Node.js uygulaması genellikle `http://0.0.0.0:3000` üzerinden çalışır.
+- `CLIENT_URL`, `TRUST_PROXY`, `DATABASE_URL`, `REDIS_URL` gibi kritik ayarlar environment variable olarak platform UI'sı veya secrets manager üzerinden sağlanır.
+
 Testler
 - Jest + ts-jest ile `.test.ts` ve `.test.js` desteklenir (jest.config.cjs).
 - Genel: `npm run test`

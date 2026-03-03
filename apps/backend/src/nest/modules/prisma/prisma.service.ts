@@ -21,5 +21,9 @@ export class PrismaService {
   get testAttempt() {
     return this.client.testAttempt;
   }
+
+  // TODO: Multi-tenant enforcement:
+  // Prisma çağrılarında request context'ten tenantId alıp,
+  // findMany / findFirst / update vb. işlemlere otomatik tenant filter ekle.
 }
 

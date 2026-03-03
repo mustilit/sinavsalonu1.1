@@ -87,31 +87,55 @@ enum ContractType {
   EDUCATOR
 }
 
+// --- Multi-tenant foundation ---
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  examTests     ExamTest[]
+  purchases     Purchase[]
+  adPurchases   AdPurchase[]
+  subscriptions Subscription[]
+
+  @@map("tenants")
+}
+
 // --- Marketplace / Exam domain ---
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  username     String   @unique
-  passwordHash String
-  role                 UserRole   @default(CANDIDATE)
-  status               UserStatus @default(ACTIVE)
-  educatorApprovedAt   DateTime?
-  lastLoginAt          DateTime?
-  metadata             Json?
-  createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
+  id                 String     @id @default(uuid())
+  email              String     @unique
+  username           String     @unique
+  passwordHash       String
+  role               UserRole   @default(CANDIDATE)
+  status             UserStatus @default(ACTIVE)
+  educatorApprovedAt DateTime?
+  lastLoginAt        DateTime?
+  metadata           Json?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
 
-  examTests ExamTest[]    @relation("educatorTests")
-  purchases Purchase[]    @relation("userPurchases")
-  attempts  TestAttempt[] @relation("userAttempts")
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  examTests               ExamTest[]               @relation("educatorTests")
+  purchases               Purchase[]               @relation("userPurchases")
+  attempts                TestAttempt[]            @relation("userAttempts")
   notificationPreferences NotificationPreference[]
-  createdDiscountCodes DiscountCode[] @relation("DiscountCodeCreatedBy")
-  reportedObjections Objection[] @relation("ObjectionReporter")
-  contractAcceptances ContractAcceptance[]
-  userPreference     UserPreference?
-  adPurchases       AdPurchase[] @relation("educatorAdPurchases")
+  createdDiscountCodes    DiscountCode[]           @relation("DiscountCodeCreatedBy")
+  reportedObjections      Objection[]              @relation("ObjectionReporter")
+  contractAcceptances     ContractAcceptance[]
+  userPreference          UserPreference?
+  adPurchases             AdPurchase[]             @relation("educatorAdPurchases")
 
+  @@index([tenantId])
   @@map("users")
 }
 
@@ -123,6 +147,7 @@ model UserPreference {
   updatedAt   DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("user_preferences")
 }
 
@@ -145,13 +170,13 @@ model ExamType {
 // --- Sınav / Test Modülü ---
 
 model Topic {
-  id         String   @id @default(uuid())
+  id         String     @id @default(uuid())
   examTypeId String
-  examType   ExamType @relation(fields: [examTypeId], references: [id])
+  examType   ExamType   @relation(fields: [examTypeId], references: [id])
   name       String
   slug       String
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  active     Boolean    @default(true)
+  createdAt  DateTime   @default(now())
   tests      ExamTest[]
 
   @@unique([examTypeId, slug])
@@ -159,50 +184,55 @@ model Topic {
 }
 
 model ExamTest {
-  id          String     @id @default(uuid())
-  title       String
-  examTypeId  String?
-  topicId     String?
-  educatorId  String?
-  isTimed     Boolean    @default(false)
-  duration    Int? // minutes
-  priceCents  Int? // price in cents (stage1 nullable)
+  id                 String     @id @default(uuid())
+  title              String
+  examTypeId         String?
+  topicId            String?
+  educatorId         String?
+  isTimed            Boolean    @default(false)
+  duration           Int? // minutes
+  priceCents         Int? // price in cents (stage1 nullable)
   campaignPriceCents Int? // FR-E-04: süreli kampanya fiyatı
   campaignValidFrom  DateTime? // kampanya başlangıç
   campaignValidUntil DateTime? // kampanya bitiş
-  currency    String? @default("TRY")
-  questionCount Int? // nullable for backfill in stage1
-  hasSolutions Boolean @default(false)
-  publishedAt DateTime?
-  status      TestStatus @default(DRAFT)
-  metadata    Json?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @default(now()) @updatedAt
+  currency           String?    @default("TRY")
+  questionCount      Int? // nullable for backfill in stage1
+  hasSolutions       Boolean    @default(false)
+  publishedAt        DateTime?
+  status             TestStatus @default(DRAFT)
+  metadata           Json?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @default(now()) @updatedAt
+  deletedAt          DateTime?
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   questions ExamQuestion[]
   attempts  TestAttempt[]
 
-  examType ExamType?  @relation(fields: [examTypeId], references: [id], onDelete: SetNull)
-  topic    Topic?     @relation(fields: [topicId], references: [id], onDelete: SetNull)
-  educator User?      @relation("educatorTests", fields: [educatorId], references: [id], onDelete: SetNull)
-  Purchase Purchase[]
+  examType    ExamType?    @relation(fields: [examTypeId], references: [id], onDelete: SetNull)
+  topic       Topic?       @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  educator    User?        @relation("educatorTests", fields: [educatorId], references: [id], onDelete: SetNull)
+  Purchase    Purchase[]
   adPurchases AdPurchase[]
 
+  @@index([tenantId])
   @@index([publishedAt])
   @@map("exam_tests")
 }
 
 model ExamQuestion {
-  id      String @id @default(uuid())
-  testId  String
-  content String
-  order   Int    @default(0)
-  solutionText String?
+  id               String  @id @default(uuid())
+  testId           String
+  content          String
+  order            Int     @default(0)
+  solutionText     String?
   solutionMediaUrl String?
 
-  test    ExamTest        @relation(fields: [testId], references: [id], onDelete: Cascade)
-  options ExamOption[]
-  answers AttemptAnswer[]
+  test       ExamTest        @relation(fields: [testId], references: [id], onDelete: Cascade)
+  options    ExamOption[]
+  answers    AttemptAnswer[]
   objections Objection[]
 
   @@map("exam_questions")
@@ -234,9 +264,9 @@ model TestAttempt {
   // autosave payload could be stored in metadata if needed
   metadata    Json?
 
-  test      ExamTest        @relation(fields: [testId], references: [id], onDelete: Cascade)
-  candidate User            @relation("userAttempts", fields: [candidateId], references: [id], onDelete: Cascade)
-  answers   AttemptAnswer[]
+  test       ExamTest        @relation(fields: [testId], references: [id], onDelete: Cascade)
+  candidate  User            @relation("userAttempts", fields: [candidateId], references: [id], onDelete: Cascade)
+  answers    AttemptAnswer[]
   objections Objection[]
 
   @@unique([testId, candidateId])
@@ -244,12 +274,13 @@ model TestAttempt {
 }
 
 model TestStats {
-  id           String   @id @default(uuid())
-  testId       String   @unique
-  ratingAvg    Float?
-  ratingCount  Int      @default(0)
-  purchaseCount Int     @default(0)
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(uuid())
+  testId        String   @unique
+  ratingAvg     Float?
+  ratingCount   Int      @default(0)
+  purchaseCount Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
   @@map("test_stats")
 }
 
@@ -274,16 +305,21 @@ model Purchase {
   testId      String
   candidateId String
   amountCents Int?
-  currency    String   @default("TRY")
+  currency    String         @default("TRY")
   status      PurchaseStatus @default(ACTIVE)
   createdAt   DateTime       @default(now())
+  deletedAt   DateTime?
 
-  test      ExamTest @relation(fields: [testId], references: [id], onDelete: Cascade)
-  candidate User     @relation("userPurchases", fields: [candidateId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  test           ExamTest      @relation(fields: [testId], references: [id], onDelete: Cascade)
+  candidate      User          @relation("userPurchases", fields: [candidateId], references: [id], onDelete: Cascade)
   discountCodeId String?
-  discountCode DiscountCode? @relation(fields: [discountCodeId], references: [id], onDelete: SetNull)
+  discountCode   DiscountCode? @relation(fields: [discountCodeId], references: [id], onDelete: SetNull)
 
   @@unique([testId, candidateId])
+  @@index([tenantId])
   @@map("purchases")
 }
 
@@ -293,31 +329,32 @@ enum FollowType {
 }
 
 model Follow {
-  id         String    @id @default(uuid())
-  followerId String
-  followType FollowType
-  educatorId String?
-  examTypeId String?
-  notificationsEnabled Boolean @default(true)
-  createdAt  DateTime  @default(now())
+  id                   String     @id @default(uuid())
+  followerId           String
+  followType           FollowType
+  educatorId           String?
+  examTypeId           String?
+  notificationsEnabled Boolean    @default(true)
+  createdAt            DateTime   @default(now())
 
-  @@index([followerId, followType])
   @@unique([followerId, educatorId])
   @@unique([followerId, examTypeId])
+  @@index([followerId, followType])
   @@map("follows")
 }
 
 model NotificationPreference {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  emailEnabled    Boolean  @default(true)
-  weeklyDigestEnabled Boolean @default(true)
-  inactiveReminderEnabled Boolean @default(true)
-  unsubscribeToken String  @unique
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                      String   @id @default(uuid())
+  userId                  String   @unique
+  emailEnabled            Boolean  @default(true)
+  weeklyDigestEnabled     Boolean  @default(true)
+  inactiveReminderEnabled Boolean  @default(true)
+  unsubscribeToken        String   @unique
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("notification_preferences")
 }
 
@@ -331,8 +368,8 @@ model AuditLog {
   entityType String
   entityId   String
   actorId    String?
-  metadata   Json     @default("{}")
-  createdAt  DateTime @default(now())
+  metadata   Json        @default("{}")
+  createdAt  DateTime    @default(now())
 
   @@index([entityType, entityId])
   @@index([createdAt])
@@ -340,38 +377,40 @@ model AuditLog {
 }
 
 model DiscountCode {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  description  String?
-  percentOff   Int      // 0-100
-  maxUses      Int?     // nullable unlimited
-  usedCount    Int      @default(0)
-  validFrom    DateTime?
-  validUntil   DateTime?
-  createdAt    DateTime @default(now())
-  createdById  String?
+  id          String    @id @default(uuid())
+  code        String    @unique
+  description String?
+  percentOff  Int // 0-100
+  maxUses     Int? // nullable unlimited
+  usedCount   Int       @default(0)
+  validFrom   DateTime?
+  validUntil  DateTime?
+  createdAt   DateTime  @default(now())
+  createdById String?
 
-  createdBy User? @relation("DiscountCodeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  purchases  Purchase[]
+  createdBy User?      @relation("DiscountCodeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  purchases Purchase[]
+
   @@map("discount_codes")
 }
 
 // Not: answerText, escalatedAt, ObjectionStatus için migrate ayrı çalıştırılacak (objection_answer_sla_status).
 model Objection {
-  id          String         @id @default(uuid())
+  id          String          @id @default(uuid())
   attemptId   String
   questionId  String
   reporterId  String
   reason      String
   status      ObjectionStatus @default(OPEN)
   answerText  String?
-  createdAt   DateTime       @default(now())
+  createdAt   DateTime        @default(now())
   answeredAt  DateTime?
   escalatedAt DateTime?
 
-  attempt   TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question  ExamQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  reporter  User         @relation("ObjectionReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  attempt  TestAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question ExamQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  reporter User         @relation("ObjectionReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
   @@map("objections")
 }
 
@@ -398,7 +437,7 @@ model RefundRequest {
 }
 
 model Review {
-  id          String   @id @default(uuid())
+  id          String @id @default(uuid())
   testId      String
   educatorId  String
   candidateId String
@@ -424,8 +463,8 @@ model Contract {
   content     String       @db.Text
   isActive    Boolean      @default(false)
   publishedAt DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   acceptances ContractAcceptance[]
 
@@ -435,7 +474,7 @@ model Contract {
 
 model ContractAcceptance {
   id         String   @id @default(uuid()) @db.Uuid
-  userId     String   // TEXT, users.id ile aynı tip (FK uyumu)
+  userId     String // TEXT, users.id ile aynı tip (FK uyumu)
   contractId String   @db.Uuid
   acceptedAt DateTime @default(now())
   ip         String?
@@ -451,37 +490,39 @@ model ContractAcceptance {
 }
 
 model AdminSettings {
-  id                 Int     @id @default(1)
-  commissionPercent  Int     @default(20) // percent
-  vatPercent         Int     @default(18)
-  purchasesEnabled   Boolean @default(true)
-  updatedAt          DateTime @updatedAt
+  id                Int      @id @default(1)
+  commissionPercent Int      @default(20) // percent
+  vatPercent        Int      @default(18)
+  purchasesEnabled  Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+
   @@map("admin_settings")
 }
 
 // Site / şirket bilgileri — ana sayfa ve footer, admin tarafından düzenlenir
 model SiteSettings {
-  id                 Int      @id @default(1)
-  siteName            String?  // "Dal" / "Sınav Salonu"
-  heroTitle           String?  // "Sınavlara Güvenle Hazırlan"
-  heroSubtitle        String?
-  searchPlaceholder   String?
-  statTests           String?  // "10.000+ Test"
-  statEducators       String?  // "500+ Eğitici"
-  statCandidates      String?  // "100.000+ Aday"
-  statSuccessRate     String?  // "%85 Başarı Oranı"
-  footerDescription   String?
-  companyName         String?
-  contactEmail        String?
-  contactPhone        String?
-  address             String?
-  linkAbout           String?  // Hakkımızda URL
-  linkPrivacy         String?  // Gizlilik politikası
-  linkContact         String?
-  linkPartnership     String?  // İş ortaklığı
-  linkSupport         String?  // Yardım ve destek
-  copyrightText       String?  // "© 2024 Dal. Tüm hakları saklıdır."
-  updatedAt           DateTime @updatedAt
+  id                Int      @id @default(1)
+  siteName          String? // "Dal" / "Sınav Salonu"
+  heroTitle         String? // "Sınavlara Güvenle Hazırlan"
+  heroSubtitle      String?
+  searchPlaceholder String?
+  statTests         String? // "10.000+ Test"
+  statEducators     String? // "500+ Eğitici"
+  statCandidates    String? // "100.000+ Aday"
+  statSuccessRate   String? // "%85 Başarı Oranı"
+  footerDescription String?
+  companyName       String?
+  contactEmail      String?
+  contactPhone      String?
+  address           String?
+  linkAbout         String? // Hakkımızda URL
+  linkPrivacy       String? // Gizlilik politikası
+  linkContact       String?
+  linkPartnership   String? // İş ortaklığı
+  linkSupport       String? // Yardım ve destek
+  copyrightText     String? // "© 2024 Dal. Tüm hakları saklıdır."
+  updatedAt         DateTime @updatedAt
+
   @@map("site_settings")
 }
 
@@ -497,24 +538,43 @@ model AdPackage {
   updatedAt    DateTime @updatedAt
 
   purchases AdPurchase[]
+
   @@map("ad_packages")
 }
 
 model AdPurchase {
-  id                 String   @id @default(uuid())
-  educatorId         String
-  adPackageId       String
-  testId             String
-  validUntil         DateTime
-  impressionsRemaining Int    @default(0)
-  createdAt          DateTime @default(now())
+  id                   String   @id @default(uuid())
+  educatorId           String
+  adPackageId          String
+  testId               String
+  validUntil           DateTime
+  impressionsRemaining Int      @default(0)
+  createdAt            DateTime @default(now())
 
-  educator User     @relation("educatorAdPurchases", fields: [educatorId], references: [id], onDelete: Cascade)
+  educator  User      @relation("educatorAdPurchases", fields: [educatorId], references: [id], onDelete: Cascade)
   adPackage AdPackage @relation(fields: [adPackageId], references: [id], onDelete: Cascade)
-  test     ExamTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+  test      ExamTest  @relation(fields: [testId], references: [id], onDelete: Cascade)
 
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
   @@index([educatorId])
   @@index([testId])
   @@index([validUntil])
   @@map("ad_purchases")
+}
+
+model Subscription {
+  id        String    @id @default(cuid())
+  tenantId  String
+  plan      String
+  status    String // active, canceled, trialing
+  startedAt DateTime
+  endsAt    DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("subscriptions")
 }

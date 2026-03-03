@@ -11,6 +11,8 @@ import { Reflector } from '@nestjs/core';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { env } from '../config/env';
+import { tenantMiddleware } from '../middleware/tenant.middleware';
+import { requestIdMiddleware } from '../middleware/request-id.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -33,6 +35,10 @@ async function bootstrap() {
       hsts: env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
     }),
   );
+
+  // Request context middleware (requestId + tenant)
+  app.use(requestIdMiddleware);
+  app.use(tenantMiddleware);
 
   // Global pipes and guards
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

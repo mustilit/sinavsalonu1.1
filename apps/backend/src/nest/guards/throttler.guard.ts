@@ -5,6 +5,10 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 export class CustomThrottlerGuard extends ThrottlerGuard {
   protected override generateKey(context: ExecutionContext, tracker: string): string {
     const req = context.switchToHttp().getRequest();
+    const tenant = req.tenant as { id?: string } | undefined;
+    if (tenant?.id) {
+      return `tenant:${tenant.id}`;
+    }
     // prefer authenticated user id when available
     const userId = req.user?.id;
     if (userId) return `user:${userId}`;
