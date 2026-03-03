@@ -27,7 +27,7 @@ cd dal
 npm install
 ```
 
-## Çalıştırma
+## Çalıştırma (lokal)
 
 ```bash
 # Geliştirme (hot reload)
@@ -37,6 +37,36 @@ npm run dev
 npm run build
 npm start
 ```
+
+## Docker ile çalıştırma
+
+Docker komutlarını her zaman `infra/docker` klasörü içinde çalıştırın:
+
+```bash
+cd infra/docker
+
+# İmajları build et
+docker compose build
+
+# Tüm stack'i ayağa kaldır
+docker compose up -d
+
+# Loglar
+docker compose logs -f backend
+
+# Temizlik
+docker compose down -v
+```
+
+Backend health kontrolü:
+
+```bash
+curl http://127.0.0.1:3000/health
+```
+
+Frontend (Docker): `http://localhost:5173`
+
+---
 
 ## API Endpoints
 

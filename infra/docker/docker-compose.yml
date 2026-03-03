@@ -3,9 +3,9 @@ services:
     image: postgres:15
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: sinavsalonu_v2
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-sinavsalonu_v2}
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
@@ -40,13 +40,13 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/sinavsalonu_v2?schema=public"
-      JWT_SECRET: "super_secret_key"
-      PORT: "3000"
-      NODE_ENV: "development"
-      CLIENT_URL: "http://localhost:5173"
-      REDIS_DISABLED: "1"
-      CRON_DISABLED: "1"
+      DATABASE_URL: ${DATABASE_URL:-"postgresql://postgres:postgres@postgres:5432/sinavsalonu_v2?schema=public"}
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: ${PORT:-3000}
+      NODE_ENV: ${NODE_ENV:-development}
+      CLIENT_URL: ${CLIENT_URL:-"http://localhost:5173"}
+      REDIS_DISABLED: ${REDIS_DISABLED:-"1"}
+      CRON_DISABLED: ${CRON_DISABLED:-"1"}
     ports:
       - "3000:3000"
     restart: on-failure
@@ -93,11 +93,11 @@ services:
       context: ../../apps/frontend
       dockerfile: ../../infra/docker/frontend.Dockerfile
       args:
-        VITE_API_URL: "http://localhost:3000"
+        VITE_API_URL: ${VITE_API_URL:-"http://127.0.0.1:3000"}
     depends_on:
       - backend
     environment:
-      VITE_API_URL: "http://localhost:3000"
+      VITE_API_URL: ${VITE_API_URL:-"http://127.0.0.1:3000"}
     ports:
       - "5173:5173"
     restart: on-failure
