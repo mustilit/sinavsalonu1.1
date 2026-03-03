@@ -10,6 +10,7 @@ import { JwtService } from '../infrastructure/services/JwtService';
 import { Reflector } from '@nestjs/core';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { env } from '../config/env';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -29,7 +30,7 @@ async function bootstrap() {
       xssFilter: true,
       noSniff: true,
       frameguard: { action: 'deny' },
-      hsts: process.env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
+      hsts: env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false,
     }),
   );
 
@@ -59,9 +60,20 @@ async function bootstrap() {
   app.useGlobalGuards(new JwtAuthGuard(jwtService, reflector), new RolesGuard(reflector));
   // Disable Express x-powered-by header for security
   app.getHttpAdapter().getInstance().disable('x-powered-by');
-  // Enable CORS for frontend (development friendly)
+  // Trust proxy if configured (for reverse proxy / load balancer setups)
+  if (env.TRUST_PROXY === '1' && env.NODE_ENV === 'production') {
+    const httpAdapter = app.getHttpAdapter();
+    const instance: any = httpAdapter.getInstance();
+    if (instance?.set) {
+      instance.set('trust proxy', 1);
+    }
+  }
+  // Enable CORS for frontend
+  const allowedOrigins = env.CLIENT_URL
+    ? env.CLIENT_URL.split(',').map((o) => o.trim()).filter(Boolean)
+    : undefined;
   app.enableCors({
-    origin: process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',') : true,
+    origin: env.NODE_ENV === 'production' ? allowedOrigins || [] : allowedOrigins || true,
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
@@ -69,7 +81,7 @@ async function bootstrap() {
     optionsSuccessStatus: 204,
   });
 
-  const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+  const port = env.PORT ? Number(env.PORT) : 3000;
   await app.listen(port, '0.0.0.0');
   console.log(`🚀 Dal API çalışıyor: http://localhost:${port}`);
 }

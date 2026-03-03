@@ -44,6 +44,46 @@ Hızlı başlangıç (local)
 
 Not: CI / prod için build -> dist/ altında çalıştırma şekli tercih edilir.
 
+## Docker ile çalıştırma
+
+### Geliştirme (docker-compose.yml)
+
+Yerel geliştirme için:
+
+```bash
+cd infra/docker
+docker compose -f docker-compose.yml up -d
+```
+
+Logları görmek için:
+
+```bash
+docker compose -f docker-compose.yml logs -f backend
+```
+
+Konteynerleri durdurmak için:
+
+```bash
+docker compose -f docker-compose.yml down
+```
+
+### Production (docker-compose.prod.yml)
+
+SaaS / production benzeri kurulum için:
+
+```bash
+cd infra/docker
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Bu dosya:
+
+- `NODE_ENV=production` ile backend'i çalıştırır.
+- `REDIS_DISABLED=0` ve `CRON_DISABLED=0` ile Redis ve cron job'larını etkinleştirir.
+- Healthcheck için `/ready` endpoint'ini kullanır.
+
+Production ortamında port publish etme genellikle bir reverse proxy (NGINX, Traefik vb.) üzerinden yapılır; bu nedenle `docker-compose.prod.yml` doğrudan host port'u publish etmez.
+
 Testler
 - Jest + ts-jest ile `.test.ts` ve `.test.js` desteklenir (jest.config.cjs).
 - Genel: `npm run test`

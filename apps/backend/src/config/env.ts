@@ -1,0 +1,52 @@
+import { z } from 'zod';
+
+const EnvSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
+  CLIENT_URL: z.string().optional(),
+  PORT: z.string().optional(),
+  REDIS_URL: z.string().optional(),
+  REDIS_DISABLED: z.string().optional(),
+  CRON_DISABLED: z.string().optional(),
+  THROTTLE_DISABLED: z.string().optional(),
+  TRUST_PROXY: z.string().optional(),
+});
+
+export type Env = z.infer<typeof EnvSchema>;
+
+function validateEnv(raw: NodeJS.ProcessEnv): Env {
+  const parsed = EnvSchema.safeParse(raw);
+  if (!parsed.success) {
+    // eslint-disable-next-line no-console
+    console.error('[env] Validation failed', parsed.error.flatten());
+    throw new Error(`Environment validation failed: ${parsed.error.message}`);
+  }
+
+  const env = parsed.data;
+
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET must be set');
+  }
+
+  if (!env.DATABASE_URL) {
+    throw new Error('DATABASE_URL must be set');
+  }
+
+  if (env.NODE_ENV === 'production') {
+    const weakSecrets = new Set([
+      'change_me',
+      'super_secret_key',
+      'your-secret-key-change-in-production',
+      '"super_secret_key"',
+    ]);
+    if (env.JWT_SECRET.length < 32 || weakSecrets.has(env.JWT_SECRET)) {
+      throw new Error('In production, JWT_SECRET must be at least 32 characters and not a default value');
+    }
+  }
+
+  return env;
+}
+
+export const env: Env = validateEnv(process.env);
+
