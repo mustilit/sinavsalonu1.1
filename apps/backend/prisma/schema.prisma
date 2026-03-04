@@ -102,6 +102,7 @@ model Tenant {
   purchases     Purchase[]
   adPurchases   AdPurchase[]
   subscriptions Subscription[]
+  testPackages  TestPackage[]
 
   @@map("tenants")
 }
@@ -208,6 +209,11 @@ model ExamTest {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
+  // Paketli/SaaS test motoru alanları
+  packageId   String?
+  package     TestPackage? @relation(fields: [packageId], references: [id])
+  durationSec Int?
+
   questions ExamQuestion[]
   attempts  TestAttempt[]
 
@@ -218,6 +224,7 @@ model ExamTest {
   adPurchases AdPurchase[]
 
   @@index([tenantId])
+  @@index([packageId])
   @@index([publishedAt])
   @@map("exam_tests")
 }
@@ -264,12 +271,20 @@ model TestAttempt {
   // autosave payload could be stored in metadata if needed
   metadata    Json?
 
+  // Timer engine alanları
+  lastResumedAt DateTime?
+  pausedAt      DateTime?
+  finishedAt    DateTime?
+  remainingSec  Int?
+
   test       ExamTest        @relation(fields: [testId], references: [id], onDelete: Cascade)
   candidate  User            @relation("userAttempts", fields: [candidateId], references: [id], onDelete: Cascade)
   answers    AttemptAnswer[]
   objections Objection[]
 
   @@unique([testId, candidateId])
+  @@index([candidateId])
+  @@index([testId])
   @@map("test_attempts")
 }
 
@@ -288,13 +303,14 @@ model AttemptAnswer {
   id               String   @id @default(uuid())
   attemptId        String
   questionId       String
-  selectedOptionId String
+  selectedOptionId String?
   isCorrect        Boolean? // optional; can be computed/stored
   createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   attempt  TestAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   question ExamQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  option   ExamOption   @relation(fields: [selectedOptionId], references: [id], onDelete: Cascade)
+  option   ExamOption?  @relation(fields: [selectedOptionId], references: [id], onDelete: Cascade)
 
   @@unique([attemptId, questionId], name: "attemptId_questionId")
   @@map("attempt_answers")
@@ -318,9 +334,30 @@ model Purchase {
   discountCodeId String?
   discountCode   DiscountCode? @relation(fields: [discountCodeId], references: [id], onDelete: SetNull)
 
+  packageId String?
+  package   TestPackage? @relation(fields: [packageId], references: [id])
+
   @@unique([testId, candidateId])
   @@index([tenantId])
   @@map("purchases")
+}
+
+model TestPackage {
+  id          String   @id @default(cuid())
+  tenantId    String
+  title       String
+  description String?
+  priceCents  Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  tests     ExamTest[]
+  purchases Purchase[]
+
+  @@index([tenantId])
+  @@map("test_packages")
 }
 
 enum FollowType {

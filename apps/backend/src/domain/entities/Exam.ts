@@ -49,4 +49,9 @@ export interface TestAttempt {
   status: AttemptStatus;
   score?: number | null;
   submittedAt?: Date | null;
+  // Timer engine alanları (optional, backward compatible)
+  lastResumedAt?: Date | null;
+  pausedAt?: Date | null;
+  finishedAt?: Date | null;
+  remainingSec?: number | null;
 }

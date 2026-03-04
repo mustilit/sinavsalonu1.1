@@ -15,6 +15,27 @@ export class SubmitAnswerUseCase {
       throw new BadRequestException({ code: 'NOT_ATTEMPT_OWNER', message: 'Actor not owner of attempt' });
     }
 
+    const now = new Date();
+    const lastResumedAt = (attempt as any).lastResumedAt ?? attempt.startedAt;
+    let remainingSec = (attempt as any).remainingSec ?? 0;
+    if ((attempt as any).status === 'IN_PROGRESS') {
+      const elapsedSec = Math.max(0, Math.floor((now.getTime() - lastResumedAt.getTime()) / 1000));
+      remainingSec = Math.max(0, remainingSec - elapsedSec);
+    }
+
+    if (remainingSec <= 0 || (attempt as any).status === 'EXPIRED') {
+      // auto-expire attempt
+      await this.prisma.testAttempt.update({
+        where: { id: attemptId },
+        data: {
+          status: 'EXPIRED',
+          remainingSec: 0,
+          finishedAt: now,
+        } as any,
+      });
+      throw new BadRequestException({ code: 'ATTEMPT_EXPIRED', message: 'Attempt has expired' });
+    }
+
     if ((attempt as any).status !== 'IN_PROGRESS') {
       throw new BadRequestException({ code: 'ATTEMPT_NOT_IN_PROGRESS', message: 'Attempt is not in progress' });
     }

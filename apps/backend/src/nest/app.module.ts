@@ -97,6 +97,7 @@ import { ListEducatorAdPurchasesUseCase } from '../application/use-cases/ListEdu
 import { ListEducatorTestsUseCase } from '../application/use-cases/ListEducatorTestsUseCase';
 import { ListEducatorPurchasesUseCase } from '../application/use-cases/ListEducatorPurchasesUseCase';
 import { DeleteDiscountCodeUseCase } from '../application/use-cases/DeleteDiscountCodeUseCase';
+import { AttemptsController } from './controllers/attempts.controller';
 import { MetricsController } from './controllers/metrics.controller';
 
 @Module({
@@ -154,7 +155,7 @@ import { MetricsController } from './controllers/metrics.controller';
     (require('./modules/refunds/refunds.module').RefundsModule),
     ContractsModule,
   ],
-  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController],
+  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AttemptsController],
   providers: [
     SeedService,
     { provide: APP_GUARD, useClass: CustomThrottlerGuard },
