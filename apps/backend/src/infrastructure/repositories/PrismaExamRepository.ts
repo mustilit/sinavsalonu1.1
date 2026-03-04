@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ExamTest, ExamQuestion, ExamOption } from '../../domain/entities/Exam';
 import { ExamWithQuestions, IExamRepository } from '../../domain/interfaces/IExamRepository';
 import { prisma } from '../database/prisma';
+import { getDefaultTenantId } from '../../common/tenant';
 
 /**
  * Prisma Exam Repository
@@ -28,9 +29,11 @@ export class PrismaExamRepository implements IExamRepository {
   ): Promise<ExamWithQuestions> {
     return prisma.$transaction(async (tx) => {
       const priceCents = (test as any).priceCents ?? (test as any).price;
+      const tenantId = (test as any).tenantId ?? getDefaultTenantId();
       const created = await tx.examTest.create({
         data: {
           id: test.id,
+          tenantId,
           title: test.title,
           educatorId: (test as any).educatorId ?? null,
           examTypeId: (test as any).examTypeId ?? null,

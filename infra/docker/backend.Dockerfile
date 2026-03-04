@@ -8,44 +8,65 @@ ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
 ARG NPM_REGISTRY=https://registry.npmjs.org
+ARG http_proxy
+ARG https_proxy
+ARG no_proxy
 
 # System deps (openssl + CA) for Prisma and HTTPS
-RUN apt-get update -y \
-  && apt-get install -y openssl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+  for i in 1 2 3 4 5; do \
+    apt-get update -y && break || (echo "apt-get update failed, retry $i" && sleep 3); \
+  done; \
+  apt-get install -y --no-install-recommends openssl ca-certificates; \
+  rm -rf /var/lib/apt/lists/*
+
+# Proxy env reset - clear any injected proxy variables before npm
+ENV HTTP_PROXY= \
+    HTTPS_PROXY= \
+    NO_PROXY= \
+    http_proxy= \
+    https_proxy= \
+    no_proxy=
+
+# Prefer IPv4 DNS resolution inside container to reduce ECONNRESET
+ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 
 # NPM network hardening (default registry when empty)
-# Ayrıca olası bozuk proxy ayarlarından kaçınmak için
-# HTTP(S)_PROXY değişkenlerini bu imaj içinde temizliyoruz.
-RUN npm config delete registry || true \
-  && npm config set registry https://registry.npmjs.org/ \
+RUN unset HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy || true \
   && npm config delete proxy || true \
   && npm config delete https-proxy || true \
+  && npm config delete registry || true \
+  && npm config set registry ${NPM_REGISTRY} \
   && npm config set fetch-retries 5 \
+  && npm config set fetch-retry-factor 3 \
   && npm config set fetch-retry-mintimeout 20000 \
-  && npm config set fetch-retry-maxtimeout 120000 \
-  && npm config set fetch-timeout 300000 \
+  && npm config set fetch-retry-maxtimeout 180000 \
+  && npm config set fetch-timeout 600000 \
+  && npm config set prefer-online true \
+  && npm config set progress false \
   && npm config set audit false \
   && npm config set fund false
 
-# Ensure no proxy env during npm install (avoids ERR_INVALID_URL from host)
-COPY package*.json ./
+# Clear npm-specific proxy env (in addition to HTTP_PROXY*)
+ENV npm_config_proxy= \
+    npm_config_https_proxy= \
+    npm_config_noproxy=
 
-# NPM proxy ayarlarını tamamen kapat
-RUN npm config delete proxy || true \
-  && npm config delete https-proxy || true \
-  && npm config set proxy null \
-  && npm config set https-proxy null
+COPY package*.json ./
 
 # Install all deps (including dev) for build
 RUN --mount=type=cache,target=/root/.npm \
-  if [ -f package-lock.json ]; then npm ci --include=dev; else npm install; fi
+  unset HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy || true; \
+  if [ -f package-lock.json ]; then npm ci --include=dev --prefer-online --no-progress; else npm install; fi
 
 COPY prisma ./prisma
 COPY . .
 
 # Build script already runs `prisma generate`
-RUN npm run build
+RUN set -eux; \
+  for i in 1 2 3 4 5; do \
+    npm run build && break || (echo "npm run build failed (retry $i)"; sleep 8); \
+  done
 
 # ---- Stage 2: Runtime ----
 FROM node:18-slim
@@ -53,9 +74,12 @@ FROM node:18-slim
 WORKDIR /usr/src/app
 
 # System deps for runtime
-RUN apt-get update -y \
-  && apt-get install -y openssl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+  for i in 1 2 3 4 5; do \
+    apt-get update -y && break || (echo "apt-get update failed, retry $i" && sleep 3); \
+  done; \
+  apt-get install -y --no-install-recommends openssl ca-certificates; \
+  rm -rf /var/lib/apt/lists/*
 
 # Reuse proxy / registry config in runtime (default registry when empty)
 ARG HTTP_PROXY

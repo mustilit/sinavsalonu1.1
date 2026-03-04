@@ -1,6 +1,12 @@
 #!/bin/sh
 set -e
 
+if [ -z "$DATABASE_URL" ]; then
+  echo "ERROR: DATABASE_URL is not set. Exiting."
+  exit 1
+fi
+
+echo "DATABASE_URL present: true"
 echo "Running migrations (with retry)..."
 for i in 1 2 3 4 5; do
   if npx prisma migrate deploy; then
@@ -15,8 +21,7 @@ for i in 1 2 3 4 5; do
   sleep 5
 done
 
-echo "Generating Prisma client..."
-npx prisma generate
+echo "Skipping Prisma client generate (already built into image)..."
 
 echo "Starting application..."
 exec npm run start

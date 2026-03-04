@@ -1,6 +1,7 @@
 import { BadRequestException, InternalServerErrorException, ConflictException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { RedisCache } from '../../infrastructure/cache/RedisCache';
+import { getDefaultTenantId } from '../../common/tenant';
 
 export class PurchaseUseCase {
   private cache: RedisCache;
@@ -62,10 +63,19 @@ export class PurchaseUseCase {
       discountApplied = disc;
     }
 
+    const tenantId = (test as any).tenantId ?? getDefaultTenantId();
+
     try {
       const result = await this.prisma.$transaction(async (tx) => {
         const purchase = await tx.purchase.create({
-          data: { testId, candidateId, amountCents: finalAmountCents, currency: (test as any).currency ?? 'TRY', ...(discountApplied ? { discountCodeId: discountApplied.id } : {}) },
+          data: {
+            tenantId,
+            testId,
+            candidateId,
+            amountCents: finalAmountCents,
+            currency: (test as any).currency ?? 'TRY',
+            ...(discountApplied ? { discountCodeId: discountApplied.id } : {}),
+          },
         });
 
         const attempt = await tx.testAttempt.create({

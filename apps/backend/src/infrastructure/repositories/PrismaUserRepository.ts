@@ -3,6 +3,7 @@ import type { UserStatus } from '../../domain/types';
 import { IUserRepository } from '../../domain/interfaces/IUserRepository';
 import type { UserStatus as PrismaUserStatus } from '@prisma/client';
 import { prisma } from '../database/prisma';
+import { getDefaultTenantId } from '../../common/tenant';
 
 /** Domain UserStatus -> Prisma enum (DB'de INACTIVE/DELETED yok, SUSPENDED kullan) */
 function toPrismaStatus(s: UserStatus): PrismaUserStatus {
@@ -34,6 +35,7 @@ export class PrismaUserRepository implements IUserRepository {
       }
 
       const status = toPrismaStatus(user.status);
+      const tenantId = (user as any).tenantId ?? getDefaultTenantId();
       const created = await tx.user.upsert({
         where: { id: user.id },
         create: {
@@ -43,6 +45,7 @@ export class PrismaUserRepository implements IUserRepository {
           passwordHash: user.passwordHash,
           role: user.role,
           status,
+          tenantId,
           educatorApprovedAt: user.educatorApprovedAt ?? undefined,
           metadata: (user.metadata ?? {}) as any,
         },

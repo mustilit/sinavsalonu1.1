@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { AppError } from '../errors/AppError';
 import { ensureEducatorActive } from '../policies/ensureEducatorActive';
 import type { IUserRepository } from '../../domain/interfaces/IUserRepository';
+import { getDefaultTenantId } from '../../common/tenant';
 
 /** FR-E-07: Eğitici reklam satın alır */
 export class PurchaseAdUseCase {
@@ -31,8 +32,11 @@ export class PurchaseAdUseCase {
     const validUntil = new Date();
     validUntil.setDate(validUntil.getDate() + adPackage.durationDays);
 
+    const tenantId = (test as any).tenantId ?? getDefaultTenantId();
+
     const purchase = await prisma.adPurchase.create({
       data: {
+        tenantId,
         educatorId,
         adPackageId,
         testId,

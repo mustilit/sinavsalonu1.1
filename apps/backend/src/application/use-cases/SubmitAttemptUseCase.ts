@@ -24,7 +24,14 @@ export class SubmitAttemptUseCase {
         select: { questionId: true, selectedOptionId: true },
       });
       const answeredCountEx = existingRows.length;
-      const optionIdsEx = Array.from(new Set(existingRows.map((r) => r.selectedOptionId).filter(Boolean)));
+      const rawOptionIdsEx = existingRows.map((r) => r.selectedOptionId);
+      const optionIdsEx = Array.from(
+        new Set(
+          (rawOptionIdsEx ?? []).filter(
+            (v): v is string => typeof v === 'string' && v.length > 0,
+          ),
+        ),
+      );
       const optionsEx = optionIdsEx.length > 0 ? await this.prisma.examOption.findMany({ where: { id: { in: optionIdsEx } }, select: { id: true, isCorrect: true } }) : [];
       const correctSetEx = new Set(optionsEx.filter((o) => o.isCorrect).map((o) => o.id));
       let correctEx = 0;
@@ -49,7 +56,13 @@ export class SubmitAttemptUseCase {
     }
 
     const answeredCount = answerRows.length;
-    const optionIds = Array.from(new Set(answerRows.map((r) => r.selectedOptionId).filter(Boolean)));
+    const optionIds = Array.from(
+      new Set(
+        answerRows
+          .map((r) => r.selectedOptionId)
+          .filter((x): x is string => x != null),
+      ),
+    );
 
     // fetch options in one query
     const options = optionIds.length > 0 ? await this.prisma.examOption.findMany({ where: { id: { in: optionIds } }, select: { id: true, isCorrect: true } }) : [];

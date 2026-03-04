@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Req } from '@nestjs/common';
 import { Roles } from '../decorators/roles.decorator';
 import type { PrismaClient } from '@prisma/client';
 import { StartTestAttemptUseCase } from '../../application/use-cases/StartTestAttemptUseCase';
@@ -6,6 +6,7 @@ import { PauseTestAttemptUseCase } from '../../application/use-cases/PauseTestAt
 import { ResumeTestAttemptUseCase } from '../../application/use-cases/ResumeTestAttemptUseCase';
 import { GetTestAttemptUseCase } from '../../application/use-cases/GetTestAttemptUseCase';
 import { SubmitAnswerUseCase } from '../../application/use-cases/SubmitAnswerUseCase';
+import { PrismaService } from '../modules/prisma/prisma.service';
 
 @Controller()
 export class AttemptsController {
@@ -15,7 +16,8 @@ export class AttemptsController {
   private readonly getUC: GetTestAttemptUseCase;
   private readonly submitAnswerUC: SubmitAnswerUseCase;
 
-  constructor(prisma: PrismaClient) {
+  constructor(@Inject(PrismaService) prismaService: PrismaService) {
+    const prisma: PrismaClient = prismaService.client;
     this.startUC = new StartTestAttemptUseCase(prisma);
     this.pauseUC = new PauseTestAttemptUseCase(prisma);
     this.resumeUC = new ResumeTestAttemptUseCase(prisma);

@@ -32,15 +32,15 @@ services:
       context: ../../apps/backend
       dockerfile: ../../infra/docker/backend.Dockerfile
       args:
-        HTTP_PROXY: ${HTTP_PROXY:-""}
-        HTTPS_PROXY: ${HTTPS_PROXY:-""}
-        NO_PROXY: ${NO_PROXY:-"localhost,127.0.0.1,postgres,redis"}
-        NPM_REGISTRY: ${NPM_REGISTRY:-"https://registry.npmjs.org"}
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,postgres,redis}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: ${DATABASE_URL:-"postgresql://postgres:postgres@postgres:5432/sinavsalonu_v2?schema=public"}
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/dal?schema=public"
       JWT_SECRET: ${JWT_SECRET}
       PORT: ${PORT:-3000}
       NODE_ENV: ${NODE_ENV:-development}
@@ -58,6 +58,8 @@ services:
       redis:
         condition: service_started
     environment:
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/dal?schema=public"
+      JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: "redis://redis:6379"
     ports:
       - "3010:3010"
@@ -80,6 +82,8 @@ services:
       redis:
         condition: service_started
     environment:
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/dal?schema=public"
+      JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: "redis://redis:6379"
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-""}
     restart: unless-stopped

@@ -1,6 +1,7 @@
 import { Injectable, OnApplicationBootstrap, Inject } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import type { PrismaClient } from '@prisma/client';
+import { getDefaultTenantId } from '../../common/tenant';
 
 /** Demo giriş: eğitici educator@demo.com / aday aday@demo.com — şifre: demo123 */
 const DEMO_PASSWORD_HASH = bcrypt.hashSync('demo123', 12);
@@ -17,6 +18,14 @@ export class SeedService implements OnApplicationBootstrap {
         console.log('Seed skipped: production environment');
         return;
       }
+
+      // Ensure default tenant exists
+      const tenantId = getDefaultTenantId();
+      await this.prisma.tenant.upsert({
+        where: { id: tenantId },
+        create: { id: tenantId, name: 'Default Tenant', slug: 'default' },
+        update: {},
+      });
 
       // AdminSettings
       try {
@@ -38,6 +47,8 @@ export class SeedService implements OnApplicationBootstrap {
 
   private async seedDemoUsersAndData() {
     // Admin her zaman güncellenir (şifre güncellemesi için)
+    const tenantId = getDefaultTenantId();
+
     await this.prisma.user.upsert({
       where: { email: 'mus.tulu@gmail.com' },
       create: {
@@ -46,6 +57,7 @@ export class SeedService implements OnApplicationBootstrap {
         passwordHash: ADMIN_PASSWORD_HASH,
         role: 'ADMIN',
         status: 'ACTIVE',
+        tenantId,
       },
       update: { passwordHash: ADMIN_PASSWORD_HASH },
     });
@@ -85,6 +97,7 @@ export class SeedService implements OnApplicationBootstrap {
         role: 'EDUCATOR',
         status: 'ACTIVE',
         educatorApprovedAt: new Date(),
+        tenantId,
       },
       update: {},
     });
@@ -104,6 +117,7 @@ export class SeedService implements OnApplicationBootstrap {
         passwordHash: DEMO_PASSWORD_HASH,
         role: 'CANDIDATE',
         status: 'ACTIVE',
+        tenantId,
       },
       update: {},
     });
@@ -125,6 +139,7 @@ export class SeedService implements OnApplicationBootstrap {
     if (testCount === 0) {
       const created = await this.prisma.examTest.create({
         data: {
+          tenantId,
           title: 'Demo TYT Matematik Denemesi',
           educatorId: educator.id,
           examTypeId: examType.id,
