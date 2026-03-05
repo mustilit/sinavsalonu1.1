@@ -1,13 +1,19 @@
 import Redis from 'ioredis';
+import { getRedisUrl, isRedisDisabled } from '../../config/redis';
 
 export class RedisCache {
   private client?: Redis;
   constructor() {
-    if (process.env.REDIS_DISABLED === '1') return;
-    const url = process.env.REDIS_URL;
-    if (url) {
-      this.client = new Redis(url);
-    }
+    if (isRedisDisabled()) return;
+    const url = getRedisUrl();
+    this.client = new Redis(url, {
+      maxRetriesPerRequest: 2,
+      enableReadyCheck: true,
+    });
+    this.client.on('error', (err) => {
+      // eslint-disable-next-line no-console
+      console.error('[REDIS] client error', err);
+    });
   }
 
   async get<T>(key: string): Promise<T | null> {
@@ -49,6 +55,20 @@ export class RedisCache {
       }
     } while (cursor !== '0');
     return total;
+  }
+
+  async ping(): Promise<string | null> {
+    if (!this.client) return null;
+    return this.client.ping();
+  }
+
+  async disconnect(): Promise<void> {
+    if (!this.client) return;
+    try {
+      await this.client.quit();
+    } catch {
+      this.client.disconnect();
+    }
   }
 }
 

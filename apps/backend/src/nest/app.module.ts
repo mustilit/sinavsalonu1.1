@@ -63,6 +63,7 @@ import { PrismaUserRepository } from '../infrastructure/repositories/PrismaUserR
 import { PrismaObjectionRepository } from '../infrastructure/repositories/PrismaObjectionRepository';
 import { PrismaAttemptRepository } from '../infrastructure/repositories/PrismaAttemptRepository';
 import { PrismaExamRepository } from '../infrastructure/repositories/PrismaExamRepository';
+import { getRedisUrl } from '../config/redis';
 import { CreateObjectionUseCase } from '../application/use-cases/CreateObjectionUseCase';
 import { AnswerObjectionUseCase } from '../application/use-cases/AnswerObjectionUseCase';
 import { ListEscalatedObjectionsUseCase } from '../application/use-cases/ListEscalatedObjectionsUseCase';
@@ -112,7 +113,7 @@ import { MetricsController } from './controllers/metrics.controller';
         if (process.env.REDIS_DISABLED === '1') {
           return { throttlers };
         }
-        const redisUrl = process.env.REDIS_URL;
+        const redisUrl = getRedisUrl();
         if (redisUrl) {
           const redis = new IORedis(redisUrl, { maxRetriesPerRequest: 2 });
           // graceful shutdown hooks (best-effort)

@@ -111,12 +111,15 @@ Testler
 
 Postgres bağlantısı (Windows / host'ta P1001)
 - `.env` içindeki `DATABASE_URL` genelde `postgres:5432` kullanır; bu host adı sadece Docker ağı içinde çözülür. Host makineden `npm test` çalıştırınca "Can't reach database server at postgres:5432" (P1001) alırsınız.
+- Kural: **Docker compose ile çalışırken `DATABASE_URL` host'u `postgres` olmalı; host makinede çalışırken `localhost` olmalı.**
 - Çözüm (önerilen): Testleri container içinde koşturun; böylece `postgres` host'u aynı Docker network'te çözülür.
   - Tüm testler: `npm run test:in-container`
   - Sadece contracts: `npm run test:in-container:contracts`
   - Sadece integration: `npm run test:in-container:integration`
 - Script'lerde varsayılan container adı `docker-backend-1` (Windows uyumluluğu için env kullanılmaz). Farklı ad kullanıyorsanız komutu elle çalıştırın: `docker exec -it <container-adı> sh -c "cd /usr/src/app && npm test -- contracts"`
 - Container içinde testlerin çalışması için image'ın bu repodaki güncel kodu (özellikle `tests/`, `jest.config.cjs`, `**/*.test.ts`) içermesi gerekir. Eski image'larda sadece `tests/*.test.js` varsa contracts/integration testleri bulunamaz; image'ı yeniden build edin.
+
+> Not: Prisma'nın default connection pool davranışı sınırsız değildir ama yüksek yük altında Postgres connection exhaustion yaşanabilir. Bu nedenle `DATABASE_URL`'a varsayılan olarak `connection_limit=5&pool_timeout=10` eklenir.
 
 API dokümantasyonu (Swagger / OpenAPI)
 - Swagger UI (development): /docs (main.ts içinde yalnızca NODE_ENV !== 'production' için aktif)

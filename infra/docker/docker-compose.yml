@@ -1,3 +1,9 @@
+x-redis-env: &redis-env
+  REDIS_URL: redis://redis:6379
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  DOCKER: "1"
+
 services:
   postgres:
     image: postgres:15
@@ -40,16 +46,23 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      <<: *redis-env
       DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/dal?schema=public"
       JWT_SECRET: ${JWT_SECRET}
       PORT: ${PORT:-3000}
       NODE_ENV: ${NODE_ENV:-development}
       CLIENT_URL: ${CLIENT_URL:-"http://localhost:5173"}
-      REDIS_DISABLED: ${REDIS_DISABLED:-"1"}
+      REDIS_DISABLED: "0"
       CRON_DISABLED: ${CRON_DISABLED:-"1"}
     ports:
       - "3000:3000"
     restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/health/db && curl -fsS http://localhost:3000/health/redis || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   worker:
     image: dal-backend:dev
@@ -58,9 +71,9 @@ services:
       redis:
         condition: service_started
     environment:
+      <<: *redis-env
       DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/dal?schema=public"
       JWT_SECRET: ${JWT_SECRET}
-      REDIS_URL: "redis://redis:6379"
     ports:
       - "3010:3010"
     restart: unless-stopped
@@ -82,9 +95,9 @@ services:
       redis:
         condition: service_started
     environment:
+      <<: *redis-env
       DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/dal?schema=public"
       JWT_SECRET: ${JWT_SECRET}
-      REDIS_URL: "redis://redis:6379"
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-""}
     restart: unless-stopped
 

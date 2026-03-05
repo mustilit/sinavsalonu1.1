@@ -1,6 +1,7 @@
 import { BadRequestException, InternalServerErrorException, ConflictException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { RedisCache } from '../../infrastructure/cache/RedisCache';
+import { prismaRetry } from '../../infrastructure/prisma/prisma-retry';
 import { getDefaultTenantId } from '../../common/tenant';
 
 export class PurchaseUseCase {
@@ -66,7 +67,8 @@ export class PurchaseUseCase {
     const tenantId = (test as any).tenantId ?? getDefaultTenantId();
 
     try {
-      const result = await this.prisma.$transaction(async (tx) => {
+      const result = await prismaRetry(() =>
+        this.prisma.$transaction(async (tx) => {
         const purchase = await tx.purchase.create({
           data: {
             tenantId,
@@ -107,8 +109,9 @@ export class PurchaseUseCase {
           }
         }
 
-        return { purchase, attempt };
-      });
+          return { purchase, attempt };
+        }),
+      );
       // invalidate purchaser's home cache (popularity may change)
       try {
         await this.cache.delByPrefix(`home:rec:${candidateId}:`);

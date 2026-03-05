@@ -2,8 +2,15 @@ import { Worker, Job } from 'bullmq';
 import { EMAIL_DLQ } from './queue.constants';
 import { prisma } from '../database/prisma';
 import { SlackNotifier } from '../services/SlackNotifier';
+import { getRedisUrl, isRedisDisabled } from '../../config/redis';
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+if (isRedisDisabled()) {
+  // eslint-disable-next-line no-console
+  console.warn('Redis is disabled; DLQ worker will not start.');
+  process.exit(0);
+}
+
+const REDIS_URL = getRedisUrl();
 const SLACK_WEBHOOK = process.env.SLACK_WEBHOOK_URL;
 
 const notifier = new SlackNotifier(SLACK_WEBHOOK);

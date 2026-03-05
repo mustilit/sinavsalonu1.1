@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
+import { prismaRetry } from '../../infrastructure/prisma/prisma-retry';
 
 export class StartTestAttemptUseCase {
   constructor(private readonly prisma: PrismaClient) {}
@@ -9,7 +10,7 @@ export class StartTestAttemptUseCase {
       throw new BadRequestException({ code: 'INVALID_INPUT', message: 'Missing testId or userId' });
     }
 
-    const test = await this.prisma.examTest.findUnique({ where: { id: testId } });
+    const test = await prismaRetry(() => this.prisma.examTest.findUnique({ where: { id: testId } }));
     if (!test) {
       throw new NotFoundException({ code: 'TEST_NOT_FOUND', message: 'Test not found' });
     }
@@ -19,21 +20,25 @@ export class StartTestAttemptUseCase {
     }
 
     // Basit B2C kontrolü: aktif purchase var mı?
-    const hasPurchase = await this.prisma.purchase.findFirst({
-      where: {
-        testId,
-        candidateId: userId,
-        status: 'ACTIVE',
-      } as any,
-    });
+    const hasPurchase = await prismaRetry(() =>
+      this.prisma.purchase.findFirst({
+        where: {
+          testId,
+          candidateId: userId,
+          status: 'ACTIVE',
+        } as any,
+      }),
+    );
 
     if (!hasPurchase) {
       throw new ForbiddenException({ code: 'NO_PURCHASE', message: 'User has no purchase for this test' });
     }
 
-    const existing = await this.prisma.testAttempt.findFirst({
-      where: { testId, candidateId: userId },
-    });
+    const existing = await prismaRetry(() =>
+      this.prisma.testAttempt.findFirst({
+        where: { testId, candidateId: userId },
+      }),
+    );
 
     const durationSec =
       (test as any).durationSec ??

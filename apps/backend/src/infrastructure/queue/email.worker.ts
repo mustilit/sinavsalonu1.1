@@ -4,8 +4,15 @@ import { EmailJob } from './queue.types';
 import { MockEmailProvider } from '../services/MockEmailProvider';
 import { prisma } from '../database/prisma';
 import http from 'http';
+import { getRedisUrl, isRedisDisabled } from '../../config/redis';
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+if (isRedisDisabled()) {
+  // eslint-disable-next-line no-console
+  console.warn('Redis is disabled; email worker will not start.');
+  process.exit(0);
+}
+
+const REDIS_URL = getRedisUrl();
 const WORKER_PORT = parseInt(process.env.WORKER_PORT || '3010', 10);
 
 const dlq = new Queue(EMAIL_DLQ, { connection: { url: REDIS_URL } as any });

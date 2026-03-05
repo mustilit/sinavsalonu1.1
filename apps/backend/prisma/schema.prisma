@@ -615,3 +615,20 @@ model Subscription {
   @@index([tenantId])
   @@map("subscriptions")
 }
+
+model IdempotencyKey {
+  id           String   @id @default(cuid())
+  userId       String
+  route        String
+  key          String
+  requestHash  String?
+  status       String   // IN_PROGRESS | COMPLETED
+  responseCode Int?
+  responseBody Json?
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  @@unique([userId, route, key])
+  @@index([expiresAt])
+  @@index([userId, route])
+}

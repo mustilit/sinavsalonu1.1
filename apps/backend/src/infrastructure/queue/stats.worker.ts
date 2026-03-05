@@ -2,8 +2,15 @@ import { Worker, Job } from 'bullmq';
 import { STATS_QUEUE } from './queue.constants';
 import { prisma } from '../database/prisma';
 import { processTestStatsRefresh } from './stats.processor';
+import { getRedisUrl, isRedisDisabled } from '../../config/redis';
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+if (isRedisDisabled()) {
+  // eslint-disable-next-line no-console
+  console.warn('Redis is disabled; stats worker will not start.');
+  process.exit(0);
+}
+
+const REDIS_URL = getRedisUrl();
 
 export function makeStatsJobHandler(prismaClient: any, processor: (prismaClient: any, testId: string) => Promise<any> = processTestStatsRefresh) {
   return async (job: Job) => {
