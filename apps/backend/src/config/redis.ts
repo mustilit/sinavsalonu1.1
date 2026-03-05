@@ -20,7 +20,15 @@ export function isRedisDisabled() {
 export function getRedisUrl(): string {
   const env = envSchema.parse(process.env);
 
-  if (env.REDIS_URL && env.REDIS_URL.trim().length > 0) return env.REDIS_URL;
+  // If REDIS_URL is provided but empty, treat as invalid (fail-fast) rather than
+  // silently falling back to host/port defaults.
+  if (typeof env.REDIS_URL === 'string' && env.REDIS_URL.trim().length === 0) {
+    // eslint-disable-next-line no-console
+    console.error('[Redis] Invalid config: REDIS_URL is set but empty.');
+    process.exit(1);
+  }
+
+  if (env.REDIS_URL && env.REDIS_URL.trim().length > 0) return env.REDIS_URL.trim();
 
   const port = env.REDIS_PORT ?? '6379';
 
@@ -31,12 +39,20 @@ export function getRedisUrl(): string {
   return `redis://${host}:${port}`;
 }
 
-export function validateRedisEnv() {
+export function validateRedisUrl(): void {
   const env = envSchema.parse(process.env);
-  if (isRedisDisabled()) return;
+  const url = getRedisUrl(); // already fail-fast for empty REDIS_URL
 
-  const url = getRedisUrl();
-  const host = url.replace('redis://', '').split(':')[0];
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    // eslint-disable-next-line no-console
+    console.error('[Redis] Invalid config: REDIS_URL is not a valid URL.');
+    process.exit(1);
+  }
+
+  const host = parsed.hostname;
 
   if (env.DOCKER === '1' && isLocalhost(host)) {
     // eslint-disable-next-line no-console
@@ -53,6 +69,39 @@ export function validateRedisEnv() {
     );
     process.exit(1);
   }
+}
+
+export function validateRedisEnv() {
+  // Backwards-compatible name used by bootstrap.
+  if (isRedisDisabled()) return;
+  validateRedisUrl();
+}
+
+export function getRedisConnectionOptions(): {
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  db?: number;
+} {
+  const url = getRedisUrl();
+  const parsed = new URL(url);
+  const port = parsed.port ? Number(parsed.port) : 6379;
+
+  const pathname = parsed.pathname?.trim() ?? '';
+  const dbRaw = pathname && pathname !== '/' ? pathname.replace(/^\//, '') : '';
+  const db = dbRaw ? Number(dbRaw) : undefined;
+
+  const username = parsed.username ? decodeURIComponent(parsed.username) : undefined;
+  const password = parsed.password ? decodeURIComponent(parsed.password) : undefined;
+
+  return {
+    host: parsed.hostname,
+    port: Number.isFinite(port) ? port : 6379,
+    ...(username ? { username } : {}),
+    ...(password ? { password } : {}),
+    ...(typeof db === 'number' && Number.isFinite(db) ? { db } : {}),
+  };
 }
 
 

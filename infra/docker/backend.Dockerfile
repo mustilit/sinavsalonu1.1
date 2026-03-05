@@ -78,7 +78,7 @@ RUN set -eux; \
   for i in 1 2 3 4 5; do \
     apt-get update -y && break || (echo "apt-get update failed, retry $i" && sleep 3); \
   done; \
-  apt-get install -y --no-install-recommends openssl ca-certificates postgresql-client; \
+  apt-get install -y --no-install-recommends openssl ca-certificates postgresql-client curl; \
   rm -rf /var/lib/apt/lists/*
 
 # Reuse proxy / registry config in runtime (default registry when empty)

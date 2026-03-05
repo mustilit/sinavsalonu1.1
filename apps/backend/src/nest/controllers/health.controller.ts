@@ -1,8 +1,8 @@
 import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
 import { Public } from '../decorators/public.decorator';
 import { prisma } from '../../infrastructure/database/prisma';
-import { RedisCache } from '../../infrastructure/cache/RedisCache';
-import { isRedisDisabled } from '../../config/redis';
+import Redis from 'ioredis';
+import { getRedisUrl, isRedisDisabled } from '../../config/redis';
 
 @Controller()
 export class HealthController {
@@ -19,11 +19,14 @@ export class HealthController {
       return { ok: true, redis: false, disabled: true };
     }
 
-    const cache = new RedisCache();
+    const url = getRedisUrl();
+    const client = new Redis(url, {
+      maxRetriesPerRequest: 1,
+      enableReadyCheck: true,
+    });
     try {
-      const pong = await cache.ping();
-      const ok = pong === 'PONG';
-      if (!ok) {
+      const pong = await client.ping();
+      if (pong !== 'PONG') {
         throw new Error(`Unexpected PING response: ${pong}`);
       }
       return { ok: true, redis: true };
@@ -33,15 +36,18 @@ export class HealthController {
       console.error('Redis health check error', message);
       throw new HttpException(
         {
-          error: {
-            code: 'REDIS_UNAVAILABLE',
-            message,
-          },
+          ok: false,
+          redis: false,
+          error: message,
         },
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     } finally {
-      await cache.disconnect().catch(() => undefined);
+      try {
+        await client.quit();
+      } catch {
+        client.disconnect();
+      }
     }
   }
 
@@ -89,10 +95,14 @@ export class HealthController {
 
     if (checks.redis !== 'disabled') {
       try {
-        const cache = new RedisCache();
-        const pong = await cache.ping();
+        const client = new Redis(getRedisUrl(), { maxRetriesPerRequest: 1, enableReadyCheck: true });
+        const pong = await client.ping();
         checks.redis = pong === 'PONG';
-        await cache.disconnect().catch(() => undefined);
+        try {
+          await client.quit();
+        } catch {
+          client.disconnect();
+        }
       } catch {
         checks.redis = false;
       }

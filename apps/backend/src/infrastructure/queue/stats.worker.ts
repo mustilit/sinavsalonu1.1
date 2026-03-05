@@ -2,15 +2,16 @@ import { Worker, Job } from 'bullmq';
 import { STATS_QUEUE } from './queue.constants';
 import { prisma } from '../database/prisma';
 import { processTestStatsRefresh } from './stats.processor';
-import { getRedisUrl, isRedisDisabled } from '../../config/redis';
+import { getRedisConnectionOptions, validateRedisUrl } from '../../config/redis';
 
-if (isRedisDisabled()) {
+if (process.env.REDIS_DISABLED === '1' || process.env.REDIS_DISABLED === 'true') {
   // eslint-disable-next-line no-console
-  console.warn('Redis is disabled; stats worker will not start.');
+  console.log('[WORKER] Redis disabled; exiting.');
   process.exit(0);
 }
 
-const REDIS_URL = getRedisUrl();
+validateRedisUrl();
+const defaultConnection = getRedisConnectionOptions();
 
 export function makeStatsJobHandler(prismaClient: any, processor: (prismaClient: any, testId: string) => Promise<any> = processTestStatsRefresh) {
   return async (job: Job) => {
@@ -21,7 +22,7 @@ export function makeStatsJobHandler(prismaClient: any, processor: (prismaClient:
 }
 
 export function createStatsWorker(opts: { connection?: any; prisma?: any; processor?: (prismaClient: any, testId: string) => Promise<any> }) {
-  const connection = opts.connection ?? { url: REDIS_URL } as any;
+  const connection = opts.connection ?? (defaultConnection as any);
   const handler = makeStatsJobHandler(opts.prisma ?? prisma, opts.processor);
   const worker = new Worker(STATS_QUEUE, handler as any, { connection, concurrency: 2 });
   worker.on('failed', (job, err) => {

@@ -23,7 +23,7 @@ export const prisma =
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-prisma.$on('error', async (e) => {
+(prisma as any).$on('error', async (e: any) => {
   // eslint-disable-next-line no-console
   console.error('Prisma connection error', e);
 

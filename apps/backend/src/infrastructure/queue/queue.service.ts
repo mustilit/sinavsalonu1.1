@@ -1,9 +1,7 @@
 import { Queue } from 'bullmq';
 import { EMAIL_QUEUE } from './queue.constants';
 import { EmailJob } from './queue.types';
-import { getRedisUrl, isRedisDisabled } from '../../config/redis';
-
-const REDIS_URL = getRedisUrl();
+import { getRedisConnectionOptions, isRedisDisabled } from '../../config/redis';
 
 export class QueueService {
   private queue: Queue | null = null;
@@ -12,7 +10,8 @@ export class QueueService {
       // Redis kapalıysa email queue'yu hiç başlatma
       return;
     }
-    this.queue = new Queue(EMAIL_QUEUE, { connection: { url: REDIS_URL } as any });
+    const connection = getRedisConnectionOptions();
+    this.queue = new Queue(EMAIL_QUEUE, { connection: connection as any });
   }
 
   async enqueueEmail(job: EmailJob, opts?: any) {
@@ -31,7 +30,9 @@ export class QueueService {
   }
 
   async enqueueJob(queueName: string, jobName: string, data: any, opts?: any) {
-    const q = new Queue(queueName, { connection: { url: REDIS_URL } as any });
+    if (isRedisDisabled()) return Promise.resolve(undefined as any);
+    const connection = getRedisConnectionOptions();
+    const q = new Queue(queueName, { connection: connection as any });
     return q.add(jobName, data, opts ?? { attempts: 3, backoff: { type: 'exponential', delay: 1000 }, removeOnComplete: true });
   }
 

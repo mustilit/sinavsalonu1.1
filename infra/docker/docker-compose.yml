@@ -3,6 +3,7 @@ x-redis-env: &redis-env
   REDIS_HOST: redis
   REDIS_PORT: 6379
   DOCKER: "1"
+  REDIS_DISABLED: "0"
 
 services:
   postgres:
@@ -52,7 +53,6 @@ services:
       PORT: ${PORT:-3000}
       NODE_ENV: ${NODE_ENV:-development}
       CLIENT_URL: ${CLIENT_URL:-"http://localhost:5173"}
-      REDIS_DISABLED: "0"
       CRON_DISABLED: ${CRON_DISABLED:-"1"}
     ports:
       - "3000:3000"

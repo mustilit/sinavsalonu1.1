@@ -15,7 +15,7 @@ import { env } from '../config/env';
 import { tenantMiddleware } from '../middleware/tenant.middleware';
 import { requestIdMiddleware } from '../middleware/request-id.middleware';
 import { validateDatabaseUrl } from '../config/database-url';
-import { validateRedisEnv } from '../config/redis';
+import { validateRedisUrl } from '../config/redis';
 
 if (!globalThis.crypto) {
   // @ts-ignore
@@ -25,7 +25,9 @@ if (!globalThis.crypto) {
 async function bootstrap() {
   // Fail-fast: DATABASE_URL ve REDIS_URL yanlış host ile configure edilmiş mi?
   validateDatabaseUrl();
-  validateRedisEnv();
+  if (process.env.REDIS_DISABLED !== '1') {
+    validateRedisUrl();
+  }
   const app = await NestFactory.create(AppModule);
   // Security headers via helmet (CSP driven by env)
   const cspEnabled = process.env.CSP_ENABLED !== 'false';

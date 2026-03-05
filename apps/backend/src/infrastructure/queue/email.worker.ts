@@ -4,18 +4,20 @@ import { EmailJob } from './queue.types';
 import { MockEmailProvider } from '../services/MockEmailProvider';
 import { prisma } from '../database/prisma';
 import http from 'http';
-import { getRedisUrl, isRedisDisabled } from '../../config/redis';
+import { getRedisConnectionOptions, validateRedisUrl } from '../../config/redis';
 
-if (isRedisDisabled()) {
+if (process.env.REDIS_DISABLED === '1' || process.env.REDIS_DISABLED === 'true') {
   // eslint-disable-next-line no-console
-  console.warn('Redis is disabled; email worker will not start.');
+  console.log('[WORKER] Redis disabled; exiting.');
   process.exit(0);
 }
 
-const REDIS_URL = getRedisUrl();
-const WORKER_PORT = parseInt(process.env.WORKER_PORT || '3010', 10);
+validateRedisUrl();
 
-const dlq = new Queue(EMAIL_DLQ, { connection: { url: REDIS_URL } as any });
+const WORKER_PORT = parseInt(process.env.WORKER_PORT || '3010', 10);
+const connection = getRedisConnectionOptions();
+
+const dlq = new Queue(EMAIL_DLQ, { connection: connection as any });
 
 let worker: Worker;
 
@@ -36,7 +38,7 @@ function startWorker() {
       });
     },
     {
-      connection: { url: REDIS_URL } as any,
+      connection: connection as any,
       concurrency: 5,
       limiter: { max: 20, duration: 1000 },
     }
@@ -61,7 +63,7 @@ function startWorker() {
 let server: http.Server | null = null;
 
 async function startHealthServer() {
-  const queue = new Queue(EMAIL_QUEUE, { connection: { url: REDIS_URL } as any });
+  const queue = new Queue(EMAIL_QUEUE, { connection: connection as any });
   server = http.createServer(async (req, res) => {
     if (req.url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
