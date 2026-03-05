@@ -46,8 +46,14 @@ function parseEnv() {
  */
 export function getApiBaseUrl() {
   const env = parseEnv();
-  const url = env.VITE_API_BASE_URL || env.VITE_API_URL;
-  if (url) return url.replace(/\/$/, '');
+  const raw = env.VITE_API_BASE_URL || env.VITE_API_URL;
+  if (raw) {
+    // Bazı ortamlarda env değerleri yanlışlıkla tırnaklı gelebiliyor:
+    // VITE_API_URL='"http://127.0.0.1:3000"'
+    // Bu durumda base URL `"%22http://127.0.0.1:3000%22` gibi bozuluyor.
+    const trimmed = raw.trim().replace(/^['"]+|['"]+$/g, '');
+    return trimmed.replace(/\/$/, '');
+  }
 
   // Dev: Vite proxy kullanıyorsak boş (relative path)
   if (typeof window !== 'undefined') {
