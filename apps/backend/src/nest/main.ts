@@ -88,16 +88,27 @@ async function bootstrap() {
     }
   }
   // Enable CORS for frontend
-  const allowedOrigins = env.CLIENT_URL
-    ? env.CLIENT_URL.split(',').map((o) => o.trim()).filter(Boolean)
-    : undefined;
+  const allowedOrigins = new Set(
+    [
+      process.env.CLIENT_URL,
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'http://localhost:5174',
+      'http://127.0.0.1:5174',
+    ]
+      .filter(Boolean)
+      .map((o) => o as string),
+  );
+
   app.enableCors({
-    origin: env.NODE_ENV === 'production' ? allowedOrigins || [] : allowedOrigins || true,
+    origin: (origin, cb) => {
+      // curl/postman gibi origin göndermeyenleri de kabul et
+      if (!origin) return cb(null, true);
+      return cb(null, allowedOrigins.has(origin));
+    },
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
   });
 
   const port = env.PORT ? Number(env.PORT) : 3000;

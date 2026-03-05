@@ -11,6 +11,8 @@ import { PrismaContractRepository } from '../../../infrastructure/repositories/P
 import { PrismaContractAcceptanceRepository } from '../../../infrastructure/repositories/PrismaContractAcceptanceRepository';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { CONTRACT_REPO, CONTRACT_ACCEPTANCE_REPO, USER_REPO } from '../../../application/constants';
+import { CaptchaService } from '../../services/captcha.service';
+import { LoginBruteforceGuard } from '../../guards/login-bruteforce.guard';
 
 @Module({
   controllers: [AuthController],
@@ -31,6 +33,8 @@ import { CONTRACT_REPO, CONTRACT_ACCEPTANCE_REPO, USER_REPO } from '../../../app
         new LoginUseCase(userRepo, passwordService, jwtService),
       inject: [PrismaUserRepository, PasswordService, JwtService],
     },
+    CaptchaService,
+    LoginBruteforceGuard,
     PrismaAuditLogRepository,
     {
       provide: CONTRACT_REPO,

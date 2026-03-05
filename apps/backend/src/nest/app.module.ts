@@ -101,46 +101,56 @@ import { DeleteDiscountCodeUseCase } from '../application/use-cases/DeleteDiscou
 import { AttemptsController } from './controllers/attempts.controller';
 import { MetricsController } from './controllers/metrics.controller';
 
+const THROTTLE_TTL_SECONDS = Number(process.env.THROTTLE_TTL_SECONDS ?? '60') || 60;
+
+const throttleDisabled =
+  process.env.THROTTLE_DISABLED === '1' &&
+  (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev' || process.env.NODE_ENV === 'local');
+
 @Module({
   imports: [
-    ThrottlerModule.forRootAsync({
-      useFactory: () => {
-        // Dev: THROTTLE_DISABLED=1 veya NODE_ENV=development → gevşek limit
-        const isDev = process.env.NODE_ENV === 'development' || process.env.THROTTLE_DISABLED === '1';
-        const limit = isDev ? 500 : 60;
-        const throttlers = [{ ttl: seconds(60), limit }];
+    ...(throttleDisabled
+      ? []
+      : [
+          ThrottlerModule.forRootAsync({
+            useFactory: () => {
+              // Dev: THROTTLE_DISABLED=1 veya NODE_ENV=development → gevşek limit
+              const isDev = process.env.NODE_ENV === 'development';
+              const limit = isDev ? 500 : 60;
+              const throttlers = [{ ttl: seconds(THROTTLE_TTL_SECONDS), limit }];
 
-        if (process.env.REDIS_DISABLED === '1') {
-          return { throttlers };
-        }
-        const redisUrl = getRedisUrl();
-        if (redisUrl) {
-          const redis = new IORedis(redisUrl, { maxRetriesPerRequest: 2 });
-          // graceful shutdown hooks (best-effort)
-          const shutdown = () => {
-            try {
-              redis.disconnect();
-            } catch (e) {
-              /* ignore */
-            }
-          };
-          process.on('beforeExit', shutdown);
-          process.on('SIGINT', () => {
-            shutdown();
-            process.exit(0);
-          });
-          process.on('SIGTERM', () => {
-            shutdown();
-            process.exit(0);
-          });
-          return {
-            storage: new ThrottlerStorageRedisService(redis),
-            throttlers,
-          };
-        }
-        return { throttlers };
-      },
-    }),
+              if (process.env.REDIS_DISABLED === '1') {
+                return { throttlers };
+              }
+              const redisUrl = getRedisUrl();
+              if (redisUrl) {
+                const redis = new IORedis(redisUrl, { maxRetriesPerRequest: 2 });
+                // graceful shutdown hooks (best-effort)
+                const shutdown = () => {
+                  try {
+                    redis.disconnect();
+                  } catch (e) {
+                    /* ignore */
+                  }
+                };
+                process.on('beforeExit', shutdown);
+                process.on('SIGINT', () => {
+                  shutdown();
+                  process.exit(0);
+                });
+                process.on('SIGTERM', () => {
+                  shutdown();
+                  process.exit(0);
+                });
+                return {
+                  storage: new ThrottlerStorageRedisService(redis),
+                  throttlers,
+                };
+              }
+              return { throttlers };
+            },
+          }),
+        ]),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -159,7 +169,7 @@ import { MetricsController } from './controllers/metrics.controller';
   controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController],
   providers: [
     SeedService,
-    { provide: APP_GUARD, useClass: CustomThrottlerGuard },
+    ...(throttleDisabled ? [] : [{ provide: APP_GUARD, useClass: CustomThrottlerGuard }]),
     { provide: EXAM_TYPE_REPO, useClass: PrismaExamTypeRepository },
     { provide: TOPIC_REPO, useClass: PrismaTopicRepository },
     { provide: USER_REPO, useClass: PrismaUserRepository },

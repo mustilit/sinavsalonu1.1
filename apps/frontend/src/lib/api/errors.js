@@ -13,6 +13,9 @@ export const SAFE_MESSAGE_MAP = {
   FORBIDDEN: 'Bu işlem için yetkiniz yok.',
   NOT_FOUND: 'İstenen kaynak bulunamadı.',
   BAD_REQUEST: 'Geçersiz istek.',
+  TOO_MANY_REQUESTS: 'Çok fazla deneme yapıldı. 60 saniye sonra tekrar deneyin.',
+  CAPTCHA_REQUIRED: 'Devam etmek için doğrulama gerekli.',
+  CAPTCHA_INVALID: 'Doğrulama başarısız. Lütfen tekrar deneyin.',
   INTERNAL_ERROR: 'Bir hata oluştu. Lütfen daha sonra tekrar deneyin.',
   ERR_NETWORK: 'Sunucuya ulaşılamadı. Bağlantınızı kontrol edin.',
   TIMEOUT: 'İstek zaman aşımına uğradı.',
@@ -47,9 +50,15 @@ export function toSafeMessage(err, opts = {}) {
   const isProd = opts.isProd ?? (import.meta.env?.PROD ?? false);
   if (err?.response?.data) {
     const { code, message } = parseBackendError(err.response.data);
+    const retryAfterSeconds = err?.response?.retryAfter;
     const safe = SAFE_MESSAGE_MAP[code];
-    if (isProd && safe) return safe;
-    return message || safe || SAFE_MESSAGE_MAP.INTERNAL_ERROR;
+    if (code === 'TOO_MANY_REQUESTS' && typeof retryAfterSeconds === 'number' && retryAfterSeconds > 0) {
+      const txt = `Çok fazla deneme yapıldı. ${retryAfterSeconds} saniye sonra tekrar deneyin.`;
+      return txt;
+    }
+    // Her zaman önce map'teki güvenli mesajları tercih et; backend message sadece fallback.
+    if (safe) return safe;
+    return message || SAFE_MESSAGE_MAP.INTERNAL_ERROR;
   }
   if (err?.code === 'ERR_NETWORK' || err?.message?.includes?.('Network') || err?.message?.includes?.('EMPTY_RESPONSE')) {
     return SAFE_MESSAGE_MAP.ERR_NETWORK;

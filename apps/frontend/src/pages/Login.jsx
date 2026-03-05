@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createPageUrl } from '@/utils';
 import { useAppNavigate } from '@/lib/navigation';
+import { toSafeMessage } from '@/lib/api/errors';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -33,20 +34,8 @@ export default function Login() {
       navigate(target, { replace: true });
     } catch (err) {
       setLoading(false);
-      const data = err?.response?.data;
-      const raw = data?.error ?? data?.message;
-      const msg = typeof raw === 'string' ? raw : (raw?.message ?? raw?.error);
-      if (msg) {
-        setError(Array.isArray(msg) ? msg[0] : msg);
-      } else if (err?.response && (data === undefined || data === null)) {
-        setError('Backend boş yanıt döndü. Backend loglarına bakın.');
-      } else if (err?.code === 'ERR_NETWORK' || err?.message?.includes('Network') || err?.message?.includes('EMPTY_RESPONSE')) {
-        setError('Sunucuya ulaşılamadı. Backend (port 3000) çalışıyor mu?');
-      } else if (err?.message) {
-        setError(err.message);
-      } else {
-        setError('Giriş başarısız.');
-      }
+      const safe = toSafeMessage(err, { isProd: import.meta.env?.PROD });
+      setError(safe || 'Giriş başarısız.');
     }
   };
 

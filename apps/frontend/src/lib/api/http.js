@@ -62,6 +62,24 @@ function safeJsonParse(text) {
 }
 
 /**
+ * Base URL + path birleştirmeyi güvenli yapan yardımcı.
+ * - base boş ise path'i root-relative hale getirir
+ * - base içinde yanlışlıkla tırnak vs. varsa URL() ile normalize eder
+ * @param {string} base
+ * @param {string} path
+ * @returns {string}
+ */
+export function joinUrl(base, path) {
+  const b = `${(base || '').trim().replace(/\/+$/, '')}/`;
+  const p = (path || '').trim().replace(/^\/+/, '');
+  // Base boş ise relative path döndür (Vite proxy senaryosu)
+  if (!b.trim() || b === '/') {
+    return `/${p}`;
+  }
+  return new URL(p, b).toString();
+}
+
+/**
  * @typedef {Object} RequestOptions
  * @property {string} [method] - GET, POST, etc.
  * @property {Record<string, string>} [headers]
@@ -88,7 +106,7 @@ export async function apiRequest(path, opts = {}) {
   } = opts;
 
   const baseUrl = getApiBaseUrl();
-  const url = baseUrl ? `${baseUrl.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}` : path.startsWith('/') ? path : `/${path}`;
+  const url = joinUrl(baseUrl, path);
 
   const headers = { 'Content-Type': 'application/json', ...customHeaders };
   if (!skipAuth) {
@@ -132,7 +150,13 @@ export async function apiRequest(path, opts = {}) {
       ? parseBackendError(parsed)
       : { code: 'HTTP_ERROR', message: res.statusText || `HTTP ${res.status}` };
     const e = new Error(message);
-    e.response = { status: res.status, data: parsed };
+    const retryAfterRaw = res.headers?.get?.('retry-after');
+    const retryAfterSeconds = retryAfterRaw != null ? Number(retryAfterRaw) : NaN;
+    e.response = {
+      status: res.status,
+      data: parsed,
+      retryAfter: !Number.isNaN(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds : undefined,
+    };
     e.code = code;
     throw e;
   }

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Req, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Get, Req, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { RegisterUseCase } from '../../application/use-cases/RegisterUseCase';
 import { RegisterEducatorUseCase } from '../../application/use-cases/RegisterEducatorUseCase';
@@ -11,6 +11,7 @@ import { Inject } from '@nestjs/common';
 import { PrismaUserRepository } from '../../infrastructure/repositories/PrismaUserRepository';
 import { PasswordService } from '../../infrastructure/services/PasswordService';
 import { JwtService } from '../../infrastructure/services/JwtService';
+import { LoginBruteforceGuard } from '../guards/login-bruteforce.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -83,7 +84,7 @@ export class AuthController {
 
   @Post('login')
   @Public()
-  @Throttle({ default: { limit: 30, ttl: 300000 } })
+  @UseGuards(LoginBruteforceGuard)
   async login(@Body() body: any) {
     const email = body?.email != null ? String(body.email).trim().toLowerCase() : '';
     const password = body?.password != null ? String(body.password) : '';
