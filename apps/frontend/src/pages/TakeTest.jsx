@@ -216,6 +216,11 @@ export default function TakeTest() {
     }
   }, [attemptState, questions, isReviewMode]);
 
+  // Reset solution panel when navigating between questions
+  useEffect(() => {
+    setShowSolution(false);
+  }, [currentIndex]);
+
   const reportQuestionMutation = useMutation({
     mutationFn: (data) =>
       base44.entities.Objection.create({
@@ -668,7 +673,7 @@ export default function TakeTest() {
                 Boş Bırak
               </Button>
             )}
-            {test?.has_solutions && (currentQuestion?.explanation || currentQuestion?.solutionMediaUrl) && (
+            {isReviewMode && test?.has_solutions && (currentQuestion?.explanation || currentQuestion?.solutionMediaUrl) && (
               <Button
                 variant="ghost"
                 size="sm"

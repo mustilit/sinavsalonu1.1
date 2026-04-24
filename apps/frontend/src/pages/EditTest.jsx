@@ -322,7 +322,7 @@ export default function EditTest() {
     },
   });
 
-  const handleSaveTest = () => updateTestMutation.mutate(formData);
+  const handleSaveTest = () => updateTestMutation.mutate({ ...formData, is_published: null });
 
   const handleTogglePublish = () => {
     if (questions.length === 0 && !formData.is_published) {
