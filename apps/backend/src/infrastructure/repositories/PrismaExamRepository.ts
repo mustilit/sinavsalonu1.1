@@ -46,11 +46,15 @@ export class PrismaExamRepository implements IExamRepository {
               id: q.id,
               content: q.content,
               order: q.order,
+              ...((q as any).mediaUrl != null && { mediaUrl: (q as any).mediaUrl }),
+              ...((q as any).solutionText != null && { solutionText: (q as any).solutionText }),
+              ...((q as any).solutionMediaUrl != null && { solutionMediaUrl: (q as any).solutionMediaUrl }),
               options: {
                 create: q.options.map((o) => ({
                   id: o.id,
                   content: o.content,
                   isCorrect: o.isCorrect,
+                  ...((o as any).mediaUrl != null && { mediaUrl: (o as any).mediaUrl }),
                 })),
               },
             })),
@@ -246,6 +250,8 @@ export class PrismaExamRepository implements IExamRepository {
           testId,
           content: question.content,
           order: question.order,
+          ...(question.solutionText !== undefined && { solutionText: question.solutionText }),
+          ...(question.solutionMediaUrl !== undefined && { solutionMediaUrl: question.solutionMediaUrl }),
           options: {
             create: question.options.map((o) => ({
               id: o.id,
@@ -263,11 +269,14 @@ export class PrismaExamRepository implements IExamRepository {
     });
   }
 
-  async updateQuestion(questionId: string, updates: Partial<ExamQuestion & { options?: ExamOption[] }>): Promise<ExamQuestion | null> {
-    const q = await prisma.examQuestion.update({
-      where: { id: questionId },
-      data: { ...(updates.content !== undefined && { content: updates.content }), ...(updates.order !== undefined && { order: updates.order }) },
-    });
+  async updateQuestion(questionId: string, updates: Partial<ExamQuestion & { options?: ExamOption[]; mediaUrl?: string | null; solutionText?: string | null; solutionMediaUrl?: string | null }>): Promise<ExamQuestion | null> {
+    const data: Record<string, unknown> = {};
+    if (updates.content !== undefined) data.content = updates.content;
+    if (updates.order !== undefined) data.order = updates.order;
+    if ('mediaUrl' in updates) data.mediaUrl = updates.mediaUrl ?? null;
+    if ('solutionText' in updates) data.solutionText = updates.solutionText ?? null;
+    if ('solutionMediaUrl' in updates) data.solutionMediaUrl = updates.solutionMediaUrl ?? null;
+    const q = await prisma.examQuestion.update({ where: { id: questionId }, data });
     return {
       id: q.id,
       testId: q.testId,
@@ -284,9 +293,11 @@ export class PrismaExamRepository implements IExamRepository {
       priceCents?: number;
       duration?: number;
       isTimed?: boolean;
+      hasSolutions?: boolean;
       campaignPriceCents?: number | null;
       campaignValidFrom?: Date | null;
       campaignValidUntil?: Date | null;
+      coverImageUrl?: string | null;
     },
   ): Promise<ExamWithQuestions | null> {
     const data: Record<string, unknown> = {};
@@ -294,9 +305,11 @@ export class PrismaExamRepository implements IExamRepository {
     if (updates.priceCents !== undefined) data.priceCents = updates.priceCents;
     if (updates.duration !== undefined) data.duration = updates.duration;
     if (updates.isTimed !== undefined) data.isTimed = updates.isTimed;
+    if (updates.hasSolutions !== undefined) data.hasSolutions = updates.hasSolutions;
     if (updates.campaignPriceCents !== undefined) data.campaignPriceCents = updates.campaignPriceCents;
     if (updates.campaignValidFrom !== undefined) data.campaignValidFrom = updates.campaignValidFrom;
     if (updates.campaignValidUntil !== undefined) data.campaignValidUntil = updates.campaignValidUntil;
+    if (updates.coverImageUrl !== undefined) data.coverImageUrl = updates.coverImageUrl;
     if (Object.keys(data).length === 0) return this.findById(testId);
 
     const updated = await prisma.examTest.update({

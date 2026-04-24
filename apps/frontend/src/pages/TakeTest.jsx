@@ -61,6 +61,7 @@ function toUIStyle(questions, stateQuestions) {
       selectedOptionId,
       selected_answer: selectedLetter,
       explanation: q.solutionText || null,
+      solutionMediaUrl: q.solutionMediaUrl || null,
     };
   });
 }
@@ -667,7 +668,7 @@ export default function TakeTest() {
                 Boş Bırak
               </Button>
             )}
-            {testPackage?.has_solutions && currentQuestion?.explanation && (
+            {test?.has_solutions && (currentQuestion?.explanation || currentQuestion?.solutionMediaUrl) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -707,10 +708,19 @@ export default function TakeTest() {
           {currentQuestion?.question_text}
         </p>
 
-        {showSolution && currentQuestion?.explanation && (
+        {showSolution && (currentQuestion?.explanation || currentQuestion?.solutionMediaUrl) && (
           <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl mb-6">
-            <p className="text-sm font-medium text-indigo-700 mb-1">Çözüm:</p>
-            <p className="text-indigo-900">{currentQuestion.explanation}</p>
+            <p className="text-sm font-medium text-indigo-700 mb-2">Çözüm:</p>
+            {currentQuestion.explanation && (
+              <p className="text-indigo-900 mb-2">{currentQuestion.explanation}</p>
+            )}
+            {currentQuestion.solutionMediaUrl && (
+              <img
+                src={currentQuestion.solutionMediaUrl}
+                alt="Çözüm görseli"
+                className="max-w-full rounded-lg border border-indigo-200"
+              />
+            )}
           </div>
         )}
 
