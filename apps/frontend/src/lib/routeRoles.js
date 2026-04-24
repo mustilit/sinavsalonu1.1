@@ -52,6 +52,7 @@ export const PAGE_ROLES = {
   ManageUsers: [ROLES.ADMIN],
   ManageTests: [ROLES.ADMIN],
   ManageRefunds: [ROLES.ADMIN],
+  AdminObjections: [ROLES.ADMIN],
 };
 
 /** Rolü büyük harfe normalize et (backend bazen küçük harf dönebilir) */

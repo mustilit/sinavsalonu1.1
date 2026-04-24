@@ -78,6 +78,20 @@ export class PublishTestUseCase {
       throw new AppError('DURATION_REQUIRED_FOR_TIMED_TEST', 'Timed tests must have a positive duration', 400);
     }
 
+    // Solutions completeness check: if hasSolutions=true, every question must have a solution
+    if ((test as any).hasSolutions) {
+      const missing = (test.questions ?? []).filter(
+        (q: any) => !q.solutionText?.trim() && !q.solutionMediaUrl?.trim(),
+      );
+      if (missing.length > 0) {
+        throw new AppError(
+          'MISSING_SOLUTIONS',
+          `${missing.length} soru için çözüm eksik. Çözümlü testlerde tüm sorulara çözüm eklenmesi zorunludur.`,
+          400,
+        );
+      }
+    }
+
     // Taxonomy: examTypeId required for publish (FR-E-03); topic optional
     if (!(test as any).examTypeId) {
       throw new AppError('TEST_TAXONOMY_REQUIRED', 'Test must have an exam type to be published', 409);

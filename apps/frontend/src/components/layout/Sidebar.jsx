@@ -14,7 +14,8 @@ import {
   GraduationCap,
   LogOut,
   Award,
-  User
+  User,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function Sidebar({ user, currentPage }) {
@@ -51,6 +52,7 @@ export default function Sidebar({ user, currentPage }) {
     { name: "Kullanıcılar", page: "ManageUsers", icon: Users },
     { name: "Tüm Testler", page: "ManageTests", icon: BookOpen },
     { name: "İade Talepleri", page: "ManageRefunds", icon: ShoppingBag },
+    { name: "Hata Bildirimleri", page: "AdminObjections", icon: AlertTriangle },
   ];
 
   let links = candidateLinks;

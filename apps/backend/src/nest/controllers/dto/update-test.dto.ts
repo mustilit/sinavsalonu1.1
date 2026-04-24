@@ -36,4 +36,14 @@ export class UpdateTestDto {
   @IsOptional()
   @IsBoolean()
   isTimed?: boolean;
+
+  @ApiPropertyOptional({ description: 'Whether this test has written solutions per question' })
+  @IsOptional()
+  @IsBoolean()
+  hasSolutions?: boolean;
+
+  @ApiPropertyOptional({ description: 'Cover image URL for the test card' })
+  @IsOptional()
+  @IsString()
+  coverImageUrl?: string | null;
 }

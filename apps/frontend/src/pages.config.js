@@ -49,6 +49,7 @@
  */
 import About from './pages/About';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminObjections from './pages/AdminObjections';
 import CompleteProfile from './pages/CompleteProfile';
 import Contact from './pages/Contact';
 import CreateTest from './pages/CreateTest';
@@ -86,6 +87,7 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "About": About,
     "AdminDashboard": AdminDashboard,
+    "AdminObjections": AdminObjections,
     "CompleteProfile": CompleteProfile,
     "Contact": Contact,
     "CreateTest": CreateTest,

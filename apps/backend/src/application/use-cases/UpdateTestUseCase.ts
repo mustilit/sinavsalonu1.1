@@ -19,9 +19,11 @@ export class UpdateTestUseCase {
       priceCents?: number;
       duration?: number;
       isTimed?: boolean;
+      hasSolutions?: boolean;
       campaignPriceCents?: number | null;
       campaignValidFrom?: Date | null;
       campaignValidUntil?: Date | null;
+      coverImageUrl?: string | null;
     },
     actorId?: string,
   ) {
@@ -47,9 +49,11 @@ export class UpdateTestUseCase {
       priceCents: updates.priceCents,
       duration: updates.duration,
       isTimed: updates.isTimed,
+      hasSolutions: updates.hasSolutions,
       campaignPriceCents: updates.campaignPriceCents,
       campaignValidFrom: updates.campaignValidFrom,
       campaignValidUntil: updates.campaignValidUntil,
+      coverImageUrl: updates.coverImageUrl,
     });
     if (!updated) throw new AppError('UPDATE_FAILED', 'Failed to update test', 400);
 

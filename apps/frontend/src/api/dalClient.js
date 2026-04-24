@@ -568,19 +568,20 @@ export const entities = {
     },
   },
 
-  // QuestionReport = Objection (educator objections - no list endpoint yet, return [])
+  // QuestionReport = Objection (educator objections)
   QuestionReport: {
     filter: async (opts = {}) => {
       try {
-        const { data } = await api.get('/admin/objections');
+        const params = opts.status ? `?status=${opts.status}` : '';
+        const { data } = await api.get(`/educators/me/objections${params}`);
         return Array.isArray(data) ? data : [];
       } catch {
         return [];
       }
     },
-    update: async (id, body) => {
-      await api.post(`/educators/objections/${id}/answer`, body);
-      return {};
+    answer: async (id, answerText) => {
+      const { data } = await api.post(`/educators/me/objections/${id}/answer`, { answerText });
+      return data;
     },
   },
 };

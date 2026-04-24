@@ -73,9 +73,11 @@ export class TestsController {
       priceCents: body.priceCents,
       duration: body.duration,
       isTimed: body.isTimed,
+      hasSolutions: body.hasSolutions,
       campaignPriceCents: body.campaignPriceCents,
       campaignValidFrom: body.campaignValidFrom ? new Date(body.campaignValidFrom) : undefined,
       campaignValidUntil: body.campaignValidUntil ? new Date(body.campaignValidUntil) : undefined,
+      coverImageUrl: body.coverImageUrl,
     }, actorId);
   }
 
@@ -91,6 +93,9 @@ export class TestsController {
     return await this.updateQuestionUC.execute(questionId, {
       content: body.content,
       order: body.order,
+      mediaUrl: body.mediaUrl,
+      solutionText: body.solutionText,
+      solutionMediaUrl: body.solutionMediaUrl,
     }, actorId);
   }
 

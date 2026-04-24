@@ -27,7 +27,7 @@ export interface IExamRepository {
     order?: 'asc' | 'desc';
   }): Promise<{ items: ExamWithQuestions[]; total: number }>;
   addQuestion(testId: string, question: ExamQuestion & { options: ExamOption[] }): Promise<ExamWithQuestions>;
-  updateQuestion(questionId: string, updates: Partial<ExamQuestion & { options?: ExamOption[] }>): Promise<ExamQuestion | null>;
+  updateQuestion(questionId: string, updates: Partial<ExamQuestion & { options?: ExamOption[]; mediaUrl?: string | null; solutionText?: string | null; solutionMediaUrl?: string | null }>): Promise<ExamQuestion | null>;
   listPublishedByFollowed(opts: { educatorIds?: string[]; examTypeIds?: string[]; limit: number; examTypeId?: string | null }): Promise<ExamWithQuestions[]>;
   listPublishedFallback(opts: { excludeIds?: string[]; limit: number; examTypeId?: string | null }): Promise<ExamWithQuestions[]>;
   listPublishedByEducator(opts: { educatorId: string; examTypeId?: string | null; page?: number; limit?: number; sortBy?: 'publishedAt' | 'price' | 'createdAt'; order?: 'asc' | 'desc' }): Promise<{ items: ExamWithQuestions[]; total: number }>;
@@ -43,9 +43,11 @@ export interface IExamRepository {
       priceCents?: number;
       duration?: number;
       isTimed?: boolean;
+      hasSolutions?: boolean;
       campaignPriceCents?: number | null;
       campaignValidFrom?: Date | null;
       campaignValidUntil?: Date | null;
+      coverImageUrl?: string | null;
     },
   ): Promise<ExamWithQuestions | null>;
 }

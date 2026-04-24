@@ -1,14 +1,28 @@
-import { Controller, Post, Param, Body, Req } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Req, Query, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiConflictResponse, ApiBadRequestResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { ParseUUIDPipe } from '../pipes/parse-uuid.pipe';
 import { AnswerObjectionDto } from './dto/answer-objection.dto';
 import { AnswerObjectionUseCase } from '../../application/use-cases/AnswerObjectionUseCase';
+import { ListEducatorObjectionsUseCase } from '../../application/use-cases/ListEducatorObjectionsUseCase';
 
 @Controller('educators/me/objections')
 @ApiTags('educators/me/objections')
 export class EducatorObjectionsController {
-  constructor(private readonly answerObjection: AnswerObjectionUseCase) {}
+  constructor(
+    @Inject(AnswerObjectionUseCase) private readonly answerObjection: AnswerObjectionUseCase,
+    @Inject(ListEducatorObjectionsUseCase) private readonly listObjections: ListEducatorObjectionsUseCase,
+  ) {}
+
+  @Get()
+  @Roles('EDUCATOR')
+  @ApiBearerAuth('bearer')
+  @ApiOkResponse({ description: 'List objections for educator\'s tests' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  async list(@Req() req: any, @Query('status') status?: string) {
+    const educatorId = (req as any).user?.id;
+    return this.listObjections.execute(educatorId, status ? { status } : undefined);
+  }
 
   @Post(':id/answer')
   @Roles('EDUCATOR')

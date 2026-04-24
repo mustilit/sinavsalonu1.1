@@ -11,4 +11,19 @@ export class UpdateQuestionDto {
   @IsOptional()
   @IsNumber()
   order?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  mediaUrl?: string | null;
+
+  @ApiPropertyOptional({ description: 'Written solution text or video/meeting URL' })
+  @IsOptional()
+  @IsString()
+  solutionText?: string | null;
+
+  @ApiPropertyOptional({ description: 'Solution image URL' })
+  @IsOptional()
+  @IsString()
+  solutionMediaUrl?: string | null;
 }

@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, MessageSquare, Clock, CheckCircle } from "lucide-react";
+import { AlertTriangle, MessageSquare, Clock, CheckCircle, ShieldCheck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -18,20 +18,10 @@ import { toast } from "sonner";
 import { format, differenceInDays } from "date-fns";
 import { tr } from "date-fns/locale";
 
-const reportTypeLabels = {
-  wrong_answer: "Yanlış Cevap",
-  unclear_question: "Belirsiz Soru",
-  missing_option: "Eksik Şık",
-  typo: "Yazım Hatası",
-  other: "Diğer"
-};
-
-const statusLabels = {
-  pending: { label: "Beklemede", color: "bg-amber-100 text-amber-700" },
-  educator_review: { label: "İncelemede", color: "bg-blue-100 text-blue-700" },
-  admin_review: { label: "Yönetici İncelemesi", color: "bg-violet-100 text-violet-700" },
-  resolved: { label: "Çözüldü", color: "bg-emerald-100 text-emerald-700" },
-  rejected: { label: "Reddedildi", color: "bg-slate-100 text-slate-600" }
+const statusConfig = {
+  OPEN:      { label: "Beklemede",           color: "bg-amber-100 text-amber-700" },
+  ANSWERED:  { label: "Yanıtlandı",          color: "bg-emerald-100 text-emerald-700" },
+  ESCALATED: { label: "Yöneticiye İletildi", color: "bg-violet-100 text-violet-700" },
 };
 
 export default function QuestionReports() {
@@ -41,38 +31,38 @@ export default function QuestionReports() {
   const queryClient = useQueryClient();
 
   const { data: reports = [], isLoading } = useQuery({
-    queryKey: ["questionReports", user?.email],
-    queryFn: () => base44.entities.QuestionReport.filter({ educator_email: user.email }, "-created_date"),
+    queryKey: ["educatorObjections"],
+    queryFn: async () => {
+      const { data } = await api.get("/educators/me/objections");
+      return Array.isArray(data) ? data : [];
+    },
     enabled: !!user,
   });
 
-  const respondMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.QuestionReport.update(id, data),
+  const answerMutation = useMutation({
+    mutationFn: ({ id, answerText }) =>
+      api.post(`/educators/me/objections/${id}/answer`, { answerText }),
     onSuccess: () => {
       toast.success("Yanıt gönderildi");
-      queryClient.invalidateQueries({ queryKey: ["questionReports"] });
+      queryClient.invalidateQueries({ queryKey: ["educatorObjections"] });
       setSelectedReport(null);
       setResponse("");
     },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message ?? "Yanıt gönderilemedi");
+    },
   });
 
-  const handleRespond = (status) => {
-    if (!response.trim()) {
-      toast.error("Lütfen bir yanıt yazın");
+  const handleAnswer = () => {
+    if (!response.trim() || response.trim().length < 5) {
+      toast.error("En az 5 karakter yazın");
       return;
     }
-    respondMutation.mutate({
-      id: selectedReport?.id,
-      data: {
-        educator_response: response,
-        educator_response_date: new Date().toISOString(),
-        status
-      }
-    });
+    answerMutation.mutate({ id: selectedReport.id, answerText: response.trim() });
   };
 
-  const pendingReports = reports.filter(r => r.status === "pending" || r.status === "educator_review");
-  const resolvedReports = reports.filter(r => r.status === "resolved" || r.status === "rejected");
+  const pending  = reports.filter(r => r.status === "OPEN");
+  const resolved = reports.filter(r => r.status !== "OPEN");
 
   return (
     <div>
@@ -83,18 +73,17 @@ export default function QuestionReports() {
 
       <Tabs defaultValue="pending" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="pending">Bekleyen ({pendingReports.length})</TabsTrigger>
-          <TabsTrigger value="resolved">Sonuçlanan ({resolvedReports.length})</TabsTrigger>
+          <TabsTrigger value="pending">Bekleyen ({pending.length})</TabsTrigger>
+          <TabsTrigger value="resolved">Sonuçlanan ({resolved.length})</TabsTrigger>
         </TabsList>
 
+        {/* ── Bekleyen ── */}
         <TabsContent value="pending">
           {isLoading ? (
             <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-24 bg-slate-100 rounded-lg animate-pulse" />
-              ))}
+              {[1, 2, 3].map(i => <div key={i} className="h-24 bg-slate-100 rounded-lg animate-pulse" />)}
             </div>
-          ) : pendingReports.length === 0 ? (
+          ) : pending.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
                 <CheckCircle className="w-12 h-12 text-emerald-300 mx-auto mb-3" />
@@ -103,41 +92,50 @@ export default function QuestionReports() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {pendingReports.map((report) => {
-                const daysLeft = report.deadline_date 
-                  ? differenceInDays(new Date(report.deadline_date), new Date())
+              {pending.map(report => {
+                const daysLeft = report.deadlineAt
+                  ? differenceInDays(new Date(report.deadlineAt), new Date())
                   : 10;
-                
+                const urgent = daysLeft <= 2;
                 return (
-                  <Card key={report.id} className={daysLeft <= 2 ? "border-rose-200" : ""}>
+                  <Card key={report.id} className={urgent ? "border-rose-200" : ""}>
                     <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-4">
-                          <div className={`p-3 rounded-xl ${daysLeft <= 2 ? "bg-rose-100" : "bg-amber-100"}`}>
-                            <AlertTriangle className={`w-5 h-5 ${daysLeft <= 2 ? "text-rose-600" : "text-amber-600"}`} />
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-4 flex-1 min-w-0">
+                          <div className={`p-3 rounded-xl shrink-0 ${urgent ? "bg-rose-100" : "bg-amber-100"}`}>
+                            <AlertTriangle className={`w-5 h-5 ${urgent ? "text-rose-600" : "text-amber-600"}`} />
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge className="bg-slate-100 text-slate-700">
-                                {reportTypeLabels[report.report_type]}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <Badge className={statusConfig[report.status]?.color ?? "bg-slate-100 text-slate-700"}>
+                                {statusConfig[report.status]?.label ?? report.status}
                               </Badge>
-                              <Badge className={statusLabels[report.status]?.color}>
-                                {statusLabels[report.status]?.label}
-                              </Badge>
+                              <span className="text-sm font-medium text-slate-800 truncate">
+                                {report.testTitle}
+                              </span>
                             </div>
-                            <p className="font-medium text-slate-900">{report.test_package_title}</p>
-                            <p className="text-sm text-slate-500 mt-1">{report.description}</p>
-                            <div className="flex items-center gap-4 mt-3 text-sm text-slate-500">
-                              <span>Bildiren: {report.reporter_name}</span>
+                            {report.questionContent && (
+                              <p className="text-sm text-slate-500 italic line-clamp-2 mb-1">
+                                "{report.questionContent}"
+                              </p>
+                            )}
+                            <p className="text-sm text-slate-700">{report.reason}</p>
+                            <div className="flex items-center gap-4 mt-2 text-xs text-slate-400 flex-wrap">
+                              <span>Bildiren: {report.reporterName}</span>
                               <span className="flex items-center gap-1">
-                                <Clock className="w-4 h-4" />
+                                <Clock className="w-3.5 h-3.5" />
                                 {daysLeft > 0 ? `${daysLeft} gün kaldı` : "Süre doldu"}
                               </span>
+                              <span>{format(new Date(report.createdAt), "d MMM yyyy", { locale: tr })}</span>
                             </div>
                           </div>
                         </div>
-                        <Button onClick={() => setSelectedReport(report)}>
-                          <MessageSquare className="w-4 h-4 mr-2" />
+                        <Button
+                          size="sm"
+                          onClick={() => { setSelectedReport(report); setResponse(""); }}
+                          className="shrink-0"
+                        >
+                          <MessageSquare className="w-4 h-4 mr-1.5" />
                           Yanıtla
                         </Button>
                       </div>
@@ -149,8 +147,9 @@ export default function QuestionReports() {
           )}
         </TabsContent>
 
+        {/* ── Sonuçlanan ── */}
         <TabsContent value="resolved">
-          {resolvedReports.length === 0 ? (
+          {resolved.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
                 <p className="text-slate-500">Sonuçlanan bildirim yok</p>
@@ -158,24 +157,42 @@ export default function QuestionReports() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {resolvedReports.map((report) => (
+              {resolved.map(report => (
                 <Card key={report.id}>
                   <CardContent className="p-6">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge className={statusLabels[report.status]?.color}>
-                        {statusLabels[report.status]?.label}
-                      </Badge>
-                      <Badge className="bg-slate-100 text-slate-700">
-                        {reportTypeLabels[report.report_type]}
-                      </Badge>
-                    </div>
-                    <p className="font-medium text-slate-900">{report.test_package_title}</p>
-                    <p className="text-sm text-slate-500 mt-1">{report.description}</p>
-                    {report.educator_response && (
-                      <div className="mt-4 p-3 bg-slate-50 rounded-lg">
-                        <p className="text-sm text-slate-600"><strong>Yanıtınız:</strong> {report.educator_response}</p>
+                    <div className="flex items-start gap-4">
+                      <div className="p-2 rounded-xl bg-slate-100 shrink-0">
+                        <ShieldCheck className="w-5 h-5 text-slate-500" />
                       </div>
-                    )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <Badge className={statusConfig[report.status]?.color ?? "bg-slate-100 text-slate-700"}>
+                            {statusConfig[report.status]?.label ?? report.status}
+                          </Badge>
+                          <span className="text-sm font-medium text-slate-800">{report.testTitle}</span>
+                        </div>
+                        {report.questionContent && (
+                          <p className="text-sm text-slate-500 italic line-clamp-1">
+                            "{report.questionContent}"
+                          </p>
+                        )}
+                        <p className="text-sm text-slate-700 mt-1">{report.reason}</p>
+                        {report.answerText && (
+                          <div className="mt-3 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                            <p className="text-xs font-semibold text-emerald-700 mb-1">Yanıtınız:</p>
+                            <p className="text-sm text-slate-700">{report.answerText}</p>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-4 mt-2 text-xs text-slate-400 flex-wrap">
+                          <span>Bildiren: {report.reporterName}</span>
+                          {report.answeredAt && (
+                            <span>
+                              Yanıtlandı: {format(new Date(report.answeredAt), "d MMM yyyy", { locale: tr })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -184,31 +201,44 @@ export default function QuestionReports() {
         </TabsContent>
       </Tabs>
 
+      {/* ── Yanıt Dialog ── */}
       <Dialog open={!!selectedReport} onOpenChange={() => setSelectedReport(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Bildirime Yanıt Ver</DialogTitle>
           </DialogHeader>
           {selectedReport && (
-            <div className="space-y-4 mt-4">
-              <div className="p-4 bg-slate-50 rounded-lg">
-                <p className="text-sm text-slate-500 mb-1">Bildirim:</p>
-                <p className="text-slate-900">{selectedReport.description}</p>
+            <div className="space-y-4 mt-2">
+              <div className="p-4 bg-slate-50 rounded-lg space-y-2">
+                <div>
+                  <p className="text-xs text-slate-400 font-medium">Test</p>
+                  <p className="text-sm font-semibold text-slate-800">{selectedReport.testTitle}</p>
+                </div>
+                {selectedReport.questionContent && (
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium">Soru (ilk 150 karakter)</p>
+                    <p className="text-sm text-slate-600 italic">"{selectedReport.questionContent}"</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-slate-400 font-medium">Aday Bildirimi</p>
+                  <p className="text-sm text-slate-700">{selectedReport.reason}</p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Textarea
-                  value={response}
-                  onChange={(e) => setResponse(e.target.value)}
-                  placeholder="Yanıtınızı yazın..."
-                  rows={4}
-                />
-              </div>
+              <Textarea
+                value={response}
+                onChange={e => setResponse(e.target.value)}
+                placeholder="Yanıtınızı yazın (en az 5 karakter)..."
+                rows={4}
+              />
               <div className="flex gap-3 justify-end">
-                <Button variant="outline" onClick={() => handleRespond("rejected")}>
-                  Reddet
-                </Button>
-                <Button onClick={() => handleRespond("resolved")} className="bg-emerald-600 hover:bg-emerald-700">
-                  Kabul Et ve Çöz
+                <Button variant="outline" onClick={() => setSelectedReport(null)}>İptal</Button>
+                <Button
+                  onClick={handleAnswer}
+                  disabled={answerMutation.isPending}
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  {answerMutation.isPending ? "Gönderiliyor..." : "Yanıtla"}
                 </Button>
               </div>
             </div>

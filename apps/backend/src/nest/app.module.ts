@@ -67,6 +67,9 @@ import { getRedisUrl } from '../config/redis';
 import { CreateObjectionUseCase } from '../application/use-cases/CreateObjectionUseCase';
 import { AnswerObjectionUseCase } from '../application/use-cases/AnswerObjectionUseCase';
 import { ListEscalatedObjectionsUseCase } from '../application/use-cases/ListEscalatedObjectionsUseCase';
+import { ListEducatorObjectionsUseCase } from '../application/use-cases/ListEducatorObjectionsUseCase';
+import { ListAllObjectionsUseCase } from '../application/use-cases/ListAllObjectionsUseCase';
+import { ListTestReportStatsUseCase } from '../application/use-cases/ListTestReportStatsUseCase';
 import { ApproveRefundUseCase } from '../application/use-cases/ApproveRefundUseCase';
 import { RejectRefundUseCase } from '../application/use-cases/RejectRefundUseCase';
 import { ListMyRefundsUseCase } from '../application/use-cases/ListMyRefundsUseCase';
@@ -227,6 +230,21 @@ const throttleDisabled =
     {
       provide: ListEscalatedObjectionsUseCase,
       useFactory: (objectionRepo: PrismaObjectionRepository) => new ListEscalatedObjectionsUseCase(objectionRepo),
+      inject: [OBJECTION_REPO],
+    },
+    {
+      provide: ListEducatorObjectionsUseCase,
+      useFactory: (objectionRepo: PrismaObjectionRepository) => new ListEducatorObjectionsUseCase(objectionRepo),
+      inject: [OBJECTION_REPO],
+    },
+    {
+      provide: ListAllObjectionsUseCase,
+      useFactory: (objectionRepo: PrismaObjectionRepository) => new ListAllObjectionsUseCase(objectionRepo),
+      inject: [OBJECTION_REPO],
+    },
+    {
+      provide: ListTestReportStatsUseCase,
+      useFactory: (objectionRepo: PrismaObjectionRepository) => new ListTestReportStatsUseCase(objectionRepo),
       inject: [OBJECTION_REPO],
     },
     PrismaRefundRepository,

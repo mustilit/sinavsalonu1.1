@@ -18,7 +18,7 @@ export class UpdateQuestionUseCase {
 
   async execute(
     questionId: string,
-    updates: { content?: string; order?: number },
+    updates: { content?: string; order?: number; mediaUrl?: string | null; solutionText?: string | null; solutionMediaUrl?: string | null },
     actorId?: string,
   ) {
     if (actorId) {
