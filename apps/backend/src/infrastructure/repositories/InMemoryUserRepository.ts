@@ -7,9 +7,10 @@ import { IUserRepository } from '../../domain/interfaces/IUserRepository';
  * Unique constraint: email ve username benzersiz olmalı
  */
 export class InMemoryUserRepository implements IUserRepository {
-  private users: Map<string, User> = new Map();
+  private users: Map<string, User & { passwordResetToken?: string | null; passwordResetTokenExpiresAt?: Date | null }> = new Map();
   private emailIndex: Map<string, string> = new Map();
   private usernameIndex: Map<string, string> = new Map();
+  private resetTokenIndex: Map<string, string> = new Map();
 
   async save(user: User): Promise<User> {
     // Unique constraint: email kontrolü
@@ -114,6 +115,29 @@ export class InMemoryUserRepository implements IUserRepository {
     });
 
     return list.slice(offset, offset + limit);
+  }
+
+  async setPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void> {
+    const user = this.users.get(userId);
+    if (!user) return;
+    if (user.passwordResetToken) this.resetTokenIndex.delete(user.passwordResetToken);
+    const updated = { ...user, passwordResetToken: token, passwordResetTokenExpiresAt: expiresAt };
+    this.users.set(userId, updated);
+    this.resetTokenIndex.set(token, userId);
+  }
+
+  async findByPasswordResetToken(token: string): Promise<User | null> {
+    const userId = this.resetTokenIndex.get(token);
+    if (!userId) return null;
+    return this.users.get(userId) ?? null;
+  }
+
+  async resetPassword(userId: string, newPasswordHash: string): Promise<void> {
+    const user = this.users.get(userId);
+    if (!user) return;
+    if (user.passwordResetToken) this.resetTokenIndex.delete(user.passwordResetToken);
+    const updated = { ...user, passwordHash: newPasswordHash, passwordResetToken: null, passwordResetTokenExpiresAt: null };
+    this.users.set(userId, updated);
   }
 
   async updateByAdmin(

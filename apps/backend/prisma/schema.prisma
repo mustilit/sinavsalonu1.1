@@ -117,8 +117,10 @@ model User {
   role               UserRole   @default(CANDIDATE)
   status             UserStatus @default(ACTIVE)
   educatorApprovedAt DateTime?
-  lastLoginAt        DateTime?
-  metadata           Json?
+  lastLoginAt                 DateTime?
+  passwordResetToken          String?   @unique
+  passwordResetTokenExpiresAt DateTime?
+  metadata                    Json?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
   deletedAt          DateTime?

@@ -27,8 +27,10 @@ export const PAGE_ROLES = {
   Educators: [ROLES.PUBLIC],
   ExamTypes: [ROLES.PUBLIC],
   EducatorProfile: [ROLES.PUBLIC],
+  ForgotPassword: [ROLES.PUBLIC],
   Login: [ROLES.PUBLIC],
   Register: [ROLES.PUBLIC],
+  ResetPassword: [ROLES.PUBLIC],
 
   MyTests: [ROLES.CANDIDATE],
   MyResults: [ROLES.CANDIDATE],

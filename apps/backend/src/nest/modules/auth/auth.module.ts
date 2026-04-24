@@ -3,9 +3,12 @@ import { AuthController } from '../../controllers/auth.controller';
 import { RegisterUseCase } from '../../../application/use-cases/RegisterUseCase';
 import { RegisterEducatorUseCase } from '../../../application/use-cases/RegisterEducatorUseCase';
 import { LoginUseCase } from '../../../application/use-cases/LoginUseCase';
+import { ForgotPasswordUseCase } from '../../../application/use-cases/ForgotPasswordUseCase';
+import { ResetPasswordUseCase } from '../../../application/use-cases/ResetPasswordUseCase';
 import { PrismaUserRepository } from '../../../infrastructure/repositories/PrismaUserRepository';
 import { PasswordService } from '../../../infrastructure/services/PasswordService';
 import { JwtService } from '../../../infrastructure/services/JwtService';
+import { MockEmailProvider } from '../../../infrastructure/services/MockEmailProvider';
 import { PrismaAuditLogRepository } from '../../../infrastructure/repositories/PrismaAuditLogRepository';
 import { PrismaContractRepository } from '../../../infrastructure/repositories/PrismaContractRepository';
 import { PrismaContractAcceptanceRepository } from '../../../infrastructure/repositories/PrismaContractAcceptanceRepository';
@@ -35,6 +38,19 @@ import { LoginBruteforceGuard } from '../../guards/login-bruteforce.guard';
     },
     CaptchaService,
     LoginBruteforceGuard,
+    MockEmailProvider,
+    {
+      provide: ForgotPasswordUseCase,
+      useFactory: (userRepo: PrismaUserRepository, emailProvider: MockEmailProvider) =>
+        new ForgotPasswordUseCase(userRepo, emailProvider),
+      inject: [PrismaUserRepository, MockEmailProvider],
+    },
+    {
+      provide: ResetPasswordUseCase,
+      useFactory: (userRepo: PrismaUserRepository, passwordService: PasswordService) =>
+        new ResetPasswordUseCase(userRepo, passwordService),
+      inject: [PrismaUserRepository, PasswordService],
+    },
     PrismaAuditLogRepository,
     {
       provide: CONTRACT_REPO,

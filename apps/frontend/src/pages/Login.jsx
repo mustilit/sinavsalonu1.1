@@ -65,6 +65,11 @@ export default function Login() {
               className="w-full"
             />
           </div>
+          <div className="flex justify-end">
+            <Link to={createPageUrl('ForgotPassword')} className="text-sm text-indigo-600 hover:underline">
+              Şifremi unuttum?
+            </Link>
+          </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700">
             {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}

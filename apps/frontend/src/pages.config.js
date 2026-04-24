@@ -60,7 +60,9 @@ import EducatorSettings from './pages/EducatorSettings';
 import Educators from './pages/Educators';
 import ExamTypes from './pages/ExamTypes';
 import Explore from './pages/Explore';
+import ForgotPassword from './pages/ForgotPassword';
 import Home from './pages/Home';
+import ResetPassword from './pages/ResetPassword';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ManageExamTypes from './pages/ManageExamTypes';
@@ -98,9 +100,11 @@ export const PAGES = {
     "Educators": Educators,
     "ExamTypes": ExamTypes,
     "Explore": Explore,
+    "ForgotPassword": ForgotPassword,
     "Home": Home,
     "Login": Login,
     "Register": Register,
+    "ResetPassword": ResetPassword,
     "ManageExamTypes": ManageExamTypes,
     "ManageRefunds": ManageRefunds,
     "ManageTests": ManageTests,

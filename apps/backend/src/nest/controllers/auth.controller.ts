@@ -3,6 +3,8 @@ import { Throttle } from '@nestjs/throttler';
 import { RegisterUseCase } from '../../application/use-cases/RegisterUseCase';
 import { RegisterEducatorUseCase } from '../../application/use-cases/RegisterEducatorUseCase';
 import { LoginUseCase } from '../../application/use-cases/LoginUseCase';
+import { ForgotPasswordUseCase } from '../../application/use-cases/ForgotPasswordUseCase';
+import { ResetPasswordUseCase } from '../../application/use-cases/ResetPasswordUseCase';
 import { Public } from '../decorators/public.decorator';
 import { RegisterEducatorDto } from './dto/register-educator.dto';
 import { IUserRepository } from '../../domain/interfaces/IUserRepository';
@@ -20,6 +22,8 @@ export class AuthController {
     private readonly registerEducatorUseCase: RegisterEducatorUseCase,
     private readonly loginUseCase: LoginUseCase,
     @Inject(USER_REPO) private readonly userRepo: IUserRepository,
+    @Inject(ForgotPasswordUseCase) private readonly forgotPasswordUC: ForgotPasswordUseCase,
+    @Inject(ResetPasswordUseCase) private readonly resetPasswordUC: ResetPasswordUseCase,
   ) {}
 
   @Get('me')
@@ -106,6 +110,30 @@ export class AuthController {
         { error: err?.message || 'Giriş sırasında hata oluştu' },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
+    }
+  }
+
+  @Post('forgot-password')
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 300000 } })
+  async forgotPassword(@Body() body: any) {
+    const email = String(body?.email ?? '').trim().toLowerCase();
+    if (!email) throw new HttpException({ error: 'E-posta gerekli' }, HttpStatus.BAD_REQUEST);
+    await this.forgotPasswordUC.execute(email);
+    return { message: 'E-posta gönderildi' }; // Always success
+  }
+
+  @Post('reset-password')
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 300000 } })
+  async resetPassword(@Body() body: any) {
+    const token = String(body?.token ?? '').trim();
+    const newPassword = String(body?.newPassword ?? '');
+    try {
+      await this.resetPasswordUC.execute(token, newPassword);
+      return { message: 'Şifre güncellendi' };
+    } catch (err: any) {
+      throw new HttpException({ error: err.message || 'İşlem başarısız' }, err.status ?? HttpStatus.BAD_REQUEST);
     }
   }
 }

@@ -195,6 +195,34 @@ export class PrismaUserRepository implements IUserRepository {
     return this.findById(userId);
   }
 
+  async setPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordResetToken: token,
+        passwordResetTokenExpiresAt: expiresAt,
+      } as any,
+    });
+  }
+
+  async findByPasswordResetToken(token: string): Promise<User | null> {
+    const user = await prisma.user.findUnique({
+      where: { passwordResetToken: token } as any,
+    });
+    return user ? this.toDomain(user as any) : null;
+  }
+
+  async resetPassword(userId: string, newPasswordHash: string): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: newPasswordHash,
+        passwordResetToken: null,
+        passwordResetTokenExpiresAt: null,
+      } as any,
+    });
+  }
+
   private toDomain(row: {
     id: string;
     email: string;
@@ -203,10 +231,12 @@ export class PrismaUserRepository implements IUserRepository {
     role: string;
     status?: string | null;
     educatorApprovedAt?: Date | null;
+    passwordResetToken?: string | null;
+    passwordResetTokenExpiresAt?: Date | null;
     metadata?: any;
     createdAt: Date;
     updatedAt: Date;
-  }): User {
+  }): User & { passwordResetTokenExpiresAt?: Date | null } {
     return {
       id: row.id,
       email: row.email,
@@ -215,6 +245,7 @@ export class PrismaUserRepository implements IUserRepository {
       role: row.role as User['role'],
       status: (row.status as User['status']) ?? 'ACTIVE',
       educatorApprovedAt: row.educatorApprovedAt ?? undefined,
+      passwordResetTokenExpiresAt: row.passwordResetTokenExpiresAt ?? null,
       metadata: (row.metadata as Record<string, unknown>) ?? {},
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

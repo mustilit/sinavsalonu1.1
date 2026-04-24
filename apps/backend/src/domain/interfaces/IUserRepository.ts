@@ -41,4 +41,8 @@ export interface IUserRepository {
       metadataMerge?: Record<string, unknown>;
     },
   ): Promise<User | null>;
+
+  setPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
+  findByPasswordResetToken(token: string): Promise<User | null>;
+  resetPassword(userId: string, newPasswordHash: string): Promise<void>;
 }
