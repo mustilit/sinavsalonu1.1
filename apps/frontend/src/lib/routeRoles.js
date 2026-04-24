@@ -48,6 +48,7 @@ export const PAGE_ROLES = {
   CreateTest: [ROLES.EDUCATOR],
   EditTest: [ROLES.EDUCATOR],
 
+  AdminCandidateReport: [ROLES.ADMIN],
   AdminDashboard: [ROLES.ADMIN],
   ManageExamTypes: [ROLES.ADMIN],
   ManageTopics: [ROLES.ADMIN],

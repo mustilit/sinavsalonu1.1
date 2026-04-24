@@ -47,6 +47,7 @@ export default function Sidebar({ user, currentPage }) {
 
   const adminLinks = [
     { name: "Yönetim Paneli", page: "AdminDashboard", icon: Settings },
+    { name: "Aday Raporu", page: "AdminCandidateReport", icon: Users },
     { name: "Sınav Türleri", page: "ManageExamTypes", icon: Award },
     { name: "Soru Konuları", page: "ManageTopics", icon: BookOpen },
     { name: "Kullanıcılar", page: "ManageUsers", icon: Users },

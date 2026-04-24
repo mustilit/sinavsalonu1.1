@@ -103,6 +103,10 @@ import { ListEducatorPurchasesUseCase } from '../application/use-cases/ListEduca
 import { DeleteDiscountCodeUseCase } from '../application/use-cases/DeleteDiscountCodeUseCase';
 import { AttemptsController } from './controllers/attempts.controller';
 import { MetricsController } from './controllers/metrics.controller';
+import { AdminCandidatesController } from './controllers/admin.candidates.controller';
+import { GetCandidateReportUseCase } from '../application/use-cases/GetCandidateReportUseCase';
+import { SendBulkCandidateEmailUseCase } from '../application/use-cases/SendBulkCandidateEmailUseCase';
+import { MockEmailProvider } from '../infrastructure/services/MockEmailProvider';
 
 const THROTTLE_TTL_SECONDS = Number(process.env.THROTTLE_TTL_SECONDS ?? '60') || 60;
 
@@ -169,7 +173,7 @@ const throttleDisabled =
     (require('./modules/refunds/refunds.module').RefundsModule),
     ContractsModule,
   ],
-  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController],
+  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AdminCandidatesController],
   providers: [
     SeedService,
     ...(throttleDisabled ? [] : [{ provide: APP_GUARD, useClass: CustomThrottlerGuard }]),
@@ -350,6 +354,13 @@ const throttleDisabled =
       provide: DeleteDiscountCodeUseCase,
       useFactory: (userRepo: PrismaUserRepository) => new DeleteDiscountCodeUseCase(userRepo),
       inject: [USER_REPO],
+    },
+    GetCandidateReportUseCase,
+    MockEmailProvider,
+    {
+      provide: SendBulkCandidateEmailUseCase,
+      useFactory: (emailProvider: MockEmailProvider) => new SendBulkCandidateEmailUseCase(emailProvider),
+      inject: [MockEmailProvider],
     },
   ],
 })
