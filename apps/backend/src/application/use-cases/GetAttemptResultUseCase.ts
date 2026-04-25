@@ -3,6 +3,14 @@ import { IExamRepository } from '../../domain/interfaces/IExamRepository';
 import { IAttemptAnswerRepository } from '../../domain/interfaces/IAttemptAnswerRepository';
 import { BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 
+/**
+ * Tamamlanmış test denemesinin sonuçlarını hesaplar ve döner.
+ * Soru başına doğru/yanlış/boş analizi yapılır; yüzde skoru da hesaplanır.
+ *
+ * Ön koşullar:
+ *   - Deneme SUBMITTED veya TIMEOUT durumunda olmalı
+ *   - İstek sahibi denemenin sahibi olan aday olmalı
+ */
 export class GetAttemptResultUseCase {
   constructor(private readonly attempts: IAttemptRepository, private readonly exams: IExamRepository, private readonly answers: IAttemptAnswerRepository) {}
 
@@ -11,20 +19,26 @@ export class GetAttemptResultUseCase {
 
     const attempt = await this.attempts.findAttemptById(attemptId);
     if (!attempt) throw new BadRequestException({ code: 'ATTEMPT_NOT_FOUND', message: 'Attempt not found' });
+    // Sonuçlar yalnızca denemenin sahibine gösterilir
     if (attempt.candidateId !== candidateId) throw new ForbiddenException({ code: 'NOT_ATTEMPT_OWNER', message: 'Not owner' });
+    // Devam eden denemenin cevabı henüz değerlendirilemez
     if (!['SUBMITTED', 'TIMEOUT'].includes(attempt.status as any)) throw new ConflictException({ code: 'ATTEMPT_NOT_FINISHED', message: 'Attempt not finished' });
 
     const test = await this.exams.findById(attempt.testId);
     if (!test) throw new BadRequestException({ code: 'TEST_NOT_FOUND', message: 'Test not found' });
 
+    // Test soru sırasını koru — cevap matrisi oluşturmak için ID listesi
     const questionIds = (test.questions ?? []).map((q: any) => q.id);
 
+    // questionId → seçilen seçenek ID'si eşlemesi
     const answerRows = await this.answers.findByAttemptId(attemptId);
     const answersMap: Record<string, string | null> = {};
     for (const a of answerRows) answersMap[a.questionId] = a.selectedOptionId ?? null;
 
+    // Her soru için doğru seçenek ID'lerini toplu çek (N+1 önler)
     const correctMap = await this.exams.findCorrectOptionIdsByQuestionIds(questionIds);
 
+    // isCorrect: null → boş, true → doğru, false → yanlış
     const questions = questionIds.map((qid: string, idx: number) => {
       const selected = answersMap[qid] ?? null;
       const correctOptionIds = correctMap[qid] ?? [];
@@ -36,6 +50,7 @@ export class GetAttemptResultUseCase {
     const correct = questions.filter((q) => q.isCorrect === true).length;
     const wrong = questions.filter((q) => q.isCorrect === false).length;
     const blank = questions.filter((q) => q.isCorrect === null).length;
+    // Yüzde 2 ondalık hassasiyetle yuvarlanır (örn. 87.50)
     const percentage = total > 0 ? Math.round((correct / total) * 10000) / 100 : 0;
 
     return {

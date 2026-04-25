@@ -4,6 +4,11 @@ import { GetPerformanceDistributionDto } from './dto/get-performance-distributio
 import { GetPerformanceDistributionUseCase } from '../../application/use-cases/GetPerformanceDistributionUseCase';
 import { PrismaAttemptRepository } from '../../infrastructure/repositories/PrismaAttemptRepository';
 
+/**
+ * Test performans dağılımı endpoint'i — adayın belirli bir testteki
+ * puan dağılımını ve percentile bilgisini döndürür.
+ * CANDIDATE rolüne kısıtlıdır.
+ */
 @Controller('tests')
 export class TestsPerformanceController {
   private uc: GetPerformanceDistributionUseCase;

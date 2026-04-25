@@ -1,5 +1,6 @@
 import type { SiteSettings } from '../../domain/types';
 
+/** Güncellenebilir site içerik alanları — hepsi opsiyonel (partial update) */
 export type UpdateSiteSettingsInput = Partial<{
   siteName: string;
   heroTitle: string;
@@ -22,12 +23,17 @@ export type UpdateSiteSettingsInput = Partial<{
   copyrightText: string;
 }>;
 
+/**
+ * Site içerik ayarlarını günceller. id=1 satırı yoksa oluşturur (upsert).
+ * Sadece gönderilen alanlar güncellenir — eksik alanlar dokunulmaz.
+ */
 export class UpdateSiteSettingsUseCase {
   async execute(
     prisma: { siteSettings: { upsert: (args: any) => Promise<any> } },
     input: UpdateSiteSettingsInput,
   ): Promise<SiteSettings> {
     const update: Record<string, unknown> = {};
+    // Gönderilmeyen alanları atla — partial update uygula
     const keys = [
       'siteName', 'heroTitle', 'heroSubtitle', 'searchPlaceholder',
       'statTests', 'statEducators', 'statCandidates', 'statSuccessRate',

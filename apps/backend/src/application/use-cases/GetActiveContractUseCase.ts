@@ -2,6 +2,10 @@ import type { IContractRepository } from '../../domain/interfaces/IContractRepos
 import type { ContractType } from '../../domain/types';
 import { AppError } from '../errors/AppError';
 
+/**
+ * Aktif (yayınlanmış) sözleşmeyi türüne göre getirir.
+ * Kayıt yoksa 404 fırlatır — frontend kayıt dışı bırakmayı engelleyebilir.
+ */
 export class GetActiveContractUseCase {
   constructor(private readonly contractRepo: IContractRepository) {}
 

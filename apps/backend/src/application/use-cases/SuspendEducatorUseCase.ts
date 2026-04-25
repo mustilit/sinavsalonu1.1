@@ -4,6 +4,11 @@ import { IUserRepository } from '../../domain/interfaces/IUserRepository';
 import { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository';
 import { USER_REPO, AUDIT_LOG_REPO } from '../constants';
 
+/**
+ * Eğiticiyi askıya alır (SUSPENDED).
+ * Askıya alınan eğitici yeni test oluşturamaz ve testleri listeden gizlenebilir.
+ * Sadece admin tarafından çağrılır.
+ */
 @Injectable()
 export class SuspendEducatorUseCase {
   constructor(

@@ -1,3 +1,4 @@
+/** Soru seçeneği güncelleme isteği DTO'su */
 import { IsString, IsOptional, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 

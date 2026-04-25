@@ -3,21 +3,31 @@ import { IObjectionRepository } from '../../domain/interfaces/IObjectionReposito
 import { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 
+/**
+ * Satın alınan test için iade talebi oluşturur.
+ *
+ * İş kuralı: İade için en az 10 onaylı itiraz gerekmektedir.
+ * Aynı satın alma için yalnızca bir aktif iade talebi olabilir.
+ *
+ * Hata senaryoları:
+ *   - REFUND_EXISTS (409): Bu satın alma için zaten bir iade talebi var
+ *   - NOT_ELIGIBLE_FOR_REFUND (400): İtiraz sayısı 10'un altında
+ *   - PURCHASE_NOT_FOUND (400): Satın alma kaydı bulunamadı
+ */
 export class CreateRefundRequestUseCase {
   constructor(private readonly refundRepo: IRefundRepository, private readonly objectionRepo: IObjectionRepository, private readonly auditRepo: IAuditLogRepository) {}
 
   async execute(purchaseId: string, candidateId: string, reason?: string) {
     if (!purchaseId || !candidateId) throw new BadRequestException('INVALID_INPUT');
 
-    // check existing refund
+    // Aynı satın alma için ikinci iade talebi engellenir
     const existing = await this.refundRepo.findByPurchaseId(purchaseId);
     if (existing) throw new ConflictException({ code: 'REFUND_EXISTS', message: 'Refund already requested for this purchase' });
 
-    // check objections count >=10
+    // İade hakkı: test başına en az 10 itiraz gerekli (haksız iade isteğini engeller)
     const purchaseRefundAllowed = await this.objectionRepo.countByTestAndCandidate((await this.getTestIdFromPurchase(purchaseId)), candidateId);
     if (purchaseRefundAllowed < 10) throw new BadRequestException({ code: 'NOT_ELIGIBLE_FOR_REFUND', message: 'Not enough objections' });
 
-    // create refund
     const testId = await this.getTestIdFromPurchase(purchaseId);
     const created = await this.refundRepo.create({ purchaseId, candidateId, testId, reason });
 
@@ -29,8 +39,8 @@ export class CreateRefundRequestUseCase {
     return created;
   }
 
+  /** Satın alma kaydından test ID'sini çeker — prisma singleton kullanır (inject edilmemiş) */
   private async getTestIdFromPurchase(purchaseId: string) {
-    // lightweight direct prisma access to purchase
     const { prisma } = require('../../infrastructure/database/prisma');
     const p = await prisma.purchase.findUnique({ where: { id: purchaseId } });
     if (!p) throw new BadRequestException({ code: 'PURCHASE_NOT_FOUND', message: 'Purchase not found' });

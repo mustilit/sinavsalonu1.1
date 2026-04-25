@@ -17,6 +17,7 @@ import {
   ArrowLeft, Save, Plus, GripVertical, BookOpen,
   Image, Lightbulb, Upload, X, Loader2, CheckCircle2
 } from "lucide-react";
+import { useServiceStatus } from "@/lib/useServiceStatus";
 
 // ─── Image upload helper ──────────────────────────────────────────────────────
 function ImageUploadButton({ value, onChange, label = "Görsel ekle" }) {
@@ -209,6 +210,7 @@ export default function EditTest() {
   const urlParams = new URLSearchParams(window.location.search);
   const testId = urlParams.get("id");
   const queryClient = useQueryClient();
+  const { testPublishingEnabled } = useServiceStatus();
 
   const [formData, setFormData] = useState(null);
   const [originalFormData, setOriginalFormData] = useState(null);
@@ -325,6 +327,11 @@ export default function EditTest() {
   const handleSaveTest = () => updateTestMutation.mutate({ ...formData, is_published: null });
 
   const handleTogglePublish = () => {
+    // Kill-switch: test publishing disabled
+    if (!testPublishingEnabled && !formData.is_published) {
+      toast.warning("Test yayınlama geçici olarak durdurulmuştur. Lütfen daha sonra tekrar deneyin.");
+      return;
+    }
     if (questions.length === 0 && !formData.is_published) {
       toast.error("Yayınlamak için en az 1 soru ekleyin");
       return;
@@ -371,8 +378,19 @@ export default function EditTest() {
         </Link>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Switch checked={formData.is_published} onCheckedChange={handleTogglePublish} />
-            <span className="text-sm text-slate-600">{formData.is_published ? "Yayında" : "Taslak"}</span>
+            <Switch
+              checked={formData.is_published}
+              onCheckedChange={handleTogglePublish}
+              disabled={!testPublishingEnabled && !formData.is_published}
+            />
+            <span className="text-sm text-slate-600">
+              {formData.is_published ? "Yayında" : "Taslak"}
+            </span>
+            {!testPublishingEnabled && !formData.is_published && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                Yayınlama bakımda
+              </span>
+            )}
           </div>
           <Button
             onClick={handleSaveTest}

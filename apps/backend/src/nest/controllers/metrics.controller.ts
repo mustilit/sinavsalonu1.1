@@ -2,6 +2,10 @@ import { Controller, Get, Header } from '@nestjs/common';
 import { Public } from '../decorators/public.decorator';
 import { getMetricsSnapshot } from '../../infrastructure/metrics/metrics';
 
+/**
+ * Prometheus metrik endpoint'i — request sayısı, uptime ve bellek kullanımını
+ * text/plain formatında döndürür. Prometheus scraping için açık tutulmuştur (@Public).
+ */
 @Controller('metrics')
 export class MetricsController {
   @Public()

@@ -3,16 +3,28 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { prisma } from '../../infrastructure/database/prisma';
 import { RedisCache } from '../../infrastructure/cache/RedisCache';
 
+/** Tek bir testin performans dağılımı raporu için dönüş tipi */
 type Result = {
   testId: string;
   totalParticipants?: number;
   maxScore?: number;
+  /** Ortalama, medyan, çeyrekler */
   stats?: { average: number; median: number; p25: number; p75: number };
+  /** Her skor değeri için katılımcı sayısı — histogram bar chart için */
   histogram?: Array<{ score: number; count: number }>;
+  /** İstek yapan adayın kendi skoru ve yüzdelik dilimi */
   my?: { score: number; percentile: number };
   message?: string;
 };
 
+/**
+ * Bir test için skor dağılım histogramı ve istatistikleri hesaplar.
+ * Adayın kendi skorunu kalabalığa göre yüzdelik dilimde konumlandırır.
+ *
+ * Performans:
+ *   - Histogram sonuçları Redis'e 10dk cache'lenir
+ *   - En az 5 katılımcı olmadan istatistik dönmez (anlamlı veri eşiği)
+ */
 export class GetPerformanceDistributionUseCase {
   private cache: RedisCache;
   constructor(private readonly attemptRepo: IAttemptRepository) {
@@ -22,7 +34,7 @@ export class GetPerformanceDistributionUseCase {
   async execute(testId: string, candidateId: string, attemptId?: string): Promise<Result> {
     if (!testId || !candidateId) throw new BadRequestException('INVALID_INPUT');
 
-    // get maxScore from examTest.questionCount or fallback to count of questions
+    // Maksimum skor = soru sayısı; önce stored count, yoksa sayım
     const test = await prisma.examTest.findUnique({ where: { id: testId }, select: { questionCount: true } });
     let maxScore = test?.questionCount ?? null;
     if (maxScore === null) {
@@ -32,6 +44,7 @@ export class GetPerformanceDistributionUseCase {
     if (maxScore === null) maxScore = 0;
 
     const total = await this.attemptRepo.countSubmittedByTest(testId);
+    // 5'ten az katılımcıyla histogram anlamlı değil
     if (total < 5) {
       return { testId, totalParticipants: total, message: 'Not enough data' };
     }
@@ -40,18 +53,19 @@ export class GetPerformanceDistributionUseCase {
     try {
       cached = await this.cache.get(cacheKey);
     } catch {}
+    // Cache geçerliyse (aynı maxScore ve katılımcı sayısı) histogram verisini yeniden kullan
     let groups = null;
     if (cached && cached.maxScore === maxScore && cached.totalParticipants === total) {
       groups = cached.histogram;
     } else {
       groups = await this.attemptRepo.groupScoresByTest(testId);
     }
-    // normalize buckets 0..maxScore
+    // 0'dan maxScore'a kadar tüm skor dilimleri için tam histogram oluştur
     const map = new Map<number, number>();
     for (const g of groups) {
       const s = Number(g.score);
       if (isNaN(s)) continue;
-      // ignore out-of-range scores
+      // Beklenen aralık dışı skor — veri tutarsızlığı; uyar ve atla
       if (s < 0 || s > maxScore) {
         console.warn(`Ignoring out-of-range score for test ${testId}: ${s}`);
         continue;
@@ -60,6 +74,7 @@ export class GetPerformanceDistributionUseCase {
     }
     const histogram: Array<{ score: number; count: number }> = [];
     let sum = 0;
+    // Tüm aralığı doldur (0 katılımcılı skorlar da dahil — grafik boşluk bırakmasın)
     for (let s = 0; s <= maxScore; s++) {
       const c = map.get(s) ?? 0;
       histogram.push({ score: s, count: c });
@@ -68,7 +83,7 @@ export class GetPerformanceDistributionUseCase {
     const totalCount = histogram.reduce((acc, b) => acc + b.count, 0);
     const average = totalCount ? sum / totalCount : 0;
 
-    // compute percentiles from histogram
+    // Kümülatif dizi üzerinden yüzdelik hesabı
     const cumulative: Array<{ score: number; cum: number }> = [];
     let cum = 0;
     for (const b of histogram) {
@@ -87,7 +102,7 @@ export class GetPerformanceDistributionUseCase {
     const p25 = this.percentileFromHistogram(cumulative, totalCount, 25);
     const p75 = this.percentileFromHistogram(cumulative, totalCount, 75);
 
-    // my score
+    // Adayın kendi skoru: belirli deneme veya en son tamamlanan deneme
     let myScore = 0;
     if (attemptId) {
       const att = await this.attemptRepo.findAttemptById(attemptId);
@@ -109,7 +124,7 @@ export class GetPerformanceDistributionUseCase {
       histogram,
     };
 
-    // cache only global part
+    // Global histogram kısmını cache'le (600sn = 10dk); kişisel skor hariç tutulur
     try {
       await this.cache.set(cacheKey, { histogram, stats: result.stats, totalParticipants: totalCount, maxScore }, 600);
     } catch {}
@@ -117,6 +132,10 @@ export class GetPerformanceDistributionUseCase {
     return { ...result, my: { score: myScore, percentile: myPercentile } };
   }
 
+  /**
+   * Kümülatif histogram üzerinden belirli bir yüzdelik dilim değerini (skor) döner.
+   * @param pct - Hedef yüzdelik (örn. 50 → medyan, 25 → alt çeyrek)
+   */
   private percentileFromHistogram(cumulative: Array<{ score: number; cum: number }>, total: number, pct: number) {
     if (!total) return 0;
     const target = (pct / 100) * total;

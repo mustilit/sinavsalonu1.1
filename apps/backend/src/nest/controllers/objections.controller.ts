@@ -4,6 +4,11 @@ import { Roles } from '../decorators/roles.decorator';
 import { CreateObjectionDto } from './dto/create-objection.dto';
 import { CreateObjectionUseCase } from '../../application/use-cases/CreateObjectionUseCase';
 
+/**
+ * Adayın soru itirazı oluşturmasını sağlar.
+ * İtiraz yalnızca CANDIDATE rolündeki kullanıcılara açıktır ve
+ * deneme sahibi olma kontrolü use-case tarafından yapılır.
+ */
 @Controller('objections')
 @ApiTags('objections')
 export class ObjectionsController {

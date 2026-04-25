@@ -9,15 +9,23 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Star, BookOpen, Users } from 'lucide-react';
 import { buildPageUrl, useAppNavigate } from '@/lib/navigation';
 
+/** URL parametresinin e-posta adresi mi yoksa ID mi olduğunu belirler */
 function isEmailLike(v) {
   return typeof v === 'string' && v.includes('@');
 }
 
+/**
+ * EducatorProfile (Eğitici Profili) sayfası — bir eğiticinin genel bilgilerini,
+ * istatistiklerini (puan, satış sayısı) ve yayındaki test paketlerini listeler.
+ * URL'de `?email=` veya `?id=` parametresiyle eğitici belirlenir.
+ */
 export default function EducatorProfile() {
   const navigate = useAppNavigate();
+  // Eğitici kimliği URL query'sinden okunur: önce e-posta, sonra ID denenir
   const urlParams = new URLSearchParams(window.location.search);
   const idOrEmail = urlParams.get('email') || urlParams.get('id') || '';
 
+  // E-posta ve ID için farklı endpoint kullanılır — API router ayrımına göre
   const endpoint = useMemo(() => {
     if (!idOrEmail) return null;
     if (isEmailLike(idOrEmail)) return `/educators/by-email?email=${encodeURIComponent(idOrEmail)}`;
@@ -75,7 +83,9 @@ export default function EducatorProfile() {
   }
 
   const educator = data.educator;
+  // İstatistikler API'den gelmeyebilir — boş objeye düşürülür (fail-open)
   const stats = data.stats || {};
+  // Sayfalama yapısından items dizisi alınır; yoksa boş dizi kullanılır
   const tests = data.tests?.items || [];
 
   return (

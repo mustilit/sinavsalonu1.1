@@ -1,12 +1,22 @@
+/**
+ * AuthContext — Kimlik doğrulama (auth) bağlamı.
+ *
+ * Uygulama genelinde giriş durumu, kullanıcı bilgisi ve auth işlemleri
+ * (login, logout, navigateToLogin) bu context üzerinden sağlanır.
+ *
+ * Kullanım: useAuth() hook'u ile herhangi bir component'ten erişilir.
+ */
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { queryClientInstance } from '@/lib/query-client';
 
+/** sessionStorage anahtarı — kullanıcı ve token burada saklanır */
 const STORAGE_KEY = 'dal_auth';
 // sessionStorage: Tarayıcı sekmesi kapatılınca oturum sonlanır
 const storage = typeof window !== 'undefined' ? sessionStorage : { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 const isDev = import.meta.env?.DEV ?? false;
 
+/** Yalnızca development ortamında auth logları basar */
 function authLog(...args) {
   if (isDev) console.debug('[auth]', ...args);
 }

@@ -4,6 +4,10 @@ import { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository
 import { TOPIC_REPO } from '../constants';
 import { AppError } from '../errors/AppError';
 
+/**
+ * Soru konusunu kalıcı olarak siler.
+ * Konuya bağlı sorular varsa silme repo katmanında engellenebilir.
+ */
 @Injectable()
 export class DeleteTopicUseCase {
   constructor(

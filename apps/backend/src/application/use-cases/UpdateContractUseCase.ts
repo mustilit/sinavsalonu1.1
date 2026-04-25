@@ -1,6 +1,10 @@
 import type { IContractRepository } from '../../domain/interfaces/IContractRepository';
 import { AppError } from '../errors/AppError';
 
+/**
+ * Mevcut sözleşmeyi günceller. Sadece gönderilen alanlar değiştirilir (partial update).
+ * title/content trim edilir — önde/arkadaki boşluklar normalize edilir.
+ */
 export class UpdateContractUseCase {
   constructor(private readonly contractRepo: IContractRepository) {}
 

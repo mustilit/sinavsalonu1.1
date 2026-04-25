@@ -1,3 +1,4 @@
+/** İtiraz listeleme sorgu parametreleri DTO'su */
 import { IsOptional, IsISO8601 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 

@@ -1,3 +1,4 @@
+/** Soru çözümü yanıt DTO'su */
 import { ApiProperty } from '@nestjs/swagger';
 
 export class QuestionSolutionResponseDto {
@@ -5,4 +6,3 @@ export class QuestionSolutionResponseDto {
   @ApiProperty({ nullable: true }) solutionText?: string | null;
   @ApiProperty({ nullable: true }) solutionMediaUrl?: string | null;
 }
-

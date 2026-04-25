@@ -2,6 +2,11 @@ import { prisma } from '../../infrastructure/database/prisma';
 import { IEmailProvider } from '../../domain/interfaces/IEmailProvider';
 import { AppError } from '../errors/AppError';
 
+/**
+ * Admin tarafından seçili eğiticilere toplu e-posta gönderir.
+ * Tek seferde maksimum 500 alıcı — daha fazlası için sayfalama gerekir.
+ * Gönderim hataları sayılır (failed); tek başarısızlık tüm işlemi durdurmaz.
+ */
 export class SendBulkEducatorEmailUseCase {
   constructor(private readonly emailProvider: IEmailProvider) {}
 
@@ -16,6 +21,7 @@ export class SendBulkEducatorEmailUseCase {
     if (!input.educatorIds?.length) {
       throw new AppError('INVALID_INPUT', 'En az bir alıcı seçin', 400);
     }
+    // 500 kişilik limit — e-posta sağlayıcısının rate limit sınırını aşmamak için
     if (input.educatorIds.length > 500) {
       throw new AppError('TOO_MANY_RECIPIENTS', 'En fazla 500 alıcıya aynı anda mail gönderilebilir', 400);
     }

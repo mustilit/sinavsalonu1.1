@@ -15,6 +15,11 @@ import { PrismaPurchaseRepository } from '../../infrastructure/repositories/Pris
 import { PrismaAttemptRepository } from '../../infrastructure/repositories/PrismaAttemptRepository';
 import { PrismaAuditLogRepository } from '../../infrastructure/repositories/PrismaAuditLogRepository';
 
+/**
+ * Test değerlendirme işlemlerini yönetir: yorum/puan oluşturma veya güncelleme,
+ * yorumları listeleme ve puan ortalamasını sorgulama.
+ * Yorum oluşturma CANDIDATE rolüne kısıtlı; listeleme ve ortalama herkese açıktır.
+ */
 @Controller()
 @ApiTags('Reviews')
 export class ReviewsController {
@@ -49,7 +54,7 @@ export class ReviewsController {
   async list(@Param('id') id: string, @Query('limit') limit: string, @Query('cursor') cursor: string) {
     const l = Math.min(50, Math.max(1, Number(limit) || 20));
     const res = await this.listUc.execute(id, l, cursor);
-    // privacy: strip candidateId/educatorId from public response
+    // Gizlilik: kamuya açık yanıtta candidateId ve educatorId alanları kaldırılır
     const items = res.items.map((r) => ({ id: r.id, testRating: r.testRating, educatorRating: r.educatorRating, comment: r.comment, createdAt: r.createdAt }));
     return { items, meta: { nextCursor: res.nextCursor } };
   }

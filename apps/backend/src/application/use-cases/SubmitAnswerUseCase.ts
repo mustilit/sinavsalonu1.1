@@ -1,13 +1,26 @@
 import { BadRequestException } from '@nestjs/common';
 import type { PrismaClient, AuditAction } from '@prisma/client';
 
+/**
+ * Devam eden bir test denemesinde soruya cevap kaydeder.
+ * - Kalan süre anlık olarak hesaplanır; süre bitmişse deneme otomatik EXPIRED yapılır.
+ * - selectedOptionId verilmezse "boş bırak" olarak yorumlanır ve mevcut cevap silinir.
+ * - Cevap kaydı ve audit log aynı transaction içinde atomik olarak yazılır.
+ */
 export class SubmitAnswerUseCase {
   constructor(private readonly prisma: PrismaClient) {}
 
+  /**
+   * Soruya cevap kaydeder veya günceller.
+   * @param attemptId        - Cevabın kaydedileceği denemenin ID'si.
+   * @param questionId       - Cevap verilen sorunun ID'si.
+   * @param selectedOptionId - Seçilen şıkkın ID'si; null/undefined ise cevap silinir.
+   * @param actorId          - İşlemi yapan kullanıcı (opsiyonel, sahiplik kontrolü için).
+   */
   async execute(attemptId: string, questionId: string, selectedOptionId?: string | null, actorId?: string) {
     if (!attemptId || !questionId) throw new BadRequestException({ code: 'INVALID_INPUT', message: 'Missing fields' });
 
-    // load attempt
+    // Deneme yüklenir
     const attempt = await this.prisma.testAttempt.findUnique({ where: { id: attemptId } });
     if (!attempt) throw new BadRequestException({ code: 'ATTEMPT_NOT_FOUND', message: 'Attempt not found' });
 
@@ -16,6 +29,7 @@ export class SubmitAnswerUseCase {
     }
 
     const now = new Date();
+    // Son devam etme anından bu yana geçen süre kalan süreden düşülür
     const lastResumedAt = (attempt as any).lastResumedAt ?? attempt.startedAt;
     let remainingSec = (attempt as any).remainingSec ?? 0;
     if ((attempt as any).status === 'IN_PROGRESS') {
@@ -23,8 +37,8 @@ export class SubmitAnswerUseCase {
       remainingSec = Math.max(0, remainingSec - elapsedSec);
     }
 
+    // Süre bitmişse deneme otomatik EXPIRED durumuna alınır ve hata döndürülür
     if (remainingSec <= 0 || (attempt as any).status === 'EXPIRED') {
-      // auto-expire attempt
       await this.prisma.testAttempt.update({
         where: { id: attemptId },
         data: {
@@ -40,13 +54,13 @@ export class SubmitAnswerUseCase {
       throw new BadRequestException({ code: 'ATTEMPT_NOT_IN_PROGRESS', message: 'Attempt is not in progress' });
     }
 
-    // validate question belongs to test
+    // Sorunun bu teste ait olduğu doğrulanır
     const question = await this.prisma.examQuestion.findUnique({ where: { id: questionId } });
     if (!question || (question as any).testId !== attempt.testId) {
       throw new BadRequestException({ code: 'QUESTION_NOT_IN_TEST', message: 'Question does not belong to this test' });
     }
 
-    // if selectedOptionId is not provided => treat as "leave blank" -> delete existing answer if any
+    // selectedOptionId yoksa: soruyu boş bırak — mevcut cevap varsa sil
     if (!selectedOptionId) {
       try {
         const [deleted] = await this.prisma.$transaction([
@@ -67,7 +81,7 @@ export class SubmitAnswerUseCase {
       }
     }
 
-    // validate option belongs to question
+    // Şıkkın bu soruya ait olduğu doğrulanır
     const option = await this.prisma.examOption.findUnique({ where: { id: selectedOptionId } });
     if (!option || (option as any).questionId !== questionId) {
       throw new BadRequestException({ code: 'OPTION_NOT_IN_QUESTION', message: 'Option does not belong to question' });
@@ -75,13 +89,14 @@ export class SubmitAnswerUseCase {
     const isCorrect = !!option?.isCorrect;
 
     try {
+      // Cevap upsert edilir + audit log atomik transaction'da yazılır
       const [result] = await this.prisma.$transaction([
         this.prisma.attemptAnswer.upsert({
           where: { attemptId_questionId: { attemptId, questionId } } as any,
           update: { selectedOptionId, isCorrect },
           create: { attemptId, questionId, selectedOptionId, isCorrect },
         }),
-        // create audit log (best-effort)
+        // Audit log best-effort: transaction başarısız olursa cevap da kaydedilmez
         this.prisma.auditLog.create({
           data: {
             action: 'SUBMIT_ANSWER' as AuditAction,

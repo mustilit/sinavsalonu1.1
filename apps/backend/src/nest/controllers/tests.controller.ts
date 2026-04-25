@@ -15,6 +15,11 @@ import { UpdateTestDto } from './dto/update-test.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { UpdateOptionDto } from './dto/update-option.dto';
 
+/**
+ * Test paketi CRUD işlemlerini ve pazar yeri listesini yönetir.
+ * Oluşturma/güncelleme işlemleri sadece EDUCATOR rolüne açıktır.
+ * Pazar yeri listesi ve test detayı herkese açıktır (@Public).
+ */
 @Controller()
 export class TestsController {
   constructor(
@@ -29,6 +34,7 @@ export class TestsController {
     private readonly updateOptionUC: UpdateOptionUseCase,
   ) {}
 
+  /** Yeni test paketi oluşturur — educatorId JWT token'dan alınır, DTO'dan gelmez */
   @Post('tests')
   @Roles('EDUCATOR')
   createTest(@Body() body: CreateTestDto, @Req() req: any) {

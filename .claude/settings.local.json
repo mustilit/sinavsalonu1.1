@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"C:/Users/mtulu/dal\" log --oneline -5)",
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "Bash(xargs grep *)",
+      "Bash(npx prisma *)",
+      "Bash(./node_modules/.bin/prisma migrate *)",
+      "Bash(npm --version)",
+      "Bash(/c/Users/mtulu/dal/apps/backend/node_modules/.bin/prisma migrate *)",
+      "Bash(/c/Users/mtulu/dal/apps/backend/node_modules/.bin/tsc --noEmit --project tsconfig.json)",
+      "Bash(node_modules/.bin/tsc --noEmit --project tsconfig.json)",
+      "Bash(npx tsc *)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(/c/Users/mtulu/dal/apps/backend/node_modules/.bin/tsc --noEmit)",
+      "Bash(sed -n '157,196p' apps/backend/prisma/schema.prisma)",
+      "Bash(sed -n '478,496p' apps/backend/prisma/schema.prisma)",
+      "Bash(sed -n '437,455p' apps/backend/prisma/schema.prisma)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(python3 -c ' *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

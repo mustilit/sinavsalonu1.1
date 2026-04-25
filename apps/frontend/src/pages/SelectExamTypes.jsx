@@ -9,19 +9,32 @@ import { toast } from "sonner";
 import { GraduationCap, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
+/**
+ * SelectExamTypes (Sınav Türü Seçimi) sayfası — yeni kayıtlı adayın
+ * ilgilendiği sınav türlerini seçtiği onboarding adımıdır.
+ * Kullanıcı zaten tercih yaptıysa veya profili eksikse başka sayfaya yönlendirilir.
+ */
 export default function SelectExamTypes() {
   const navigate = useNavigate();
   const { user, isLoadingAuth } = useAuth();
+  // Checkbox ile seçilen sınav türü ID'lerinin listesi
   const [selectedExams, setSelectedExams] = useState([]);
+  // Tercihler kaydedilirken butonu kilitleyen bayrak
   const [saving, setSaving] = useState(false);
 
+  // Auth yüklenme durumu — sayfanın hazır olup olmadığını belirler
   const loading = isLoadingAuth;
 
+  // Sadece aktif sınav türlerini listele
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
     queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
   });
 
+  // Kullanıcı durumuna göre yönlendirme mantığı:
+  // - Giriş yapmamışsa → Home
+  // - Zaten tercih yapmışsa → Explore (bu sayfaya tekrar gelmemeli)
+  // - Profil eksikse → CompleteProfile
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -37,6 +50,7 @@ export default function SelectExamTypes() {
     }
   }, [user, loading, navigate]);
 
+  // Seçili listeden ID'yi ekler veya çıkarır (toggle)
   const toggleExam = (examId) => {
     setSelectedExams(prev => 
       prev.includes(examId) 
@@ -45,9 +59,10 @@ export default function SelectExamTypes() {
     );
   };
 
+  // Seçilen sınav türlerini kullanıcı profiline kaydeder ve Explore'a yönlendirir
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (selectedExams.length === 0) {
       toast.error("Lütfen en az bir sınav türü seçin");
       return;
@@ -65,6 +80,7 @@ export default function SelectExamTypes() {
     }
   };
 
+  // Tercih yapmadan geçiş — kullanıcı daha sonra profilinden güncelleyebilir
   const handleSkip = async () => {
     navigate(createPageUrl("Explore"));
   };

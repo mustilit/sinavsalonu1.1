@@ -4,6 +4,11 @@ import { prisma } from '../../infrastructure/database/prisma';
 import Redis from 'ioredis';
 import { getRedisUrl, isRedisDisabled } from '../../config/redis';
 
+/**
+ * Sağlık kontrolü endpoint'leri — load balancer ve monitoring sistemleri için.
+ * /health: temel servis durumu; /health/redis: Redis bağlantı kontrolü.
+ * Her iki endpoint de herkese açıktır (@Public).
+ */
 @Controller()
 export class HealthController {
   @Public()

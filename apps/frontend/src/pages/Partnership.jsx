@@ -7,7 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Handshake, TrendingUp, Users, Award, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
+/**
+ * Partnership (İş Ortaklığı) sayfası — kurumsal satış, eğitim kurumu
+ * ve teknoloji ortaklığı seçeneklerini listeler; başvuru formu içerir.
+ * Form gönderimi şu an simüle edilmektedir (gerçek backend entegrasyonu yok).
+ */
 export default function Partnership() {
+  // Ortaklık başvuru formu alanları
   const [formData, setFormData] = useState({
     company_name: "",
     name: "",
@@ -15,8 +21,10 @@ export default function Partnership() {
     phone: "",
     message: ""
   });
+  // Form gönderim yüklenme durumu — butonu devre dışı bırakmak için
   const [loading, setLoading] = useState(false);
 
+  // Formu doğrular ve başvuruyu gönderir (şu an setTimeout ile simüle edilmektedir)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.company_name || !formData.name || !formData.email || !formData.message) {

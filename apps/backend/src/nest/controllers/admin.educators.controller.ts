@@ -6,6 +6,10 @@ import { ApproveEducatorUseCase } from '../../application/use-cases/ApproveEduca
 import { SuspendEducatorUseCase } from '../../application/use-cases/SuspendEducatorUseCase';
 import { UnsuspendEducatorUseCase } from '../../application/use-cases/UnsuspendEducatorUseCase';
 
+/**
+ * Admin eğitici durum yönetimi — eğiticiyi onaylama, askıya alma ve askıyı kaldırma.
+ * Sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/educators')
 @ApiTags('admin/educators')
 export class AdminEducatorsController {

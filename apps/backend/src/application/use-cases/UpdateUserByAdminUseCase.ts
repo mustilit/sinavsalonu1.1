@@ -3,13 +3,18 @@ import type { IUserRepository } from '../../domain/interfaces/IUserRepository';
 import type { User } from '../../domain/entities/User';
 import type { UserStatus } from '../../domain/types';
 
+/** Admin tarafından kullanıcı üzerinde yapılabilecek değişiklikler */
 export type AdminUpdateUserInput = {
   role?: User['role'];
   status?: UserStatus;
-  educatorApprovedAt?: Date | null;
-  metadataMerge?: Record<string, unknown>;
+  educatorApprovedAt?: Date | null;   // Eğitici onay tarihi — onaylama/reddetme
+  metadataMerge?: Record<string, unknown>; // Metadata alanına eklenmek/güncellenmek istenen değerler
 };
 
+/**
+ * Admin kullanıcısı tarafından herhangi bir kullanıcının rol, durum veya metadata'sını günceller.
+ * Eğitici onaylama/askıya alma/rol değiştirme senaryolarında kullanılır.
+ */
 export class UpdateUserByAdminUseCase {
   constructor(private readonly userRepo: IUserRepository) {}
 

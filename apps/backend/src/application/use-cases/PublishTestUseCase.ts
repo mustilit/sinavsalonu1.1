@@ -5,6 +5,7 @@ import { AppError } from '../errors/AppError';
 import { ensureEducatorActive } from '../policies/ensureEducatorActive';
 import { PrismaFollowRepository } from '../../infrastructure/repositories/PrismaFollowRepository';
 import { RedisCache } from '../../infrastructure/cache/RedisCache';
+import { prisma } from '../../infrastructure/database/prisma';
 
 export class PublishTestUseCase {
   static MIN_QUESTIONS = 5;
@@ -25,6 +26,12 @@ export class PublishTestUseCase {
    * Educator must be approved and not suspended (ensureEducatorActive).
    */
   async execute(testId: string, actorId?: string): Promise<ExamWithQuestions> {
+    // Kill-switch: test publishing disabled
+    const settings = await prisma.adminSettings.findFirst({ where: { id: 1 } });
+    if (settings && settings.testPublishingEnabled === false) {
+      throw new AppError('TEST_PUBLISHING_DISABLED', 'Test yayınlama geçici olarak durdurulmuştur', 503);
+    }
+
     if (actorId) {
       const user = await this.userRepository.findById(actorId);
       if (!user) {

@@ -5,12 +5,20 @@ import api from '@/api/dalClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+/**
+ * ForgotPassword (Şifremi Unuttum) sayfası — e-posta adresiyle
+ * şifre sıfırlama bağlantısı talep etmeyi sağlar.
+ * Gönderim başarılıysa kullanıcıya onay ekranı gösterilir.
+ */
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState(null);
+  // Form gönderim yüklenme durumu
   const [loading, setLoading] = useState(false);
+  // API isteği başarıyla tamamlandığında true — onay ekranına geçiş sağlar
   const [submitted, setSubmitted] = useState(false);
 
+  // Şifre sıfırlama e-postası gönderir; hata varsa kullanıcıya gösterir
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -25,6 +33,7 @@ export default function ForgotPassword() {
     }
   };
 
+  {/* E-posta gönderildikten sonra gösterilen onay ekranı */}
   if (submitted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4" data-testid="forgot-password-success">

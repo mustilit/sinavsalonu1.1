@@ -6,6 +6,11 @@ import { ListEscalatedObjectionsUseCase } from '../../application/use-cases/List
 import { ListAllObjectionsUseCase } from '../../application/use-cases/ListAllObjectionsUseCase';
 import { ListTestReportStatsUseCase } from '../../application/use-cases/ListTestReportStatsUseCase';
 
+/**
+ * Admin itiraz yönetimi — tüm itirazları, yalnızca eskalatlanmışları listeler
+ * ve soru başarısızlık istatistiklerini raporlar.
+ * Sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/objections')
 @ApiTags('admin/objections')
 export class AdminObjectionsController {

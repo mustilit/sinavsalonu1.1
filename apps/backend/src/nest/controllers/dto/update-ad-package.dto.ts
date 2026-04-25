@@ -1,3 +1,4 @@
+/** Reklam paketi güncelleme isteği DTO'su */
 import { IsString, IsNumber, IsOptional, IsBoolean, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 

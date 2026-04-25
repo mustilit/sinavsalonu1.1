@@ -9,6 +9,11 @@ import { CONTRACT_REPO } from '../../application/constants';
 import { Inject } from '@nestjs/common';
 import type { IContractRepository } from '../../domain/interfaces/IContractRepository';
 
+/**
+ * Admin eğitici sözleşme yönetimi — sözleşmeleri listeler, oluşturur,
+ * günceller ve aktif sürümü belirler.
+ * Eğitici kaydında geçerli sözleşme varlığı kontrol edilir; sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/contracts')
 @ApiTags('admin/contracts')
 export class AdminContractsController {

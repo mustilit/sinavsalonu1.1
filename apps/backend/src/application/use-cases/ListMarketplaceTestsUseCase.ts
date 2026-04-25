@@ -2,9 +2,12 @@ import { IExamRepository } from '../../domain/interfaces/IExamRepository';
 import { ReviewAggregationService } from '../services/ReviewAggregationService';
 import { AppError } from '../errors/AppError';
 
+/** UUID doğrulama regex'i — gelen filtre parametreleri bu kuralla kontrol edilir. */
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/** İzin verilen sıralama değerleri. */
 const SORT_VALUES = ['newest', 'priceAsc', 'priceDesc'] as const;
 
+/** Marketplace test listesi için filtre parametreleri. */
 export type ListMarketplaceFilters = {
   examTypeId?: string;
   topicId?: string;
@@ -16,11 +19,22 @@ export type ListMarketplaceFilters = {
   limit?: number;
 };
 
+/**
+ * Marketplace'te yayınlı testleri listeler.
+ * Filtreleme (sınav türü, konu, eğitici, fiyat, puan), sayfalama ve sıralama destekler.
+ * Her teste ait ortalama puan ReviewAggregationService ile zenginleştirilir.
+ */
 export class ListMarketplaceTestsUseCase {
+  /** Puan ortalamalarını hesaplamak için kullanılan servis. */
   private agg = new ReviewAggregationService();
   constructor(private readonly examRepository: IExamRepository) {}
 
+  /**
+   * Yayınlı testleri filtreler, sıralar, sayfalayarak döner.
+   * @param filters - Arama ve sıralama kriterleri (opsiyonel).
+   */
   async execute(filters?: ListMarketplaceFilters) {
+    // UUID formatı zorunluluğu — hatalı ID'ler erken yakalanır
     if (filters?.examTypeId && !UUID_REGEX.test(filters.examTypeId)) {
       throw new AppError('INVALID_UUID', 'Invalid examTypeId', 400);
     }
@@ -34,10 +48,12 @@ export class ListMarketplaceTestsUseCase {
       throw new AppError('INVALID_SORT', 'sort must be one of: newest, priceAsc, priceDesc', 400);
     }
 
+    // Sayfa boyutunu 1-50 arasında sınırla; varsayılan 20
     const limit = Math.min(50, Math.max(1, filters?.limit ?? 20));
     const page = Math.max(1, filters?.page ?? 1);
     const sort = filters?.sort ?? 'newest';
 
+    // Sıralama yönü belirleme: newest → publishedAt desc, priceAsc → priceCents asc, priceDesc → priceCents desc
     const sortBy = sort === 'newest' ? 'publishedAt' : 'priceCents';
     const order = sort === 'priceAsc' ? 'asc' : 'desc';
 
@@ -53,6 +69,7 @@ export class ListMarketplaceTestsUseCase {
       order,
     });
 
+    // Test ID'lerine göre toplu puan ortalamaları çekilerek her teste eklenir
     const items = res.items;
     const ids = items.map((t) => t.id);
     const aggs = await this.agg.getAggregatesForTestIds(ids);
@@ -62,6 +79,7 @@ export class ListMarketplaceTestsUseCase {
       ratingCount: aggs[t.id]?.count ?? 0,
     }));
 
+    // Sadece gerekli alanlar istemciye döner (bilgi minimizasyonu)
     const summaries = enriched.map((t: any) => ({
       id: t.id,
       title: t.title,

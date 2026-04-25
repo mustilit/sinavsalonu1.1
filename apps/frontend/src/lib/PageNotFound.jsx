@@ -1,6 +1,10 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 
+/**
+ * 404 sayfası — tanınmayan bir rota ziyaret edildiğinde gösterilir.
+ * Admin ise geliştirici notu da görünür (sayfa mevcut değil uyarısı).
+ */
 export default function PageNotFound() {
   const location = useLocation();
   const navigate = useNavigate();

@@ -15,6 +15,10 @@ import { PasswordService } from '../../infrastructure/services/PasswordService';
 import { JwtService } from '../../infrastructure/services/JwtService';
 import { LoginBruteforceGuard } from '../guards/login-bruteforce.guard';
 
+/**
+ * Kimlik doğrulama işlemlerini yönetir: kayıt, giriş, şifre sıfırlama ve oturum bilgisi.
+ * Public endpoint'ler @Public() ile işaretlenmiştir — JWT guard bu endpoint'leri atlar.
+ */
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -26,6 +30,7 @@ export class AuthController {
     @Inject(ResetPasswordUseCase) private readonly resetPasswordUC: ResetPasswordUseCase,
   ) {}
 
+  /** Oturum açmış kullanıcının profil bilgilerini döndürür — JWT token'dan ID alınır */
   @Get('me')
   async me(@Req() req: any) {
     const sub = req.user?.sub;
@@ -45,6 +50,7 @@ export class AuthController {
     };
   }
 
+  /** Yeni aday kaydı — e-posta ve kullanıcı adı benzersizliği use-case tarafından doğrulanır */
   @Post('register')
   @Public()
   async register(@Body() body: any) {
@@ -62,6 +68,7 @@ export class AuthController {
     }
   }
 
+  /** Eğitici kaydı — sözleşme varlığı kontrol edilir; 30 istek/5 dakika throttle uygulanır */
   @Post('register/educator')
   @Public()
   @Throttle({ default: { limit: 30, ttl: 300000 } })
@@ -86,6 +93,7 @@ export class AuthController {
     }
   }
 
+  /** Giriş — BruteforceGuard ile korunur; e-posta küçük harfe normalize edilir */
   @Post('login')
   @Public()
   @UseGuards(LoginBruteforceGuard)
@@ -113,6 +121,7 @@ export class AuthController {
     }
   }
 
+  /** Şifre sıfırlama e-postası gönderir; kullanıcı bulunamasa da 200 döner (kullanıcı numaralandırmayı önler) */
   @Post('forgot-password')
   @Public()
   @Throttle({ default: { limit: 5, ttl: 300000 } })
@@ -123,6 +132,7 @@ export class AuthController {
     return { message: 'E-posta gönderildi' }; // Always success
   }
 
+  /** Token ile yeni şifre belirler; 10 istek/5 dakika throttle — brute-force token tahminine karşı */
   @Post('reset-password')
   @Public()
   @Throttle({ default: { limit: 10, ttl: 300000 } })

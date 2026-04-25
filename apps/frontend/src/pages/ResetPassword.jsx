@@ -5,15 +5,24 @@ import api from '@/api/dalClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+/**
+ * ResetPassword (Şifre Sıfırla) sayfası — URL'deki `token` parametresiyle
+ * yeni şifre belirlemeyi sağlar. Token yoksa geçersiz bağlantı uyarısı gösterilir.
+ * Başarı durumunda kullanıcı giriş sayfasına yönlendirilir.
+ */
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
+  // E-posta ile gönderilen şifre sıfırlama tokenı — URL query parametresinden okunur
   const token = searchParams.get('token');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState(null);
+  // API isteği süresince formu kilitlemek için yüklenme durumu
   const [loading, setLoading] = useState(false);
+  // Sıfırlama başarılıysa true — başarı ekranına geçiş sağlar
   const [submitted, setSubmitted] = useState(false);
 
+  {/* Token URL'de yoksa geçersiz bağlantı ekranı göster */}
   if (!token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4" data-testid="reset-password-invalid">
@@ -34,15 +43,18 @@ export default function ResetPassword() {
     );
   }
 
+  // Şifre doğrulama + token ile backend'e sıfırlama isteği gönderir
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
 
+    // Backend ile aynı minimum uzunluk kuralı (ResetPasswordUseCase: 8 karakter)
     if (newPassword.length < 8) {
       setError('Şifre en az 8 karakter olmalıdır.');
       return;
     }
 
+    // İki şifre alanının eşleşip eşleşmediğini istemci tarafında kontrol et
     if (newPassword !== confirmPassword) {
       setError('Şifreler eşleşmiyor.');
       return;

@@ -1,3 +1,4 @@
+/** Denetim logu listeleme sorgu parametreleri DTO'su — çok boyutlu filtreleme desteği */
 import { IsOptional, IsString, IsNumber } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';

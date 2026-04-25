@@ -1,3 +1,4 @@
+/** Eğitici kaydı isteği DTO'su — e-posta, kullanıcı adı ve şifre doğrulaması içerir */
 import { IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 

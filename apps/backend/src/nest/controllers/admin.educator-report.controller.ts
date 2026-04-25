@@ -4,6 +4,10 @@ import { Roles } from '../decorators/roles.decorator';
 import { GetEducatorReportUseCase } from '../../application/use-cases/GetEducatorReportUseCase';
 import { SendBulkEducatorEmailUseCase } from '../../application/use-cases/SendBulkEducatorEmailUseCase';
 
+/**
+ * Admin eğitici raporu ve toplu e-posta — eğitici performansını listeler
+ * ve seçili eğiticilere toplu e-posta gönderir. Sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/educator-report')
 @ApiTags('admin/educator-report')
 export class AdminEducatorReportController {

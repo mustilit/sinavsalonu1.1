@@ -19,9 +19,16 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 
+/**
+ * MyDiscountCodes (İndirim Kodlarım) sayfası — eğiticinin kendi test
+ * paketleri için indirim kodu oluşturmasını, listelemesini ve silmesini sağlar.
+ * Kodlar eğiticinin e-postasına bağlıdır; maksimum indirim oranı %50 ile sınırlandırılmıştır.
+ */
 export default function MyDiscountCodes() {
   const { user } = useAuth();
+  // Yeni kod oluşturma diyaloğunun açık/kapalı durumu
   const [showDialog, setShowDialog] = useState(false);
+  // Yeni kod formu alanları; varsayılan değerler: %10 indirim, 100 kullanım hakkı
   const [formData, setFormData] = useState({
     code: "",
     discount_percent: 10,
@@ -31,18 +38,21 @@ export default function MyDiscountCodes() {
   });
   const queryClient = useQueryClient();
 
+  // Giriş yapan eğiticinin indirim kodlarını yükle; cache key'e e-posta eklendi (çoklu kullanıcı senaryosu)
   const { data: codes = [], isLoading } = useQuery({
     queryKey: ["discountCodes", user?.email],
     queryFn: () => base44.entities.DiscountCode.filter({ educator_email: user.email }, "-created_date"),
     enabled: !!user,
   });
 
+  // Kod oluşturma formunda belirli bir teste kısıtlama yapılabilmesi için eğiticinin testleri
   const { data: myTests = [] } = useQuery({
     queryKey: ["myTests", user?.email],
     queryFn: () => base44.entities.TestPackage.filter({ educator_owns: true }),
     enabled: !!user,
   });
 
+  // Kodu backend'e kaydeder; educator_email ve current_uses otomatik atanır
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.DiscountCode.create({
       ...data,
@@ -66,11 +76,13 @@ export default function MyDiscountCodes() {
     },
   });
 
+  // Formu doğrular ve kodu oluşturur; %50 üzeri indirim platforma zarar verebileceğinden engellenir
   const handleSubmit = () => {
     if (!formData.code || formData.discount_percent < 1) {
       toast.error("Lütfen gerekli alanları doldurun");
       return;
     }
+    // İndirim oranı iş kuralı: maksimum %50
     if (formData.discount_percent > 50) {
       toast.error("İndirim oranı maksimum %50 olabilir");
       return;
@@ -78,6 +90,7 @@ export default function MyDiscountCodes() {
     createMutation.mutate(formData);
   };
 
+  // Kodu panoya kopyalar ve kullanıcıya bildirim gösterir
   const copyCode = (code) => {
     navigator.clipboard.writeText(code);
     toast.success("Kod kopyalandı");

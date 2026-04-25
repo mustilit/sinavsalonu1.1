@@ -2,6 +2,11 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { ArrowLeft, Shield } from "lucide-react";
 
+/**
+ * Privacy (Gizlilik Politikası) sayfası — KVKK kapsamındaki veri
+ * toplama, kullanım, güvenlik, paylaşım ve kullanıcı hakları bilgilerini
+ * açıklayan statik yasal bilgi sayfası.
+ */
 export default function Privacy() {
   return (
     <div className="min-h-screen bg-white">

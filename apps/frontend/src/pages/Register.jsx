@@ -6,14 +6,21 @@ import { createPageUrl } from '@/utils';
 import { useAppNavigate } from '@/lib/navigation';
 import { Link } from 'react-router-dom';
 
+/**
+ * Register (Kayıt Ol) sayfası — yeni kullanıcı kaydı için e-posta,
+ * kullanıcı adı ve şifre formunu sunar. Başarılı kayıt sonrası
+ * kullanıcı giriş sayfasına yönlendirilir.
+ */
 export default function Register() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
+  // Form gönderim sırasında butonu devre dışı bırakmak için yüklenme durumu
   const [loading, setLoading] = useState(false);
   const navigate = useAppNavigate();
 
+  // base44 auth API'si üzerinden kayıt oluşturur; hata varsa ekranda gösterir
   const submit = async (e) => {
     e.preventDefault();
     setError(null);

@@ -1,3 +1,4 @@
+/** Soru konusu oluşturma isteği DTO'su — sınav türü UUID'si zorunludur */
 import { IsString, MinLength, IsOptional, IsBoolean, IsUUID } from 'class-validator';
 
 export class CreateTopicDto {

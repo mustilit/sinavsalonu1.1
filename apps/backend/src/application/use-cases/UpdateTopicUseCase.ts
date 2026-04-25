@@ -4,6 +4,10 @@ import { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository
 import { TOPIC_REPO } from '../constants';
 import { slugify } from '../utils/slugify';
 
+/**
+ * Soru konusunu günceller. Slug çakışması aynı sınav türü içinde kontrol edilir
+ * (farklı sınav türlerinde aynı slug olabilir — örn. "matematik" hem YKS hem KPSS'de).
+ */
 @Injectable()
 export class UpdateTopicUseCase {
   constructor(

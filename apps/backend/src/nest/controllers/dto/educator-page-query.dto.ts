@@ -1,3 +1,4 @@
+/** Eğitici profil sayfası sorgu parametreleri DTO'su — sayfalama ve filtreleme */
 import { IsOptional, IsString, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -24,4 +25,3 @@ export class EducatorPageQueryDto {
   @IsString()
   sortDir?: 'asc' | 'desc';
 }
-

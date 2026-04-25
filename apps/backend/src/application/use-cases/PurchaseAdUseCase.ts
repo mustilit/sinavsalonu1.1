@@ -5,15 +5,28 @@ import { ensureEducatorActive } from '../policies/ensureEducatorActive';
 import type { IUserRepository } from '../../domain/interfaces/IUserRepository';
 import { getDefaultTenantId } from '../../common/tenant';
 
-/** FR-E-07: Eğitici reklam satın alır */
+/**
+ * FR-E-07: Eğitici, kendi yayınlanmış testine reklam paketi satın alır.
+ * - Eğitici aktif ve onaylı olmalıdır (ensureEducatorActive kontrolü).
+ * - Reklam paketi aktif olmalıdır.
+ * - Test yayınlanmış (PUBLISHED) ve eğiticiye ait olmalıdır.
+ */
 export class PurchaseAdUseCase {
   constructor(private readonly userRepo: IUserRepository) {}
 
+  /**
+   * Reklam satın alma işlemini gerçekleştirir.
+   * @param educatorId   - Satın almayı yapan eğiticinin ID'si.
+   * @param adPackageId  - Satın alınacak reklam paketinin ID'si.
+   * @param testId       - Reklamın gösterileceği testin ID'si.
+   */
   async execute(educatorId: string, adPackageId: string, testId: string) {
     const user = await this.userRepo.findById(educatorId);
     if (!user) throw new AppError('USER_NOT_FOUND', 'User not found', 404);
+    // Eğitici askıya alınmış veya onaylanmamışsa işlemi engelle
     ensureEducatorActive(user);
 
+    // Reklam paketi ve test bilgileri paralel olarak çekilir (performans)
     const [adPackage, test] = await Promise.all([
       prisma.adPackage.findUnique({ where: { id: adPackageId } }),
       prisma.examTest.findUnique({ where: { id: testId } }),
@@ -22,6 +35,7 @@ export class PurchaseAdUseCase {
     if (!adPackage) throw new BadRequestException({ code: 'AD_PACKAGE_NOT_FOUND', message: 'Ad package not found' });
     if (!adPackage.active) throw new BadRequestException({ code: 'AD_PACKAGE_INACTIVE', message: 'Ad package is not active' });
     if (!test) throw new BadRequestException({ code: 'TEST_NOT_FOUND', message: 'Test not found' });
+    // Sadece testin sahibi olan eğitici reklam alabilir
     if (test.educatorId !== educatorId) {
       throw new AppError('FORBIDDEN_NOT_OWNER', 'Only the educator who owns the test can purchase ads for it', 403);
     }
@@ -29,6 +43,7 @@ export class PurchaseAdUseCase {
       throw new BadRequestException({ code: 'TEST_NOT_PUBLISHED', message: 'Test must be published to purchase ads' });
     }
 
+    // Geçerlilik bitiş tarihi: bugün + paket süresi (gün cinsinden)
     const validUntil = new Date();
     validUntil.setDate(validUntil.getDate() + adPackage.durationDays);
 

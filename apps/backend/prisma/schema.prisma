@@ -529,11 +529,15 @@ model ContractAcceptance {
 }
 
 model AdminSettings {
-  id                Int      @id @default(1)
-  commissionPercent Int      @default(20) // percent
-  vatPercent        Int      @default(18)
-  purchasesEnabled  Boolean  @default(true)
-  updatedAt         DateTime @updatedAt
+  id                     Int      @id @default(1)
+  commissionPercent      Int      @default(20) // percent
+  vatPercent             Int      @default(18)
+  // ── Kill switches ─────────────────────────────────────────────────────
+  purchasesEnabled       Boolean  @default(true)  // Satış Durdur
+  packageCreationEnabled Boolean  @default(true)  // Paket Durdur (test oluşturma)
+  testPublishingEnabled  Boolean  @default(true)  // Canlı Test Durdur (yayınlama)
+  testAttemptsEnabled    Boolean  @default(true)  // Test Durdur (çözüm başlatma)
+  updatedAt              DateTime @updatedAt
 
   @@map("admin_settings")
 }

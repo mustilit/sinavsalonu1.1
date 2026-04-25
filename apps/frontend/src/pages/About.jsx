@@ -2,6 +2,10 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { GraduationCap, Target, Users, Award, Heart, ArrowLeft } from "lucide-react";
 
+/**
+ * About (Hakkımızda) sayfası — platformun misyonu, vizyonu,
+ * değerleri ve tercih edilme nedenlerini açıklayan statik tanıtım sayfası.
+ */
 export default function About() {
   return (
     <div className="min-h-screen bg-white">

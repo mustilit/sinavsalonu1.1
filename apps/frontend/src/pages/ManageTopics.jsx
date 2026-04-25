@@ -26,26 +26,39 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
+/**
+ * ManageTopics (Soru Konuları Yönetimi) sayfası — admin'e özel;
+ * sınav türlerine bağlı soru konularını listeleme, ekleme, düzenleme
+ * ve silme işlemlerini sağlar. Admin olmayan kullanıcılara erişim engellenir.
+ */
 export default function ManageTopics() {
   const { user } = useAuth();
+  // Konu ekleme / düzenleme diyaloğunun açık/kapalı durumu
   const [showDialog, setShowDialog] = useState(false);
+  // Düzenlenmekte olan konu; null ise yeni konu ekleme modundadır
   const [editingTopic, setEditingTopic] = useState(null);
+  // Silinecek konunun ID'si; AlertDialog gösterimi için kullanılır
   const [deleteId, setDeleteId] = useState(null);
+  // Diyalog formundaki konu adı ve sınav türü ID'si
   const [formData, setFormData] = useState({ name: "", exam_type_id: "" });
+  // Sınav türüne göre filtreleme; "all" seçili olunca filtreleme uygulanmaz
   const [filterExamType, setFilterExamType] = useState("all");
   const queryClient = useQueryClient();
 
+  // Konuları en yeni-en eski sırasıyla çek; sadece admin rolünde sorgu etkin
   const { data: topics = [], isLoading } = useQuery({
     queryKey: ["topics"],
     queryFn: () => base44.entities.Topic.list("-created_date"),
     enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
   });
 
+  // Konu formunda sınav türü seçimi için aktif türleri yükle
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
     queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
   });
 
+  // Konu oluştururken exam_type_name'i de kaydeder (denormalize veri — liste görünümü için)
   const createMutation = useMutation({
     mutationFn: (data) => {
       const examType = examTypes.find(e => e.id === data.exam_type_id);
@@ -61,6 +74,7 @@ export default function ManageTopics() {
     },
   });
 
+  // Konuyu güncellerken exam_type_name'i de günceller
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => {
       const examType = examTypes.find(e => e.id === data.exam_type_id);
@@ -85,6 +99,7 @@ export default function ManageTopics() {
     },
   });
 
+  // Diyaloğu açar: topic verilmişse düzenleme, verilmemişse yeni konu moduna girer
   const openDialog = (topic = null) => {
     if (topic) {
       setEditingTopic(topic);
@@ -114,8 +129,9 @@ export default function ManageTopics() {
     }
   };
 
-  const filteredTopics = filterExamType === "all" 
-    ? topics 
+  // "all" seçili olunca tüm konular, aksi halde seçili sınav türüne ait konular gösterilir
+  const filteredTopics = filterExamType === "all"
+    ? topics
     : topics.filter(t => t.exam_type_id === filterExamType);
 
   if ((user?.role || '').toString().toUpperCase() !== "ADMIN") {

@@ -3,6 +3,13 @@ import type { IContractAcceptanceRepository } from '../../domain/interfaces/ICon
 import type { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository';
 import { AppError } from '../errors/AppError';
 
+/**
+ * Kullanıcının belirli bir sözleşmeyi kabul etmesini sağlar.
+ *
+ * Idempotent davranış: kullanıcı aynı sözleşmeyi daha önce kabul ettiyse
+ * yeni kayıt oluşturmadan mevcut kabul tarihini döner.
+ * Audit log kaydı best-effort olarak tutulur; hata fırlatmaz.
+ */
 export class AcceptContractUseCase {
   constructor(
     private readonly contractRepo: IContractRepository,
@@ -10,6 +17,15 @@ export class AcceptContractUseCase {
     private readonly auditRepo?: IAuditLogRepository,
   ) {}
 
+  /**
+   * Sözleşme kabulünü işler.
+   *
+   * @param params.userId      - Kabul eden kullanıcının kimliği
+   * @param params.contractId  - Kabul edilecek sözleşmenin kimliği
+   * @param params.ip          - İsteği atan istemcinin IP adresi (opsiyonel, kayıt amaçlı)
+   * @param params.userAgent   - İstemci User-Agent başlığı (opsiyonel, kayıt amaçlı)
+   * @returns Kabul tarihini ISO 8601 formatında içeren nesne
+   */
   async execute(params: {
     userId: string;
     contractId: string;
@@ -20,15 +36,18 @@ export class AcceptContractUseCase {
     if (!contract) {
       throw new AppError('CONTRACT_NOT_FOUND', 'Contract not found', 404);
     }
+    // Yalnızca aktif sözleşmeler kabul edilebilir
     if (!contract.isActive) {
       throw new AppError('CONTRACT_NOT_ACTIVE', 'Contract is not active', 409);
     }
 
+    // Kullanıcı bu sözleşmeyi daha önce kabul ettiyse tekrar kayıt açılmaz
     const existing = await this.acceptanceRepo.findByUserAndContract(params.userId, params.contractId);
     if (existing) {
       return { acceptedAt: existing.acceptedAt.toISOString() };
     }
 
+    // Yeni kabul kaydını oluştur; IP ve User-Agent delil amaçlı saklanır
     const created = await this.acceptanceRepo.create({
       userId: params.userId,
       contractId: params.contractId,
@@ -46,7 +65,7 @@ export class AcceptContractUseCase {
           metadata: { acceptanceId: created.id },
         });
       } catch {
-        // best-effort
+        // best-effort: audit log hatası ana akışı kesmez
       }
     }
 

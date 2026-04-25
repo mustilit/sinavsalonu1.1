@@ -28,6 +28,11 @@ import { Inject } from '@nestjs/common';
 import type { IUserRepository } from '../../domain/interfaces/IUserRepository';
 import type { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository';
 
+/**
+ * Eğiticiye özel işlemleri ve kamuya açık profil sayfasını yönetir.
+ * /educators/me/* endpoint'leri EDUCATOR rolüne kısıtlıdır.
+ * /educators/:id ve /educators/by-email endpoint'leri herkese açıktır (@Public).
+ */
 @Controller('educators')
 @ApiTags('Educators')
 export class EducatorsController {
@@ -45,6 +50,7 @@ export class EducatorsController {
     private readonly listPurchasesUC: ListEducatorPurchasesUseCase,
     private readonly deleteDiscountCodeUC: DeleteDiscountCodeUseCase,
   ) {
+    // GetEducatorPageUseCase birden fazla bağımlılık gerektirdiğinden doğrudan örneklenir
     this.pageUc = new GetEducatorPageUseCase(new PrismaUserRepository(), new PrismaExamRepository(), new PrismaTestStatsRepository(), new ReviewAggregationService());
   }
 

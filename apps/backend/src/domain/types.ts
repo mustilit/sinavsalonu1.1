@@ -87,7 +87,11 @@ export type DiscountCode = {
 export type AdminSettings = {
   commissionPercent: number;
   vatPercent: number;
+  // Kill switches
   purchasesEnabled: boolean;
+  packageCreationEnabled: boolean;
+  testPublishingEnabled: boolean;
+  testAttemptsEnabled: boolean;
 };
 
 export type SiteSettings = {

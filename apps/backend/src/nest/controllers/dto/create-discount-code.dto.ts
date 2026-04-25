@@ -1,3 +1,4 @@
+/** İndirim kodu oluşturma isteği DTO'su — maksimum indirim oranı %50 ile sınırlandırılmıştır */
 import { IsString, IsNumber, IsOptional, IsDateString, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 

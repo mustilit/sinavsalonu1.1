@@ -1,3 +1,4 @@
+/** İtiraz yanıtlama isteği DTO'su — yanıt metni en az 5 karakter olmalıdır */
 import { IsString, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 

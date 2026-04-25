@@ -9,6 +9,10 @@ import { ListExamTypesUseCase } from '../../application/use-cases/ListExamTypesU
 import { UpdateExamTypeUseCase } from '../../application/use-cases/UpdateExamTypeUseCase';
 import { DeleteExamTypeUseCase } from '../../application/use-cases/DeleteExamTypeUseCase';
 
+/**
+ * Admin sınav türü CRUD yönetimi — sınav türlerini listeler, oluşturur,
+ * günceller ve siler. Sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/exam-types')
 @ApiTags('admin/exam-types')
 export class AdminExamTypesController {

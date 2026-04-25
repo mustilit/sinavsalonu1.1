@@ -4,6 +4,10 @@ import { IExamRepository } from '../../domain/interfaces/IExamRepository';
 import { IAttemptAnswerRepository } from '../../domain/interfaces/IAttemptAnswerRepository';
 import { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository';
 
+/**
+ * Süreli testlerde süre dolunca denemeyi otomatik olarak TIMEOUT durumuna alır.
+ * Skoru hesaplar ve kaydeder. İdempotent: zaten bitmiş denemeye tekrar uygulanabilir.
+ */
 export class TimeoutAttemptUseCase {
   constructor(
     private readonly attempts: IAttemptRepository,
@@ -19,8 +23,8 @@ export class TimeoutAttemptUseCase {
     if (!attempt) throw new BadRequestException({ code: 'ATTEMPT_NOT_FOUND', message: 'Attempt not found' });
     if (attempt.candidateId !== candidateId) throw new ForbiddenException({ code: 'NOT_ATTEMPT_OWNER', message: 'Not owner' });
 
+    // Zaten sonuçlanmış deneme — idempotent, ikinci kez işlem yapma
     if ((attempt as any).status === 'TIMEOUT' || (attempt as any).status === 'SUBMITTED') {
-      // idempotent
       return attempt;
     }
 

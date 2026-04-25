@@ -1,3 +1,4 @@
+/** Ana sayfa önerilen testler sorgu DTO'su — limit ve sınav türü filtresi */
 import { IsOptional, IsInt, Min, Max, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -13,4 +14,3 @@ export class GetRecommendedDto {
   @IsString()
   examTypeId?: string;
 }
-

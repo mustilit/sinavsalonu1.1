@@ -4,8 +4,14 @@ import { Public } from '../decorators/public.decorator';
 import { GetSiteSettingsUseCase } from '../../application/use-cases/GetSiteSettingsUseCase';
 import { ListExamTypesUseCase } from '../../application/use-cases/ListExamTypesUseCase';
 import { ListFeaturedEducatorsUseCase } from '../../application/use-cases/ListFeaturedEducatorsUseCase';
+import { GetPopularPackagesUseCase } from '../../application/use-cases/GetPopularPackagesUseCase';
 import type { PrismaClient } from '@prisma/client';
 
+/**
+ * Site geneli kamuya açık veri endpoint'leri — site ayarları, aktif sınav türleri,
+ * öne çıkan eğiticiler ve popüler paketleri döndürür.
+ * Tüm endpoint'ler kimlik doğrulama gerektirmez (@Public).
+ */
 @Controller('site')
 @ApiTags('Site')
 export class SiteController {
@@ -14,6 +20,7 @@ export class SiteController {
     private readonly getSiteSettings: GetSiteSettingsUseCase,
     private readonly listExamTypes: ListExamTypesUseCase,
     private readonly listFeaturedEducators: ListFeaturedEducatorsUseCase,
+    private readonly getPopularPackages: GetPopularPackagesUseCase,
   ) {}
 
   @Get('settings')
@@ -33,8 +40,45 @@ export class SiteController {
   @Get('featured-educators')
   @Public()
   @ApiOkResponse({ description: 'Featured educators for homepage' })
-  async getFeaturedEducators(@Query('limit') limit?: string) {
+  async getFeaturedEducators(
+    @Query('limit') limit?: string,
+    @Query('examTypeIds') examTypeIds?: string,
+  ) {
     const n = limit ? parseInt(limit, 10) : 6;
-    return this.listFeaturedEducators.execute(this.prisma, isNaN(n) ? 6 : n);
+    const parsedExamTypeIds = examTypeIds
+      ? examTypeIds.split(',').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+    return this.listFeaturedEducators.execute(
+      this.prisma,
+      isNaN(n) ? 6 : n,
+      parsedExamTypeIds,
+    );
+  }
+
+  @Get('service-status')
+  @Public()
+  @ApiOkResponse({ description: 'Current kill-switch status for all services' })
+  async getServiceStatus() {
+    const row = await this.prisma.adminSettings.findFirst({ where: { id: 1 } });
+    return {
+      purchasesEnabled:       row?.purchasesEnabled       ?? true,
+      packageCreationEnabled: row?.packageCreationEnabled ?? true,
+      testPublishingEnabled:  row?.testPublishingEnabled  ?? true,
+      testAttemptsEnabled:    row?.testAttemptsEnabled    ?? true,
+    };
+  }
+
+  @Get('popular-packages')
+  @Public()
+  @ApiOkResponse({ description: 'Popular test packages sorted by purchase count' })
+  async getPopularPackages(
+    @Query('examTypeIds') examTypeIds?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const n = limit ? parseInt(limit, 10) : 6;
+    const parsedExamTypeIds = examTypeIds
+      ? examTypeIds.split(',').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+    return this.getPopularPackages.execute(parsedExamTypeIds, isNaN(n) ? 6 : n);
   }
 }

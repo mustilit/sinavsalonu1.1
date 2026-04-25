@@ -6,6 +6,10 @@ import { AnswerObjectionDto } from './dto/answer-objection.dto';
 import { AnswerObjectionUseCase } from '../../application/use-cases/AnswerObjectionUseCase';
 import { ListEducatorObjectionsUseCase } from '../../application/use-cases/ListEducatorObjectionsUseCase';
 
+/**
+ * Eğiticiye gelen soru itirazlarını listeler ve yanıtlar.
+ * Listeleme isteğe bağlı `status` filtresi destekler; yanıtlama SLA kontrolüne tabidir.
+ */
 @Controller('educators/me/objections')
 @ApiTags('educators/me/objections')
 export class EducatorObjectionsController {

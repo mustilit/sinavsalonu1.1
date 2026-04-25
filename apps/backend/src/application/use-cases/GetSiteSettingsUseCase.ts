@@ -1,5 +1,6 @@
 import type { SiteSettings } from '../../domain/types';
 
+/** Veritabanında kayıt yoksa kullanılan varsayılan site ayarları — fail-open */
 const DEFAULTS: SiteSettings = {
   siteName: 'Dal',
   heroTitle: 'Sınavlara Güvenle Hazırlan',
@@ -22,9 +23,14 @@ const DEFAULTS: SiteSettings = {
   copyrightText: '© 2024 Dal. Tüm hakları saklıdır.',
 };
 
+/**
+ * Site içerik ayarlarını getirir (hero başlık, istatistikler, footer vb.).
+ * Kayıt bulunamazsa DEFAULTS ile fail-open çalışır.
+ */
 export class GetSiteSettingsUseCase {
   async execute(prisma: { siteSettings: { findUnique: (args: any) => Promise<any> } }): Promise<SiteSettings> {
     const row = await prisma.siteSettings.findUnique({ where: { id: 1 } });
+    // Satır yoksa varsayılanları döndür (sistem açık kalmaya devam eder)
     if (!row) return DEFAULTS;
     return {
       siteName: row.siteName ?? DEFAULTS.siteName,

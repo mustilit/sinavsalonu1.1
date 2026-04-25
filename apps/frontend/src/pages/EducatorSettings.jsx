@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { User, Save, Globe, Linkedin, Phone, MapPin, FileText, Upload, CheckCircle, GraduationCap, ShieldCheck, Bell, Award, Camera } from "lucide-react";
+import { User, Save, Globe, Linkedin, Phone, MapPin, FileText, Upload, CheckCircle, GraduationCap, ShieldCheck, Bell, Award, Camera, CreditCard, Building2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery } from "@tanstack/react-query";
@@ -32,7 +32,10 @@ export default function EducatorSettings() {
       email_promotions: true,
       email_educator_updates: true,
       email_test_reminders: true
-    }
+    },
+    iban: "",
+    bankName: "",
+    accountHolder: "",
   });
   const [uploadingCV, setUploadingCV] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -63,7 +66,10 @@ export default function EducatorSettings() {
         email_promotions: true,
         email_educator_updates: true,
         email_test_reminders: true
-      }
+      },
+      iban: user.iban || "",
+      bankName: user.bankName || "",
+      accountHolder: user.accountHolder || "",
     };
     setFormData(initialData);
     setInitialFormData(initialData);
@@ -297,12 +303,13 @@ export default function EducatorSettings() {
         </div>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8">
+          <TabsList className="grid w-full grid-cols-6 mb-8">
             <TabsTrigger value="profile">Profil</TabsTrigger>
             <TabsTrigger value="verification">Doğrulama</TabsTrigger>
             <TabsTrigger value="contact">İletişim</TabsTrigger>
             <TabsTrigger value="exams">Sınav Tercihleri</TabsTrigger>
             <TabsTrigger value="notifications">Bildirimler</TabsTrigger>
+            <TabsTrigger value="payment">Ödeme</TabsTrigger>
           </TabsList>
 
           {/* Profil Tab */}
@@ -676,6 +683,91 @@ export default function EducatorSettings() {
 
               <Button 
                 type="submit" 
+                className="bg-indigo-600 hover:bg-indigo-700"
+                disabled={updateMutation.isPending || !hasChanges}
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {updateMutation.isPending ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
+              </Button>
+            </form>
+          </TabsContent>
+          {/* Ödeme Tab */}
+          <TabsContent value="payment">
+            <form onSubmit={(e) => { e.preventDefault(); updateMutation.mutate(); }} className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-indigo-600" />
+                  Ödeme Bilgileri
+                </h3>
+                <p className="text-sm text-slate-500 mb-6">
+                  Komisyon ödemelerinizin aktarılacağı banka hesabı bilgilerini girin. Bu bilgiler yalnızca yöneticiler tarafından görülür.
+                </p>
+
+                <div className="space-y-6">
+                  <div>
+                    <Label htmlFor="iban" className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4" />
+                      IBAN <span className="text-rose-500 ml-1">*</span>
+                    </Label>
+                    <Input
+                      id="iban"
+                      placeholder="TR00 0000 0000 0000 0000 0000 00"
+                      value={formData.iban}
+                      onChange={(e) => {
+                        // normalize: uppercase, keep only alphanumeric
+                        const raw = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                        // insert spaces every 4 chars for display
+                        const formatted = raw.match(/.{1,4}/g)?.join(' ') ?? raw;
+                        setFormData({ ...formData, iban: formatted });
+                      }}
+                      className="mt-2 font-mono"
+                      maxLength={34} // TR + 24 digits + spaces
+                    />
+                    {formData.iban && !/^TR\d{24}$/.test(formData.iban.replace(/\s/g, '')) && (
+                      <p className="text-xs text-rose-500 mt-1">IBAN formatı: TR ile başlayan 26 karakter (TR + 24 rakam)</p>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">Türkiye IBAN formatı: TR ile başlar, toplam 26 karakter</p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="accountHolder" className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Hesap Sahibi Adı <span className="text-rose-500 ml-1">*</span>
+                    </Label>
+                    <Input
+                      id="accountHolder"
+                      placeholder="Ad Soyad"
+                      value={formData.accountHolder}
+                      onChange={(e) => setFormData({ ...formData, accountHolder: e.target.value })}
+                      className="mt-2"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Banka hesabında kayıtlı ad ve soyadınız</p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="bankName" className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4" />
+                      Banka Adı
+                    </Label>
+                    <Input
+                      id="bankName"
+                      placeholder="Örn: Ziraat Bankası"
+                      value={formData.bankName}
+                      onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                      className="mt-2"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-sm text-amber-800">
+                    <strong>Önemli:</strong> Komisyon ödemelerinizin zamanında yapılabilmesi için IBAN ve hesap sahibi bilgilerinizi eksiksiz doldurun. Bilgileriniz şifreli olarak saklanmaktadır.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
                 className="bg-indigo-600 hover:bg-indigo-700"
                 disabled={updateMutation.isPending || !hasChanges}
               >

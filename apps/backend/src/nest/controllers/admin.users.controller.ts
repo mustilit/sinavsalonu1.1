@@ -6,6 +6,10 @@ import { PrismaUserRepository } from '../../infrastructure/repositories/PrismaUs
 import { ListUsersUseCase } from '../../application/use-cases/ListUsersUseCase';
 import { UpdateUserByAdminUseCase } from '../../application/use-cases/UpdateUserByAdminUseCase';
 
+/**
+ * Admin kullanıcı yönetimi — tüm kullanıcıları listeler ve admin tarafından günceller.
+ * Sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/users')
 @ApiTags('admin/users')
 export class AdminUsersController {

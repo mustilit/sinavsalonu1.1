@@ -1,3 +1,4 @@
+/** Test denemesi anlık durum yanıtı DTO'su — aktif deneme bilgilerini içerir */
 import { ApiProperty } from '@nestjs/swagger';
 
 class AttemptInfoDto {
@@ -35,4 +36,3 @@ export class AttemptStateResponseDto {
   @ApiProperty({ type: [QuestionStateDto] }) questions!: QuestionStateDto[];
   @ApiProperty() summary!: { answeredCount: number; blankCount: number };
 }
-

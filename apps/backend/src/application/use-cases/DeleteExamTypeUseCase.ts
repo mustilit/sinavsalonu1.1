@@ -4,6 +4,10 @@ import { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository
 import { EXAM_TYPE_REPO } from '../constants';
 import { AppError } from '../errors/AppError';
 
+/**
+ * Sınav türünü kalıcı olarak siler.
+ * Alt konuları varsa silme engellenir (CONFLICT 409) — veri bütünlüğü korunur.
+ */
 @Injectable()
 export class DeleteExamTypeUseCase {
   constructor(

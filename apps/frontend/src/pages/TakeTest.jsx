@@ -28,6 +28,10 @@ import StarRating from "@/components/ui/StarRating";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { buildPageUrl, useAppNavigate, useLoginRedirect } from "@/lib/navigation";
+import { useServiceStatus } from "@/lib/useServiceStatus";
+import OnboardingTour from "@/components/onboarding/OnboardingTour";
+import { useShouldShowTour, useCompleteTour, TOUR_KEYS } from "@/lib/useOnboarding";
+import { CANDIDATE_TEST_STEPS } from "@/components/onboarding/tourSteps";
 
 // Map Dal question/options to Sınav Salonu format
 function toUIStyle(questions, stateQuestions) {
@@ -75,6 +79,8 @@ export default function TakeTest() {
   const { user } = useAuth();
   const navigate = useAppNavigate();
   const loginUrl = useLoginRedirect();
+  const showTestTour = useShouldShowTour(TOUR_KEYS.CANDIDATE_TEST);
+  const completeTour = useCompleteTour();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [flagged, setFlagged] = useState(new Set());
@@ -326,7 +332,13 @@ export default function TakeTest() {
     },
   });
 
+  const { testAttemptsEnabled } = useServiceStatus();
+
   const startTest = () => {
+    if (!testAttemptsEnabled) {
+      toast.warning("Test başlatma geçici olarak durdurulmuştur. Lütfen daha sonra tekrar deneyin.");
+      return;
+    }
     setTestStarted(true);
     const now = Date.now();
     setStartTime(now);
@@ -560,6 +572,15 @@ export default function TakeTest() {
   if (!testStarted && !isReviewMode) {
     return (
       <div className="max-w-2xl mx-auto">
+        {/* Test-taking onboarding tour — shown before first test attempt */}
+        {showTestTour && (
+          <OnboardingTour
+            steps={CANDIDATE_TEST_STEPS}
+            onComplete={() => completeTour(TOUR_KEYS.CANDIDATE_TEST)}
+            onSkip={() => completeTour(TOUR_KEYS.CANDIDATE_TEST)}
+          />
+        )}
+
         <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
           <h1 className="text-2xl font-bold text-slate-900 mb-2">{test?.title}</h1>
           <p className="text-slate-500 mb-2">{testPackage?.title}</p>
@@ -578,9 +599,16 @@ export default function TakeTest() {
             </div>
           </div>
 
-          <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700" onClick={startTest}>
-            Teste Başla
-          </Button>
+          {!testAttemptsEnabled ? (
+            <div className="w-full max-w-xs rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3 text-center">
+              <p className="text-sm font-semibold text-amber-800">🔧 Test başlatma bakımdadır</p>
+              <p className="text-xs text-amber-600 mt-1">Lütfen daha sonra tekrar deneyin.</p>
+            </div>
+          ) : (
+            <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700" onClick={startTest}>
+              Teste Başla
+            </Button>
+          )}
         </div>
       </div>
     );

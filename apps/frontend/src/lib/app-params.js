@@ -1,11 +1,17 @@
+// SSR/Node ortamında window yoktur — güvenli fallback
 const isNode = typeof window === 'undefined';
 const windowObj = isNode ? { localStorage: new Map() } : window;
 const storage = windowObj.localStorage;
 
+/** camelCase parametre adını localStorage anahtarı için snake_case'e çevirir */
 const toSnakeCase = (str) => {
 	return str.replace(/([A-Z])/g, '_$1').toLowerCase();
 }
 
+/**
+ * URL query parametresini okur; localStorage'a persist eder.
+ * removeFromUrl: URL'den parametreyi temizler (token gizliği vb. için).
+ */
 const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl = false } = {}) => {
 	if (isNode) {
 		return defaultValue;

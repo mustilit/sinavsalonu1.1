@@ -1,16 +1,26 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 
+/**
+ * Gerçek zamanlı kalan süreyi hesaplar.
+ * Deneme duraklatılmışsa remainingSec olduğu gibi döner;
+ * devam ediyorsa son resume anından itibaren geçen süre düşülür.
+ */
 function recomputeRemaining(attempt: any, now: Date) {
   if (attempt.status !== 'IN_PROGRESS') {
     return attempt.remainingSec ?? 0;
   }
+  // Son devam (resume) zamanı veya başlangıç zamanı baz alınır
   const lastResumedAt: Date = attempt.lastResumedAt ?? attempt.startedAt;
   const elapsedSec = Math.max(0, Math.floor((now.getTime() - lastResumedAt.getTime()) / 1000));
   const prevRemaining = attempt.remainingSec ?? 0;
   return Math.max(0, prevRemaining - elapsedSec);
 }
 
+/**
+ * Mevcut deneme durumunu getirir: sorular, verilen cevaplar ve kalan süre.
+ * Süre dolmuşsa denemeyi otomatik EXPIRED olarak işaretler.
+ */
 export class GetTestAttemptUseCase {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -42,6 +52,7 @@ export class GetTestAttemptUseCase {
     let remainingSec = recomputeRemaining(attempt as any, now);
     let status = attempt.status as any;
 
+    // Süre dolmuşsa istemci sonraki getirme isteğinde de zaman aşımını fark etsin
     if (status === 'IN_PROGRESS' && remainingSec <= 0) {
       status = 'EXPIRED';
       const updated = await this.prisma.testAttempt.update({

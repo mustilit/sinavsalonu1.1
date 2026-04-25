@@ -1,3 +1,4 @@
+/** Eğitici profil güncelleme isteği DTO'su — bio, avatarUrl, displayName vb. metadata */
 import { IsOptional, IsObject, IsString, IsUrl, MaxLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 

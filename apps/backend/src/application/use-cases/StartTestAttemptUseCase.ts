@@ -10,6 +10,12 @@ export class StartTestAttemptUseCase {
       throw new BadRequestException({ code: 'INVALID_INPUT', message: 'Missing testId or userId' });
     }
 
+    // Kill-switch: new test attempts disabled
+    const killSettings = await this.prisma.adminSettings.findFirst({ where: { id: 1 } });
+    if (killSettings && killSettings.testAttemptsEnabled === false) {
+      throw new BadRequestException({ code: 'TEST_ATTEMPTS_DISABLED', message: 'Test başlatma geçici olarak durdurulmuştur' });
+    }
+
     const test = await prismaRetry(() => this.prisma.examTest.findUnique({ where: { id: testId } }));
     if (!test) {
       throw new NotFoundException({ code: 'TEST_NOT_FOUND', message: 'Test not found' });

@@ -1,5 +1,10 @@
 import type { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository';
 
+/**
+ * Sistem denetim kayıtlarını filtreli listeler.
+ * Tarih aralığı, eylem türü, aktör veya entity'ye göre filtreleme desteklenir.
+ * Yalnızca admin panelinden erişilebilir.
+ */
 export class ListAuditLogsUseCase {
   constructor(private readonly auditRepo: IAuditLogRepository) {}
 

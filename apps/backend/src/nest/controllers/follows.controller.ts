@@ -9,6 +9,11 @@ import { PrismaFollowRepository } from '../../infrastructure/repositories/Prisma
 import { PrismaAuditLogRepository } from '../../infrastructure/repositories/PrismaAuditLogRepository';
 import { Request } from 'express';
 
+/**
+ * Aday takip işlemlerini yönetir: eğitici veya sınav türü takip etme,
+ * takipten çıkma ve takip listesini sorgulama.
+ * Tüm endpoint'ler CANDIDATE rolüne kısıtlıdır.
+ */
 @Controller('follows')
 @ApiTags('Follows')
 export class FollowsController {

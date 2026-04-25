@@ -1,20 +1,29 @@
 import { z } from 'zod';
 
+/**
+ * Ortam değişkenleri şeması — Zod ile doğrulanır.
+ * Zorunlu: DATABASE_URL, JWT_SECRET
+ * Opsiyonel özellik bayrakları: REDIS_DISABLED, CRON_DISABLED, THROTTLE_DISABLED
+ */
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
-  CLIENT_URL: z.string().optional(),
-  PORT: z.string().optional(),
-  REDIS_URL: z.string().optional(),
-  REDIS_DISABLED: z.string().optional(),
-  CRON_DISABLED: z.string().optional(),
-  THROTTLE_DISABLED: z.string().optional(),
-  TRUST_PROXY: z.string().optional(),
+  CLIENT_URL: z.string().optional(),          // CORS için izin verilen frontend URL'i
+  PORT: z.string().optional(),                // HTTP sunucu portu (varsayılan 3000)
+  REDIS_URL: z.string().optional(),           // Redis bağlantı URL'i; yoksa cache devre dışı
+  REDIS_DISABLED: z.string().optional(),      // '1' ise Redis tamamen atlanır
+  CRON_DISABLED: z.string().optional(),       // '1' ise zamanlanmış görevler çalışmaz
+  THROTTLE_DISABLED: z.string().optional(),   // '1' ise rate limiting devre dışı (test için)
+  TRUST_PROXY: z.string().optional(),         // Reverse proxy arkasında çalışıyorsa '1'
 });
 
 export type Env = z.infer<typeof EnvSchema>;
 
+/**
+ * Ortam değişkenlerini doğrular ve üretim güvenlik kontrollerini uygular.
+ * Geliştirme ortamındaki zayıf JWT_SECRET veya eksik CLIENT_URL üretimde hata verir.
+ */
 function validateEnv(raw: NodeJS.ProcessEnv): Env {
   const parsed = EnvSchema.safeParse(raw);
   if (!parsed.success) {

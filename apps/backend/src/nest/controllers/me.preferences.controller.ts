@@ -5,6 +5,10 @@ import { GetUserPreferencesUseCase } from '../../application/use-cases/GetUserPr
 import { UpdateUserPreferencesUseCase } from '../../application/use-cases/UpdateUserPreferencesUseCase';
 import { PrismaUserPreferenceRepository } from '../../infrastructure/repositories/PrismaUserPreferenceRepository';
 
+/**
+ * Kullanıcının UI tercihlerini (onboarding durumu, tema vb.) okur ve günceller.
+ * Tüm roller erişebilir; güncelleme için WHITELIST kontrolü use-case katmanında yapılır.
+ */
 @Controller('me')
 @ApiTags('me')
 export class MePreferencesController {

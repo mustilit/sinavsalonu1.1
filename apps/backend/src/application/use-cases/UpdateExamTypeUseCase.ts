@@ -4,6 +4,10 @@ import { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository
 import { EXAM_TYPE_REPO } from '../constants';
 import { slugify } from '../utils/slugify';
 
+/**
+ * Sınav türünü günceller. Slug çakışması kontrolü yapılır (kendi ID'si hariç).
+ * isActive: false yapılırsa sınav türü listeden gizlenir.
+ */
 @Injectable()
 export class UpdateExamTypeUseCase {
   constructor(

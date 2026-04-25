@@ -9,6 +9,10 @@ import { ListTopicsByExamTypeUseCase } from '../../application/use-cases/ListTop
 import { UpdateTopicUseCase } from '../../application/use-cases/UpdateTopicUseCase';
 import { DeleteTopicUseCase } from '../../application/use-cases/DeleteTopicUseCase';
 
+/**
+ * Admin soru konusu CRUD yönetimi — sınav türüne göre konuları listeler,
+ * oluşturur, günceller ve siler. Sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/topics')
 @ApiTags('admin/topics')
 export class AdminTopicsController {

@@ -4,6 +4,10 @@ import { Roles } from '../decorators/roles.decorator';
 import { ListAuditLogsUseCase } from '../../application/use-cases/ListAuditLogsUseCase';
 import { ListAuditLogsQueryDto } from './dto/list-audit-logs-query.dto';
 
+/**
+ * Admin denetim logu görüntüleme — eylem, varlık tipi, aktör ve tarih aralığına
+ * göre filtrelenebilir audit log listesi döndürür. Sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/audit')
 @ApiTags('admin/audit')
 export class AdminAuditController {

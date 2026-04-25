@@ -3,6 +3,10 @@ import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiForbiddenResponse } from '@ne
 import { Roles } from '../decorators/roles.decorator';
 import { ListMyPurchasesUseCase } from '../../application/use-cases/ListMyPurchasesUseCase';
 
+/**
+ * Giriş yapmış adayın satın alma geçmişini ve ilgili deneme bilgilerini döndürür.
+ * CANDIDATE ve ADMIN rollerine açıktır.
+ */
 @Controller('me')
 @ApiTags('me')
 export class MePurchasesController {

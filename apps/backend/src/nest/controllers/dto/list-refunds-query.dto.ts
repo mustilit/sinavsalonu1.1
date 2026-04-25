@@ -1,3 +1,4 @@
+/** İade talebi listeleme sorgu DTO'su — varsayılan durum: PENDING */
 import { IsOptional, IsIn } from 'class-validator';
 
 export class ListRefundsQueryDto {

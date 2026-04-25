@@ -3,6 +3,10 @@ import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiForbiddenResponse } from '@ne
 import { Roles } from '../decorators/roles.decorator';
 import { ListMyRefundsUseCase } from '../../application/use-cases/ListMyRefundsUseCase';
 
+/**
+ * Giriş yapmış adayın iade taleplerini listeler.
+ * Sadece CANDIDATE rolüne açıktır.
+ */
 @Controller('me')
 @ApiTags('me')
 export class MeRefundsController {

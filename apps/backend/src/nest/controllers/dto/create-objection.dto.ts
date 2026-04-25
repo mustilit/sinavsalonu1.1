@@ -1,3 +1,4 @@
+/** Soru itirazı oluşturma isteği DTO'su — deneme ve soru UUID'si zorunludur */
 import { IsString, IsUUID, MinLength, IsOptional, IsUrl } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 

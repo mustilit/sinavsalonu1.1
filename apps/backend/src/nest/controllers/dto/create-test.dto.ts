@@ -1,3 +1,4 @@
+/** Test paketi oluşturma isteği DTO'su — sorular dahil tam test tanımı */
 import { IsString, IsOptional, IsBoolean, IsNumber, IsUUID, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 

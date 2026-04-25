@@ -7,6 +7,10 @@ import { GetAdminSettingsUseCase } from '../../application/use-cases/GetAdminSet
 import { UpdateAdminSettingsUseCase } from '../../application/use-cases/UpdateAdminSettingsUseCase';
 import { UpdateAdminSettingsDto } from './dto/update-admin-settings.dto';
 
+/**
+ * Admin uygulama ayarları — satın alma kill-switch gibi özellik bayraklarını
+ * okur ve günceller. Sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/settings')
 @ApiTags('admin/settings')
 export class AdminSettingsController {
@@ -35,6 +39,9 @@ export class AdminSettingsController {
       commissionPercent: dto.commissionPercent,
       vatPercent: dto.vatPercent,
       purchasesEnabled: dto.purchasesEnabled,
+      packageCreationEnabled: dto.packageCreationEnabled,
+      testPublishingEnabled: dto.testPublishingEnabled,
+      testAttemptsEnabled: dto.testAttemptsEnabled,
     });
   }
 }

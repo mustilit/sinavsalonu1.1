@@ -2,7 +2,13 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { ArrowLeft, HelpCircle, Book, CreditCard, User, Settings, MessageCircle } from "lucide-react";
 
+/**
+ * Support (Yardım ve Destek) sayfası — sık sorulan soruları kategorilere
+ * göre accordion yapısında listeler; her soru bir `<details>` öğesiyle açılıp kapanır.
+ * Sayfanın altında destek ekibine yönlendiren iletişim bölümü yer alır.
+ */
 export default function Support() {
+  // SSS kategorileri: her kategori ikon, başlık ve soru-cevap çiftlerini içerir
   const faqs = [
     {
       category: "Genel",

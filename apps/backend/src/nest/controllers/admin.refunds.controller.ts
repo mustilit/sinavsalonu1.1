@@ -8,6 +8,10 @@ import { ListPendingRefundsUseCase } from '../../application/use-cases/ListPendi
 import { RejectRefundDto } from './dto/reject-refund.dto';
 import { ListRefundsQueryDto } from './dto/list-refunds-query.dto';
 
+/**
+ * Admin iade yönetimi — bekleyen iade taleplerini listeler, onaylar veya reddeder.
+ * Sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/refunds')
 @ApiTags('admin/refunds')
 export class AdminRefundsController {

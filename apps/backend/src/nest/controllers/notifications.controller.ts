@@ -11,12 +11,16 @@ import { UpdateNotificationPreferencesUseCase } from '../../application/use-case
 import { Roles } from '../decorators/roles.decorator';
 import { Request } from 'express';
 
+/**
+ * Bildirim tercihlerini ve e-posta aboneliğini yönetir.
+ * /unsubscribe endpoint'i e-posta bağlantısı üzerinden geldiğinden herkese açıktır (@Public).
+ */
 @Controller('notifications')
 @ApiTags('Notifications')
 export class NotificationsController {
   private readonly useCase: UnsubscribeEmailUseCase;
   constructor() {
-    // lightweight wiring to avoid full DI complexity
+    // Tam DI karmaşıklığını önlemek için hafif manuel bağlama
     this.useCase = new UnsubscribeEmailUseCase(new PrismaNotificationPreferenceRepository(), new PrismaAuditLogRepository());
   }
 

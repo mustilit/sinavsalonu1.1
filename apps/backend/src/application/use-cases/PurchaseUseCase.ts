@@ -4,26 +4,38 @@ import { RedisCache } from '../../infrastructure/cache/RedisCache';
 import { prismaRetry } from '../../infrastructure/prisma/prisma-retry';
 import { getDefaultTenantId } from '../../common/tenant';
 
+/**
+ * Adayın test satın alma işlemini yönetir.
+ * - Kampanya fiyatı varsa ve geçerliyse baz fiyat olarak kullanılır.
+ * - İndirim kodu uygulanabilir; maksimum %50 sınırı vardır.
+ * - Satın alma + deneme (attempt) oluşturma atomik transaction ile yapılır.
+ * - İndirim kullanım sayısı race condition'a karşı korumalı (updateMany with lt check).
+ * - Başarılı satın alma sonrası aday için öneri cache'i temizlenir.
+ */
 export class PurchaseUseCase {
+  /** Öneri cache'ini temizlemek için kullanılan Redis bağlantısı. */
   private cache: RedisCache;
   constructor(private readonly prisma: PrismaClient) {
     this.cache = new RedisCache();
   }
 
   /**
-   * Execute purchase: amount is never provided by client.
-   * final price derived from test.priceCents and discount rules.
+   * Test satın alma işlemini gerçekleştirir.
+   * Fiyat istemci tarafından gönderilmez; test fiyatı ve indirim kurallarından hesaplanır.
+   * @param testId       - Satın alınacak testin ID'si.
+   * @param candidateId  - Satın almayı yapan adayın ID'si.
+   * @param discountCode - Opsiyonel indirim kodu.
    */
   async execute(testId: string, candidateId: string, discountCode?: string) {
     if (!testId || !candidateId) throw new BadRequestException({ code: 'INVALID_INPUT', message: 'Missing testId or candidateId' });
 
-    // FR-Y-05: Satın alma geçici durdurma - purchasesEnabled kontrolü
+    // FR-Y-05: Satın alma kill-switch'i — admin panelinden geçici durdurulabilir
     const settings = await this.prisma.adminSettings.findFirst({ where: { id: 1 } });
     if (settings && !settings.purchasesEnabled) {
       throw new BadRequestException({ code: 'PURCHASES_DISABLED', message: 'Purchases are temporarily suspended' });
     }
 
-    // Pre-checks: ensure test exists and is published, and candidate is ACTIVE
+    // Ön kontroller: test yayınlanmış olmalı, aday aktif olmalı
     const test = await this.prisma.examTest.findUnique({ where: { id: testId } });
     if (!test) throw new BadRequestException({ code: 'TEST_NOT_FOUND', message: 'Test not found' });
     if ((test as any).status && (test as any).status !== 'PUBLISHED') {
@@ -40,6 +52,7 @@ export class PurchaseUseCase {
     const campaignPrice = (test as any).campaignPriceCents;
     const campaignFrom = (test as any).campaignValidFrom;
     const campaignUntil = (test as any).campaignValidUntil;
+    // Kampanya fiyatı geçerli aralıktaysa baz fiyat olarak kullanılır
     if (typeof campaignPrice === 'number' && campaignFrom && campaignUntil && now >= campaignFrom && now <= campaignUntil) {
       baseAmountCents = campaignPrice;
     }
@@ -47,7 +60,7 @@ export class PurchaseUseCase {
     let discountApplied: any = null;
 
     if (discountCode) {
-      // prefer discount tied to educator or global (createdById = null)
+      // Eğiticiye bağlı indirim kodu veya global (createdById=null) indirim kodu tercih edilir
       const disc = await this.prisma.discountCode.findFirst({
         where: {
           code: discountCode,
@@ -59,6 +72,7 @@ export class PurchaseUseCase {
       if (disc.validUntil && disc.validUntil < now) throw new BadRequestException({ code: 'DISCOUNT_EXPIRED', message: 'Discount expired' });
       if (disc.maxUses && disc.usedCount >= disc.maxUses) throw new BadRequestException({ code: 'DISCOUNT_MAXED_OUT', message: 'Discount usage limit reached' });
       const percent = disc.percentOff ?? 0;
+      // Maksimum %50 indirim sınırı — aşırı indirim güvenlik kuralı
       if (percent > 50) throw new BadRequestException({ code: 'DISCOUNT_TOO_HIGH', message: 'Discount percent too high' });
       finalAmountCents = Math.max(0, Math.round(baseAmountCents * (100 - percent) / 100));
       discountApplied = disc;
@@ -67,6 +81,7 @@ export class PurchaseUseCase {
     const tenantId = (test as any).tenantId ?? getDefaultTenantId();
 
     try {
+      // Satın alma, deneme oluşturma ve audit kaydı tek transaction içinde yapılır
       const result = await prismaRetry(() =>
         this.prisma.$transaction(async (tx) => {
         const purchase = await tx.purchase.create({
@@ -94,13 +109,15 @@ export class PurchaseUseCase {
           },
         });
 
-        // increment discount usedCount if applied - race safe via updateMany
+        // İndirim kullanım sayısını artır — updateMany + lt koşuluyla race condition koruması
         if (discountApplied) {
           if (discountApplied.maxUses) {
+            // Maksimum kullanım sayısı varsa — usedCount < maxUses koşuluyla atomik artış
             const updated = await tx.discountCode.updateMany({
               where: { id: discountApplied.id, usedCount: { lt: discountApplied.maxUses } },
               data: { usedCount: { increment: 1 } },
             });
+            // Güncellenen kayıt yoksa sınıra ulaşılmış demektir (race condition durumu)
             if (updated.count === 0) {
               throw new BadRequestException({ code: 'DISCOUNT_MAXED_OUT', message: 'Discount usage limit reached' });
             }
@@ -112,17 +129,18 @@ export class PurchaseUseCase {
           return { purchase, attempt };
         }),
       );
-      // invalidate purchaser's home cache (popularity may change)
+      // Satın alma sonrası adayın önerileri değişebilir — home öneri cache'ini temizle
       try {
         await this.cache.delByPrefix(`home:rec:${candidateId}:`);
       } catch {}
       return result;
     } catch (e: any) {
+      // P2002: unique constraint ihlali — aday aynı testi zaten satın almış
       if (e?.code === 'P2002') {
         throw new ConflictException({ code: 'ALREADY_PURCHASED', message: 'Candidate has already purchased this test' });
       }
       if (e instanceof BadRequestException) throw e;
-      // enqueue stats refresh for test
+      // Hata durumunda stats yenileme işi kuyruğa eklenir (best-effort)
       try {
         const { QueueService } = require('../../infrastructure/queue/queue.service');
         const qs = new QueueService();

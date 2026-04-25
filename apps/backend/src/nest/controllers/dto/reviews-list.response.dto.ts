@@ -1,3 +1,4 @@
+/** Test değerlendirme listesi yanıt DTO'su — cursor tabanlı sayfalama */
 export class ListReviewsResponseDto {
   items!: Array<{
     id: string;
@@ -8,4 +9,3 @@ export class ListReviewsResponseDto {
   }>;
   meta?: { nextCursor?: string };
 }
-

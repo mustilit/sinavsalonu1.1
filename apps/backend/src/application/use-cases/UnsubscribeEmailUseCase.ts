@@ -1,6 +1,11 @@
 import { INotificationPreferenceRepository } from '../../domain/interfaces/INotificationPreferenceRepository';
 import { PrismaAuditLogRepository } from '../../infrastructure/repositories/PrismaAuditLogRepository';
 
+/**
+ * E-posta aboneliğini iptal eder.
+ * E-posta içindeki tek kullanımlık token üzerinden kimlik doğrulaması yapılır
+ * (giriş gerektirmez — kullanıcının doğrudan e-postadan tıklaması yeterli).
+ */
 export class UnsubscribeEmailUseCase {
   constructor(private readonly repo: INotificationPreferenceRepository, private readonly auditRepo: PrismaAuditLogRepository) {}
 
@@ -11,7 +16,7 @@ export class UnsubscribeEmailUseCase {
         action: 'NOTIFICATIONS_DISABLED',
         entityType: 'NotificationPreference',
         entityId: token,
-        actorId: null,
+        actorId: null, // token bazlı işlem — kullanıcı ID'si bilinmiyor
         metadata: { reason: 'unsubscribe' },
       } as any);
     }

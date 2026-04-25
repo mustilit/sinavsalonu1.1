@@ -1,3 +1,4 @@
+/** Test paketi güncelleme isteği DTO'su — kampanya fiyatı ve kapak görseli dahil */
 import { IsString, IsOptional, IsBoolean, IsNumber, IsDateString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 

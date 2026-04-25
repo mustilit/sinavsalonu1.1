@@ -8,6 +8,10 @@ import { ApiTags, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
 import { ApiErrorResponses } from '../swagger/decorators';
 import { HomeRecommendedResponseDto } from './dto/home-recommended.response.dto';
 
+/**
+ * Ana sayfa endpoint'leri — adaya özel öneri test listesini döndürür.
+ * Takip edilen eğiticiler ve sınav türleri önceliklendirilir; CANDIDATE rolüne açıktır.
+ */
 @Controller('home')
 @ApiTags('Home')
 export class HomeController {

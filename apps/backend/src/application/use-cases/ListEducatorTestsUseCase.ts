@@ -1,6 +1,7 @@
 import { IExamRepository } from '../../domain/interfaces/IExamRepository';
 import { AppError } from '../errors/AppError';
 
+/** Eğiticinin kendi test paketlerini listeler (yayında + taslak dahil). */
 export class ListEducatorTestsUseCase {
   constructor(private readonly examRepository: IExamRepository) {}
 

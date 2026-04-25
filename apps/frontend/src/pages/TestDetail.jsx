@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppNavigate, useLoginRedirect } from "@/lib/navigation";
+import { useServiceStatus } from "@/lib/useServiceStatus";
 
 const difficultyLabels = {
   easy: { label: "Kolay", color: "bg-emerald-100 text-emerald-700" },
@@ -38,6 +39,7 @@ export default function TestDetail() {
   const { user } = useAuth();
   const navigate = useAppNavigate();
   const loginUrl = useLoginRedirect();
+  const { purchasesEnabled } = useServiceStatus();
   const [testRating, setTestRating] = useState(0);
   const [testComment, setTestComment] = useState("");
 
@@ -180,6 +182,10 @@ export default function TestDetail() {
   const handlePurchase = () => {
     if (!user) {
       navigate(loginUrl(), { replace: true });
+      return;
+    }
+    if (!purchasesEnabled) {
+      toast.warning("Satın alma servislerimiz bakımdadır. Lütfen daha sonra tekrar deneyin.");
       return;
     }
     purchaseMutation.mutate();
@@ -460,14 +466,21 @@ export default function TestDetail() {
                 })}
               </div>
             ) : (
-              <Button 
-                className="w-full h-12 bg-indigo-600 hover:bg-indigo-700"
-                onClick={handlePurchase}
-                disabled={purchaseMutation.isPending}
-              >
-                <ShoppingCart className="w-5 h-5 mr-2" />
-                {purchaseMutation.isPending ? "İşleniyor..." : "Satın Al"}
-              </Button>
+              {!purchasesEnabled ? (
+                <div className="w-full rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3 text-center">
+                  <p className="text-sm font-semibold text-amber-800">🔧 Satın alma servisleri bakımdadır</p>
+                  <p className="text-xs text-amber-600 mt-1">Lütfen daha sonra tekrar deneyin.</p>
+                </div>
+              ) : (
+                <Button
+                  className="w-full h-12 bg-indigo-600 hover:bg-indigo-700"
+                  onClick={handlePurchase}
+                  disabled={purchaseMutation.isPending}
+                >
+                  <ShoppingCart className="w-5 h-5 mr-2" />
+                  {purchaseMutation.isPending ? "İşleniyor..." : "Satın Al"}
+                </Button>
+              )}
             )}
 
             <div className="mt-6 space-y-3">

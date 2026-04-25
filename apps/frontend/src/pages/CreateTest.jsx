@@ -10,13 +10,20 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, WrenchIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { buildPageUrl, useAppNavigate } from "@/lib/navigation";
+import { useServiceStatus } from "@/lib/useServiceStatus";
+import OnboardingTour from "@/components/onboarding/OnboardingTour";
+import { useShouldShowTour, useCompleteTour, TOUR_KEYS } from "@/lib/useOnboarding";
+import { EDUCATOR_CREATE_STEPS } from "@/components/onboarding/tourSteps";
 
 export default function CreateTest() {
   const { user } = useAuth();
   const navigate = useAppNavigate();
+  const { packageCreationEnabled } = useServiceStatus();
+  const showCreateTour = useShouldShowTour(TOUR_KEYS.EDUCATOR_CREATE);
+  const completeTour = useCompleteTour();
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -84,6 +91,18 @@ export default function CreateTest() {
     );
   }
 
+  if (!packageCreationEnabled) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <div className="w-20 h-20 mx-auto bg-amber-100 rounded-full flex items-center justify-center mb-4">
+          <WrenchIcon className="w-10 h-10 text-amber-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Bakım Modu</h2>
+        <p className="text-slate-600">Test oluşturma geçici olarak durdurulmuştur. Lütfen daha sonra tekrar deneyin.</p>
+      </div>
+    );
+  }
+
   if (user.role === "EDUCATOR" && user?.status === "PENDING_EDUCATOR_APPROVAL") {
     return (
       <div className="max-w-2xl mx-auto text-center py-20">
@@ -103,6 +122,15 @@ export default function CreateTest() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {/* Educator test-creation onboarding tour */}
+      {showCreateTour && (
+        <OnboardingTour
+          steps={EDUCATOR_CREATE_STEPS}
+          onComplete={() => completeTour(TOUR_KEYS.EDUCATOR_CREATE)}
+          onSkip={() => completeTour(TOUR_KEYS.EDUCATOR_CREATE)}
+        />
+      )}
+
       <Link
         to={createPageUrl("EducatorDashboard")}
         className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6"

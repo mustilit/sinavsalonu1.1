@@ -4,6 +4,10 @@ import { Roles } from '../decorators/roles.decorator';
 import { GetCandidateReportUseCase } from '../../application/use-cases/GetCandidateReportUseCase';
 import { SendBulkCandidateEmailUseCase } from '../../application/use-cases/SendBulkCandidateEmailUseCase';
 
+/**
+ * Admin aday yönetimi — aday raporunu listeler ve toplu e-posta gönderir.
+ * Sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/candidates')
 @ApiTags('admin/candidates')
 export class AdminCandidatesController {

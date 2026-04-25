@@ -14,6 +14,14 @@ type Summary = {
   tags?: string[];
 };
 
+/**
+ * Aday için kişiselleştirilmiş test önerileri oluşturur.
+ *
+ * Kişiselleştirme stratejisi:
+ *   - Takip edilen eğitici/sınav türü testleri → önce gösterilir (max %60 slot)
+ *   - Kalan slotlar global popüler testlerle doldurulur
+ *   - Sonuçlar Redis'te 2dk cache'lenir
+ */
 export class GetRecommendedTestsUseCase {
   private cache: RedisCache;
   constructor(private readonly examRepo: IExamRepository, private readonly followRepo: IFollowRepository) {
@@ -21,6 +29,7 @@ export class GetRecommendedTestsUseCase {
   }
 
   async execute(candidateId: string, limit = 20, examTypeId?: string) {
+    // Limit: 1–50 arasında sıkıştır
     const l = Math.min(Math.max(limit, 1), 50);
     const cacheKey = `home:rec:${candidateId}:${examTypeId ?? 'all'}:v1`;
     const cached = await this.cache.get<{ items: Summary[] }>(cacheKey);
@@ -28,9 +37,11 @@ export class GetRecommendedTestsUseCase {
       return { items: cached.items.slice(0, l), meta: { limit: l, followedBoosted: Math.ceil(l * 0.6), fallbackCount: Math.max(0, l - Math.ceil(l * 0.6)) } };
     }
 
+    // Adayın takip ettiği eğitici ve sınav türü ID'leri
     const educatorIds = await this.followRepo.listFollowedEducatorIds(candidateId).catch((): string[] => []);
     const examTypeIds = await this.followRepo.listFollowedExamTypeIds(candidateId).catch((): string[] => []);
 
+    // Takip edilen içerik maksimum %60 slot — aşırı kişiselleşmeyi önler
     const followedLimit = Math.ceil(l * 0.6);
     const fallbackLimit = l - followedLimit;
 
@@ -38,10 +49,11 @@ export class GetRecommendedTestsUseCase {
     if ((educatorIds && educatorIds.length) || (examTypeIds && examTypeIds.length)) {
       followedItems = await this.examRepo.listPublishedByFollowed({ educatorIds, examTypeIds, limit: followedLimit, examTypeId });
     }
+    // Takip listesinde olanları fallback'ten dışla
     const excludeIds = followedItems.map((t) => t.id);
     const fallbackItems = await this.examRepo.listPublishedFallback({ excludeIds, limit: fallbackLimit, examTypeId });
     const combined = [...followedItems, ...fallbackItems];
-    // dedupe by id, preserving order
+    // Birleştirilen listede ID çakışmasını önle (ID sırasını koru)
     const seen = new Set<string>();
     const deduped = [];
     for (const t of combined) {

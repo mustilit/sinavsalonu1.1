@@ -6,6 +6,10 @@ import { GetSiteSettingsUseCase } from '../../application/use-cases/GetSiteSetti
 import { UpdateSiteSettingsUseCase } from '../../application/use-cases/UpdateSiteSettingsUseCase';
 import { UpdateSiteSettingsDto } from './dto/update-site-settings.dto';
 
+/**
+ * Admin site ayarları — bakım modu, duyurular vb. genel site konfigürasyonunu
+ * okur ve günceller. Sadece ADMIN rolüne açıktır.
+ */
 @Controller('admin/site-settings')
 @ApiTags('admin/site-settings')
 export class AdminSiteSettingsController {

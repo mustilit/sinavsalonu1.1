@@ -6,8 +6,13 @@ import { EXAM_TYPE_REPO } from '../constants';
 import { TOPIC_REPO } from '../constants';
 import { slugify } from '../utils/slugify';
 
+/** UUID formatı doğrulama — gelen examTypeId'nin geçerli olduğunu kontrol eder */
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/**
+ * Belirtilen sınav türüne yeni konu ekler (örn. YKS > Matematik).
+ * Slug aynı sınav türü içinde benzersiz olmalıdır.
+ */
 @Injectable()
 export class CreateTopicUseCase {
   constructor(

@@ -1,3 +1,4 @@
+/** Sınav türü güncelleme isteği DTO'su */
 import { IsOptional, IsString, IsBoolean, MaxLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 

@@ -4,6 +4,7 @@ import { ITopicRepository } from '../../domain/interfaces/ITopicRepository';
 import { ExamTest, ExamQuestion } from '../../domain/entities/Exam';
 import { AppError } from '../errors/AppError';
 import { randomUUID } from 'crypto';
+import { prisma } from '../../infrastructure/database/prisma';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -24,6 +25,12 @@ export class CreateTestUseCase {
     topicId?: string | null;
     questions?: (ExamQuestion & { options: any[] })[];
   }) {
+    // Kill-switch: package/test creation disabled
+    const settings = await prisma.adminSettings.findFirst({ where: { id: 1 } });
+    if (settings && settings.packageCreationEnabled === false) {
+      throw new AppError('PACKAGE_CREATION_DISABLED', 'Test oluşturma geçici olarak durdurulmuştur', 503);
+    }
+
     let examTypeId: string | null = input.examTypeId ?? null;
     let topicId: string | null = input.topicId ?? null;
 

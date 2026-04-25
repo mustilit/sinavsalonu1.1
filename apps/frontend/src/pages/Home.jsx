@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery } from "@tanstack/react-query";
+import OnboardingTour from "@/components/onboarding/OnboardingTour";
+import { useShouldShowTour, useCompleteTour, TOUR_KEYS } from "@/lib/useOnboarding";
+import { CANDIDATE_WELCOME_STEPS } from "@/components/onboarding/tourSteps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { buildPageUrl, useAppNavigate } from "@/lib/navigation";
+import api from "@/lib/api/apiClient";
 import {
   Dialog,
   DialogContent,
@@ -14,21 +18,189 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import TestPackageCard from "@/components/ui/TestPackageCard";
-import { 
-  GraduationCap, 
-  Search, 
-  TrendingUp, 
-  Users, 
-  BookOpen, 
+import {
+  GraduationCap,
+  Search,
+  TrendingUp,
+  Users,
+  BookOpen,
   Award,
   ArrowRight,
   CheckCircle,
   Star,
   User,
   UserCircle,
-  Briefcase
+  Briefcase,
+  Clock,
+  Sparkles,
 } from "lucide-react";
+
+// ── helpers ────────────────────────────────────────────────────────────────
+
+function priceTL(cents) {
+  if (cents === null || cents === undefined) return "Ücretsiz";
+  if (cents === 0) return "Ücretsiz";
+  return `₺${(cents / 100).toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+function starStr(avg) {
+  if (!avg) return null;
+  return Number(avg).toFixed(1);
+}
+
+// ── inline package card (uses backend PopularPackageItem format) ───────────
+
+function PackageCard({ pkg }) {
+  return (
+    <Link
+      to={createPageUrl("TestDetail") + `?id=${pkg.id}`}
+      className="group bg-white rounded-2xl border border-slate-100 hover:shadow-lg hover:shadow-slate-200/60 transition-all duration-300 flex flex-col overflow-hidden"
+    >
+      {/* coloured top bar */}
+      <div
+        className="h-2 w-full"
+        style={{ backgroundColor: "#0000CD", opacity: 0.85 }}
+      />
+      <div className="p-5 flex flex-col flex-1 gap-3">
+        {/* badge row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {pkg.examTypeName && (
+            <span
+              className="text-xs font-medium px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: "rgba(0,0,205,0.08)", color: "#0000CD" }}
+            >
+              {pkg.examTypeName}
+            </span>
+          )}
+          {pkg.isTimed && (
+            <span className="text-xs text-slate-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" /> Süreli
+            </span>
+          )}
+        </div>
+
+        {/* title */}
+        <h3
+          className="font-semibold text-slate-900 line-clamp-2 text-base leading-snug group-hover:text-indigo-700 transition-colors"
+        >
+          {pkg.title}
+        </h3>
+
+        {/* educator */}
+        {pkg.educatorUsername && (
+          <p className="text-sm text-slate-500 flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5 flex-shrink-0" />
+            {pkg.educatorUsername}
+          </p>
+        )}
+
+        {/* stats row */}
+        <div className="flex items-center gap-4 text-xs text-slate-400 mt-auto pt-1">
+          <span className="flex items-center gap-1">
+            <BookOpen className="w-3.5 h-3.5" />
+            {pkg.questionCount} soru
+          </span>
+          {starStr(pkg.ratingAvg) && (
+            <span className="flex items-center gap-1">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              {starStr(pkg.ratingAvg)}
+            </span>
+          )}
+          {pkg.saleCount > 0 && (
+            <span className="flex items-center gap-1">
+              <TrendingUp className="w-3.5 h-3.5" />
+              {pkg.saleCount} satış
+            </span>
+          )}
+        </div>
+
+        {/* price + cta */}
+        <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-1">
+          <span className="text-lg font-bold text-slate-900">
+            {priceTL(pkg.priceCents)}
+          </span>
+          <span
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
+            style={{ backgroundColor: "#0000CD" }}
+          >
+            İncele
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// ── inline educator card ────────────────────────────────────────────────────
+
+function EducatorCard({ educator }) {
+  return (
+    <Link
+      to={createPageUrl("EducatorProfile") + `?id=${educator.id}`}
+      className="group flex items-start gap-4 p-5 rounded-2xl bg-white border border-slate-100 hover:shadow-lg hover:shadow-slate-200/60 transition-all duration-300"
+    >
+      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center flex-shrink-0">
+        <User className="w-7 h-7 text-indigo-500" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-slate-900 truncate group-hover:text-indigo-700 transition-colors">
+          {educator.username}
+        </p>
+        <div className="flex items-center flex-wrap gap-3 mt-1.5 text-sm text-slate-500">
+          <span className="flex items-center gap-1">
+            <BookOpen className="w-3.5 h-3.5" />
+            {educator.testCount} test
+          </span>
+          {educator.saleCount > 0 && (
+            <span className="flex items-center gap-1">
+              <TrendingUp className="w-3.5 h-3.5" />
+              {educator.saleCount} satış
+            </span>
+          )}
+          {educator.ratingAvg != null && Number(educator.ratingAvg) > 0 && (
+            <span className="flex items-center gap-1">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              {Number(educator.ratingAvg).toFixed(1)}
+            </span>
+          )}
+        </div>
+      </div>
+      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors flex-shrink-0 mt-1" />
+    </Link>
+  );
+}
+
+// ── section header component ────────────────────────────────────────────────
+
+function SectionHeader({ title, isPersonalized, linkTo, linkLabel = "Tümünü Gör" }) {
+  return (
+    <div className="flex items-center justify-between mb-7">
+      <div className="flex items-center gap-3">
+        <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+        {isPersonalized && (
+          <span
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+            style={{ backgroundColor: "rgba(0,0,205,0.08)", color: "#0000CD" }}
+          >
+            <Sparkles className="w-3 h-3" />
+            Size Özel
+          </span>
+        )}
+      </div>
+      {linkTo && (
+        <Link
+          to={linkTo}
+          className="flex items-center gap-1.5 text-sm font-medium hover:opacity-75 transition-opacity"
+          style={{ color: "#0000CD" }}
+        >
+          {linkLabel} <ArrowRight className="w-4 h-4" />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+// ── main component ──────────────────────────────────────────────────────────
 
 export default function Home() {
   const { user } = useAuth();
@@ -36,111 +208,65 @@ export default function Home() {
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const navigate = useAppNavigate();
 
+  // ── Onboarding ────────────────────────────────────────────────────────────
+  const role = (user?.role || '').toString().toUpperCase();
+  const isCandidate = role === 'CANDIDATE' || (role !== 'EDUCATOR' && role !== 'ADMIN' && !!user);
+  const showWelcomeTour = useShouldShowTour(TOUR_KEYS.CANDIDATE_WELCOME) && isCandidate;
+  const completeTour = useCompleteTour();
+
+  // Compute personalisation exam-type IDs from user profile
+  const examTypeIds = useMemo(() => {
+    const ids = user?.interested_exam_types;
+    if (Array.isArray(ids) && ids.length > 0) return ids;
+    return [];
+  }, [user?.interested_exam_types]);
+
+  const isPersonalized = examTypeIds.length > 0;
+  const examTypeIdsParam = isPersonalized ? examTypeIds.join(",") : undefined;
+
+  // ── data queries ──────────────────────────────────────────────────────────
+
   const { data: examTypes = [] } = useQuery({
-    queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
+    queryKey: ["home-exam-types"],
+    queryFn: async () => {
+      const { data } = await api.get("/site/exam-types");
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
-  const { data: allPurchases = [] } = useQuery({
-    queryKey: ["allPurchases", user?.email],
-    queryFn: () => base44.entities.Purchase.filter({ user_email: user?.email }),
-    enabled: !!user,
+  const { data: packages = [], isLoading: pkgsLoading } = useQuery({
+    queryKey: ["home-popular-packages", examTypeIdsParam],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: "6" });
+      if (examTypeIdsParam) params.set("examTypeIds", examTypeIdsParam);
+      const { data } = await api.get(`/site/popular-packages?${params}`);
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 3 * 60 * 1000,
   });
 
-  const { data: allTests = [] } = useQuery({
-    queryKey: ["allPublishedTests"],
-    queryFn: () => base44.entities.TestPackage.filter({ is_published: true, is_active: true }),
+  const { data: educators = [], isLoading: eduLoading } = useQuery({
+    queryKey: ["home-featured-educators", examTypeIdsParam],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: "6" });
+      if (examTypeIdsParam) params.set("examTypeIds", examTypeIdsParam);
+      const { data } = await api.get(`/site/featured-educators?${params}`);
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 3 * 60 * 1000,
   });
 
-  // Tests already have question_count from API
-  const enrichedTests = allTests;
-
-  // Featured tests - öncelikle kullanıcının ilgilendiği sınavlar, sonra popüler olanlar
-  const featuredTests = (() => {
-    const userInterests = user?.interested_exam_types || [];
-    
-    if (userInterests.length > 0) {
-      // Kullanıcının ilgilendiği sınavlara ait testler
-      const interestedTests = enrichedTests.filter(test => 
-        userInterests.includes(test.exam_type_id)
-      );
-      
-      // Diğer testler
-      const otherTests = enrichedTests.filter(test => 
-        !userInterests.includes(test.exam_type_id)
-      );
-      
-      // İlgilenilen testleri önce göster (satışa göre sırala), sonra diğerleri
-      return [
-        ...interestedTests.sort((a, b) => (b.total_sales || 0) - (a.total_sales || 0)),
-        ...otherTests.sort((a, b) => (b.total_sales || 0) - (a.total_sales || 0))
-      ].slice(0, 6);
-    }
-    
-    // Kullanıcı tercih yapmamışsa, en çok satanları göster
-    return enrichedTests
-      .sort((a, b) => (b.total_sales || 0) - (a.total_sales || 0))
-      .slice(0, 6);
-  })();
-
-  // Get top educators
-  const topEducators = Object.values(
-    allTests.reduce((acc, test) => {
-      if (!acc[test.educator_email]) {
-        acc[test.educator_email] = {
-          email: test.educator_email,
-          name: test.educator_name,
-          testCount: 0,
-          totalSales: 0,
-          avgRating: 0,
-          ratingCount: 0,
-        };
-      }
-      acc[test.educator_email].testCount++;
-      acc[test.educator_email].totalSales += test.total_sales || 0;
-      if (test.average_rating > 0) {
-        acc[test.educator_email].avgRating += test.average_rating;
-        acc[test.educator_email].ratingCount++;
-      }
-      return acc;
-    }, {})
-  ).map((edu) => ({
-    ...edu,
-    avgRating: edu.ratingCount > 0 ? (edu.avgRating / edu.ratingCount).toFixed(1) : 0,
-  }))
-  .sort((a, b) => b.totalSales - a.totalSales)
-  .slice(0, 6);
-
-  const { data: purchases = [] } = useQuery({
-    queryKey: ["purchases", user?.email],
-    queryFn: () => user ? base44.entities.Purchase.filter({ user_email: user.email }) : [],
-    enabled: !!user,
-  });
-
-  const { data: results = [] } = useQuery({
-    queryKey: ["results", user?.email],
-    queryFn: () => user ? base44.entities.TestResult.filter({ user_email: user.email }) : [],
-    enabled: !!user,
-  });
-
-  const purchasedIds = new Set(purchases.map(p => p.test_package_id));
-  const completedIds = new Set(results.map(r => r.test_package_id));
-
-  // Calculate popularity based on purchases
-  const examTypePopularity = allPurchases.reduce((acc, purchase) => {
-    const test = allTests.find(t => t.id === purchase.test_package_id);
-    if (test?.exam_type_id) {
-      acc[test.exam_type_id] = (acc[test.exam_type_id] || 0) + 1;
-    }
-    return acc;
-  }, {});
-
-  // Sort exam types by popularity
-  const sortedExamTypes = [...examTypes].sort((a, b) => {
-    const aCount = examTypePopularity[a.id] || 0;
-    const bCount = examTypePopularity[b.id] || 0;
-    return bCount - aCount;
-  });
+  // Sort exam types by match with user's interested types
+  const sortedExamTypes = useMemo(() => {
+    if (!isPersonalized) return examTypes;
+    const set = new Set(examTypeIds);
+    return [...examTypes].sort((a, b) => {
+      const aMatch = set.has(a.id) ? 1 : 0;
+      const bMatch = set.has(b.id) ? 1 : 0;
+      return bMatch - aMatch;
+    });
+  }, [examTypes, examTypeIds, isPersonalized]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -149,31 +275,52 @@ export default function Home() {
   };
 
   const handleLogin = (userType) => {
-    sessionStorage.setItem('preferred_user_type', userType);
+    sessionStorage.setItem("preferred_user_type", userType);
     navigate(buildPageUrl("Login", { from: createPageUrl("Explore") }));
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header - sidebar is provided by Layout when user is logged in */}
+    <div className="min-h-screen bg-slate-50">
+      {/* ── Onboarding Tour ──────────────────────────────────────────────── */}
+      {showWelcomeTour && (
+        <OnboardingTour
+          steps={CANDIDATE_WELCOME_STEPS}
+          onComplete={() => completeTour(TOUR_KEYS.CANDIDATE_WELCOME)}
+          onSkip={() => completeTour(TOUR_KEYS.CANDIDATE_WELCOME)}
+        />
+      )}
+
+      {/* ── Topbar ──────────────────────────────────────────────────────── */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{backgroundColor: '#0000CD'}}>
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ backgroundColor: "#0000CD" }}
+              >
                 <GraduationCap className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold text-slate-900">Sınav Salonu</span>
             </div>
             <nav className="flex items-center gap-3">
-              <Link to={createPageUrl("Explore")} className="text-slate-600 hover:text-slate-900 transition-colors">
+              <Link
+                to={createPageUrl("Explore")}
+                className="text-slate-600 hover:text-slate-900 transition-colors text-sm"
+              >
                 Testleri Keşfet
               </Link>
+              <Link
+                to={createPageUrl("Educators")}
+                className="text-slate-600 hover:text-slate-900 transition-colors text-sm"
+              >
+                Eğiticiler
+              </Link>
               {!user && (
-                <Button 
-                 onClick={() => setShowLoginDialog(true)}
-                 style={{backgroundColor: '#0000CD'}}
-                 className="hover:opacity-90"
+                <Button
+                  onClick={() => setShowLoginDialog(true)}
+                  style={{ backgroundColor: "#0000CD" }}
+                  className="hover:opacity-90"
                 >
                   Giriş Yap
                 </Button>
@@ -183,9 +330,9 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero Section */}
+      {/* ── Hero ────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0" style={{ backgroundColor: '#0000CD' }} />
+        <div className="absolute inset-0" style={{ backgroundColor: "#0000CD" }} />
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1920')] bg-cover bg-center opacity-10" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
           <div className="max-w-3xl">
@@ -196,7 +343,7 @@ export default function Home() {
             <p className="mt-6 text-lg text-indigo-100 max-w-xl">
               Alanında uzman eğiticilerden binlerce test çöz, performansını takip et ve hedefine ulaş.
             </p>
-            
+
             <form onSubmit={handleSearch} className="mt-10 flex gap-3">
               <div className="flex-1 relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -207,214 +354,231 @@ export default function Home() {
                   className="pl-12 h-14 bg-white/95 backdrop-blur border-0 rounded-xl text-lg"
                 />
               </div>
-              <Button type="submit" size="lg" className="h-14 px-8 bg-white hover:bg-slate-100 rounded-xl" style={{color: '#0000CD'}}>
+              <Button
+                type="submit"
+                size="lg"
+                className="h-14 px-8 bg-white hover:bg-slate-100 rounded-xl"
+                style={{ color: "#0000CD" }}
+              >
                 Ara
               </Button>
             </form>
 
             <div className="mt-10 flex flex-wrap gap-6 text-white/90">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
-                <span>10,000+ Test</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
-                <span>500+ Eğitici</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
-                <span>100,000+ Aday</span>
-              </div>
+              {[
+                { icon: CheckCircle, label: "10,000+ Test" },
+                { icon: CheckCircle, label: "500+ Eğitici" },
+                { icon: CheckCircle, label: "100,000+ Aday" },
+              ].map(({ icon: Icon, label }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <Icon className="w-5 h-5 text-emerald-400" />
+                  <span>{label}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Exam Types */}
-      {examTypes.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-slate-900">Sınav Türleri</h2>
-            <Link 
-              to={createPageUrl("ExamTypes")} 
-              className="flex items-center gap-2 font-medium hover:opacity-80"
-              style={{color: '#0000CD'}}
-            >
-              Tümünü Gör <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-          <div className="bg-white rounded-xl overflow-hidden">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x" style={{borderColor: 'rgba(0, 0, 205, 0.2)'}}>
-            {sortedExamTypes.slice(0, 6).map((exam) => (
-              <Link
-                key={exam.id}
-                to={createPageUrl("Explore") + `?exam_type=${exam.id}`}
-                className="group p-6 hover:bg-slate-50 transition-all text-center"
-              >
-                <div className="w-12 h-12 mx-auto rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform" style={{backgroundColor: 'rgba(0, 0, 205, 0.1)'}}>
-                  <Award className="w-6 h-6" style={{color: '#0000CD'}} />
-                </div>
-                <p className="mt-3 font-semibold text-slate-900">{exam.name}</p>
-              </Link>
-            ))}
-            </div>
-          </div>
-        </section>
-      )}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16 py-16">
 
-      {/* Featured Tests */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-slate-900">Öne Çıkan Testler</h2>
-          <Link 
-            to={createPageUrl("Explore")} 
-            className="flex items-center gap-2 font-medium hover:opacity-80"
-            style={{color: '#0000CD'}}
-          >
-            Tümünü Gör <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {featuredTests.map((test) => (
-            <TestPackageCard
-              key={test.id}
-              test={test}
-              isPurchased={user && purchasedIds.has(test.id)}
-              isCompleted={user && completedIds.has(test.id)}
-              onBuy={() => navigate(buildPageUrl("TestDetail", { id: test.id }))}
+        {/* ── 1. Sınav Türleri band ──────────────────────────────────────── */}
+        {examTypes.length > 0 && (
+          <section>
+            <SectionHeader
+              title="Sınav Türleri"
+              isPersonalized={false}
+              linkTo={createPageUrl("ExamTypes")}
             />
-          ))}
-        </div>
-      </section>
-
-      {/* Featured Educators */}
-      {topEducators.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-slate-900">Öne Çıkan Eğiticiler</h2>
-            <Link 
-              to={createPageUrl("Educators")} 
-              className="flex items-center gap-2 font-medium hover:opacity-80"
-              style={{color: '#0000CD'}}
-            >
-              Tümünü Gör <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-          <div className="bg-white rounded-xl overflow-hidden">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3">
-            {topEducators.map((educator) => (
-              <Link
-                key={educator.email}
-                to={createPageUrl("EducatorProfile") + `?email=${encodeURIComponent(educator.email)}`}
-                className="group p-6 hover:bg-slate-50 transition-all"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-violet-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <User className="w-8 h-8 text-indigo-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
-                      {educator.name}
-                    </h3>
-                    <div className="flex items-center gap-3 mt-2 text-sm text-slate-500">
-                      <div className="flex items-center gap-1">
-                        <BookOpen className="w-4 h-4" />
-                        <span>{educator.testCount} Test</span>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+                {sortedExamTypes.slice(0, 6).map((exam, idx) => {
+                  const isPreferred = isPersonalized && examTypeIds.includes(exam.id);
+                  return (
+                    <Link
+                      key={exam.id}
+                      to={createPageUrl("Explore") + `?exam_type=${exam.id}`}
+                      className={`group p-6 text-center transition-all border-r last:border-r-0 border-b lg:border-b-0 border-slate-100 ${
+                        isPreferred
+                          ? "bg-indigo-50/60 hover:bg-indigo-50"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <div
+                        className="w-12 h-12 mx-auto rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"
+                        style={{
+                          backgroundColor: isPreferred
+                            ? "rgba(0,0,205,0.15)"
+                            : "rgba(0,0,205,0.07)",
+                        }}
+                      >
+                        <Award className="w-6 h-6" style={{ color: "#0000CD" }} />
                       </div>
-                      {educator.avgRating > 0 && (
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                          <span>{educator.avgRating}</span>
-                        </div>
+                      <p className="mt-3 font-semibold text-slate-800 text-sm">
+                        {exam.name}
+                      </p>
+                      {isPreferred && (
+                        <p className="mt-1 text-xs font-medium" style={{ color: "#0000CD" }}>
+                          İlgi alanınız
+                        </p>
                       )}
-                    </div>
-                    <div className="mt-3 text-xs text-slate-400">
-                      {educator.totalSales} satış
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )}
 
-      {/* Stats */}
-      <section className="py-20" style={{ backgroundColor: '#0000CD' }}>
+        {/* ── 2. Test Paketleri ─────────────────────────────────────────── */}
+        <section>
+          <SectionHeader
+            title="Test Paketleri"
+            isPersonalized={isPersonalized}
+            linkTo={
+              isPersonalized && examTypeIds[0]
+                ? createPageUrl("Explore") + `?exam_type=${examTypeIds[0]}`
+                : createPageUrl("Explore")
+            }
+          />
+
+          {pkgsLoading ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl border border-slate-100 h-52 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : packages.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>Henüz yayınlanmış test paketi yok</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {packages.map((pkg) => (
+                <PackageCard key={pkg.id} pkg={pkg} />
+              ))}
+            </div>
+          )}
+
+          {!isPersonalized && !user && (
+            <p className="mt-5 text-center text-sm text-slate-500">
+              <button
+                onClick={() => setShowLoginDialog(true)}
+                className="font-medium hover:underline"
+                style={{ color: "#0000CD" }}
+              >
+                Giriş yapın
+              </button>{" "}
+              — ilgi alanlarınıza göre kişiselleştirilmiş öneriler gösterin.
+            </p>
+          )}
+        </section>
+
+        {/* ── 3. Eğiticiler ─────────────────────────────────────────────── */}
+        <section>
+          <SectionHeader
+            title="Eğiticiler"
+            isPersonalized={isPersonalized}
+            linkTo={createPageUrl("Educators")}
+          />
+
+          {eduLoading ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl border border-slate-100 h-24 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : educators.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>Eğitici bulunamadı</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {educators.map((edu) => (
+                <EducatorCard key={edu.id} educator={edu} />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* ── Stats band ──────────────────────────────────────────────────── */}
+      <section className="py-20" style={{ backgroundColor: "#0000CD" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 divide-x divide-white/20">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 divide-x divide-white/20">
             {[
               { icon: Users, value: "100,000+", label: "Aktif Aday" },
               { icon: BookOpen, value: "10,000+", label: "Test Paketi" },
               { icon: GraduationCap, value: "500+", label: "Uzman Eğitici" },
               { icon: TrendingUp, value: "%85", label: "Başarı Oranı" },
-            ].map((stat, idx) => (
-              <div key={idx} className="text-center p-8">
+            ].map(({ icon: Icon, value, label }) => (
+              <div key={label} className="text-center p-8">
                 <div className="w-14 h-14 mx-auto bg-white/20 rounded-2xl flex items-center justify-center mb-4">
-                  <stat.icon className="w-7 h-7 text-white" strokeWidth={1.5} />
+                  <Icon className="w-7 h-7 text-white" strokeWidth={1.5} />
                 </div>
-                <p className="text-3xl font-bold text-white">{stat.value}</p>
-                <p className="text-white/70 mt-1">{stat.label}</p>
+                <p className="text-3xl font-bold text-white">{value}</p>
+                <p className="text-white/70 mt-1">{label}</p>
               </div>
             ))}
-            </div>
           </div>
         </div>
       </section>
 
-      {/* CTA */}
+      {/* ── CTA (only for guests) ───────────────────────────────────────── */}
       {!user && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Aday Olarak Katıl */}
-            <div className="rounded-3xl p-12 text-center" style={{ backgroundColor: '#0000CD' }}>
-              <h2 className="text-3xl font-bold text-white mb-4">
-                Aday Olarak Katıl
-              </h2>
-              <p className="text-white/80 max-w-xl mx-auto mb-8">
-                Alanında uzman eğiticilerden binlerce test çöz,<br />performansını takip et ve hedefine ulaş.
-              </p>
-              <Button 
-                size="lg" 
-                className="bg-white hover:bg-slate-100"
-                style={{color: '#0000CD'}}
-                onClick={() => {
-                  sessionStorage.setItem('preferred_user_type', 'candidate');
-                  navigate(createPageUrl("Login"));
-                }}
+            {[
+              {
+                type: "candidate",
+                title: "Aday Olarak Katıl",
+                desc: "Alanında uzman eğiticilerden binlerce test çöz, performansını takip et ve hedefine ulaş.",
+                icon: UserCircle,
+              },
+              {
+                type: "educator",
+                title: "Eğitici Olarak Katıl",
+                desc: "Uzman olduğun konuda test paketleri oluştur, binlerce adaya ulaş ve gelir elde et.",
+                icon: Briefcase,
+              },
+            ].map(({ type, title, desc, icon: Icon }) => (
+              <div
+                key={type}
+                className="rounded-3xl p-10 text-center"
+                style={{ backgroundColor: "#0000CD" }}
               >
-                Hemen Başla
-              </Button>
-            </div>
-
-            {/* Eğitici Olarak Katıl */}
-            <div className="rounded-3xl p-12 text-center" style={{ backgroundColor: '#0000CD' }}>
-              <h2 className="text-3xl font-bold text-white mb-4">
-                Eğitici Olarak Katıl
-              </h2>
-              <p className="text-white/80 max-w-xl mx-auto mb-8">
-                Uzman olduğun konuda test paketleri oluştur,<br />binlerce adaya ulaş ve gelir elde et.
-              </p>
-              <Button 
-                size="lg" 
-                className="bg-white hover:bg-slate-100"
-                style={{color: '#0000CD'}}
-                onClick={() => {
-                  sessionStorage.setItem('preferred_user_type', 'educator');
-                  navigate(createPageUrl("Login"));
-                }}
-              >
-                Hemen Başla
-              </Button>
-            </div>
+                <div className="w-16 h-16 mx-auto bg-white/15 rounded-2xl flex items-center justify-center mb-5">
+                  <Icon className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-3">{title}</h2>
+                <p className="text-white/80 mb-7 text-sm">{desc}</p>
+                <Button
+                  size="lg"
+                  className="bg-white hover:bg-slate-100"
+                  style={{ color: "#0000CD" }}
+                  onClick={() => {
+                    sessionStorage.setItem("preferred_user_type", type);
+                    navigate(createPageUrl("Login"));
+                  }}
+                >
+                  Hemen Başla
+                </Button>
+              </div>
+            ))}
           </div>
         </section>
       )}
 
-      {/* Footer */}
-      <footer className="text-slate-400 py-12" style={{ backgroundColor: '#0000CD' }}>
+      {/* ── Footer ──────────────────────────────────────────────────────── */}
+      <footer className="text-slate-400 py-12" style={{ backgroundColor: "#0000CD" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-3 gap-8 mb-8">
             <div>
@@ -425,85 +589,93 @@ export default function Home() {
                 <span className="text-lg font-bold text-white">Sınav Salonu</span>
               </div>
               <p className="text-white/70 text-sm">
-                Sınavlara hazırlık için en güvenilir platform.<br />
-                Alanında uzman eğiticilerden test çöz,<br />
+                Sınavlara hazırlık için en güvenilir platform.
+                <br />
+                Alanında uzman eğiticilerden test çöz,
+                <br />
                 performansını takip et.
               </p>
             </div>
             <div>
               <h3 className="text-white font-semibold mb-4">Kurumsal</h3>
               <div className="grid grid-cols-2 gap-3">
-                <Link to={createPageUrl("About")} className="text-white/70 hover:text-white text-sm transition-colors">
-                  Hakkımızda
-                </Link>
-                <Link to={createPageUrl("Contact")} className="text-white/70 hover:text-white text-sm transition-colors">
-                  İletişim
-                </Link>
-                <Link to={createPageUrl("Privacy")} className="text-white/70 hover:text-white text-sm transition-colors">
-                  Gizlilik Politikası
-                </Link>
-                <Link to={createPageUrl("Partnership")} className="text-white/70 hover:text-white text-sm transition-colors">
-                  İş Ortaklığı
-                </Link>
+                {[
+                  { label: "Hakkımızda", page: "About" },
+                  { label: "İletişim", page: "Contact" },
+                  { label: "Gizlilik Politikası", page: "Privacy" },
+                  { label: "İş Ortaklığı", page: "Partnership" },
+                ].map(({ label, page }) => (
+                  <Link
+                    key={page}
+                    to={createPageUrl(page)}
+                    className="text-white/70 hover:text-white text-sm transition-colors"
+                  >
+                    {label}
+                  </Link>
+                ))}
               </div>
             </div>
             <div>
               <h3 className="text-white font-semibold mb-4">Destek</h3>
-              <Link to={createPageUrl("Support")} className="text-white/70 hover:text-white text-sm transition-colors block">
+              <Link
+                to={createPageUrl("Support")}
+                className="text-white/70 hover:text-white text-sm transition-colors block"
+              >
                 Yardım ve Destek
               </Link>
             </div>
           </div>
           <div className="pt-8 border-t border-white/10">
-            <p className="text-sm text-white/50 text-center">© 2024 Sınav Salonu. Tüm hakları saklıdır.</p>
+            <p className="text-sm text-white/50 text-center">
+              © {new Date().getFullYear()} Sınav Salonu. Tüm hakları saklıdır.
+            </p>
           </div>
         </div>
       </footer>
 
-      {/* Login Type Selection Dialog */}
+      {/* ── Login type dialog ────────────────────────────────────────────── */}
       <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-2xl text-center">Sınav Salonu'na Hoş Geldiniz</DialogTitle>
+            <DialogTitle className="text-2xl text-center">
+              Sınav Salonu'na Hoş Geldiniz
+            </DialogTitle>
             <DialogDescription className="text-center">
               Devam etmek için hesap türünüzü seçin
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 pt-4">
-            <button
-              onClick={() => handleLogin('candidate')}
-              className="w-full p-6 rounded-xl border-2 border-slate-200 hover:bg-slate-50 transition-all group text-left"
-              style={{borderColor: '#0000CD', color: '#0000CD'}}
-              onMouseEnter={(e) => e.currentTarget.style.borderColor = '#0000CD'}
-              onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center group-hover:text-white transition-colors" style={{backgroundColor: 'rgba(0, 0, 205, 0.1)'}}  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0000CD'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 205, 0.1)'}>
-                  <UserCircle className="w-6 h-6" style={{color: '#0000CD'}} />
+            {[
+              {
+                type: "candidate",
+                label: "Aday Olarak Giriş",
+                sub: "Test çöz ve performansını takip et",
+                icon: UserCircle,
+              },
+              {
+                type: "educator",
+                label: "Eğitici Olarak Giriş",
+                sub: "Test paketi oluştur ve gelir elde et",
+                icon: Briefcase,
+              },
+            ].map(({ type, label, sub, icon: Icon }) => (
+              <button
+                key={type}
+                onClick={() => handleLogin(type)}
+                className="w-full p-5 rounded-xl border-2 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 transition-all text-left flex items-center gap-4"
+              >
+                <div
+                  className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: "rgba(0,0,205,0.1)" }}
+                >
+                  <Icon className="w-5 h-5" style={{ color: "#0000CD" }} />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg text-slate-900">Aday Olarak Giriş</h3>
-                  <p className="text-sm text-slate-500">Test çöz ve performansını takip et</p>
+                  <p className="font-semibold text-slate-900">{label}</p>
+                  <p className="text-sm text-slate-500">{sub}</p>
                 </div>
-              </div>
-            </button>
-            <button
-              onClick={() => handleLogin('educator')}
-              className="w-full p-6 rounded-xl border-2 border-slate-200 hover:bg-slate-50 transition-all group text-left"
-              style={{borderColor: '#0000CD', color: '#0000CD'}}
-              onMouseEnter={(e) => e.currentTarget.style.borderColor = '#0000CD'}
-              onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center group-hover:text-white transition-colors" style={{backgroundColor: 'rgba(0, 0, 205, 0.1)'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0000CD'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 205, 0.1)'}>
-                  <Briefcase className="w-6 h-6" style={{color: '#0000CD'}} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-slate-900">Eğitici Olarak Giriş</h3>
-                  <p className="text-sm text-slate-500">Test paketi oluştur ve gelir elde et</p>
-                </div>
-              </div>
-            </button>
+              </button>
+            ))}
           </div>
         </DialogContent>
       </Dialog>

@@ -1,3 +1,4 @@
+/** Site ayarları güncelleme DTO'su — bakım modu vb. genel konfigürasyon */
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 

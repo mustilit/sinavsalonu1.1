@@ -1,3 +1,4 @@
+/** Test denemesi sonuç yanıtı DTO'su — tamamlanmış deneme bilgilerini içerir */
 import { ApiProperty } from '@nestjs/swagger';
 
 class AttemptMinimalDto {
@@ -22,4 +23,3 @@ export class AttemptResultResponseDto {
   @ApiProperty() summary!: { correct: number; wrong: number; blank: number; total: number; percentage?: number };
   @ApiProperty({ type: [QuestionResultDto] }) questions!: QuestionResultDto[];
 }
-

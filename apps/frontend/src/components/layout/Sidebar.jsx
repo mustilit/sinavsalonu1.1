@@ -16,6 +16,8 @@ import {
   Award,
   User,
   AlertTriangle,
+  Banknote,
+  ShieldAlert,
 } from "lucide-react";
 
 export default function Sidebar({ user, currentPage }) {
@@ -55,6 +57,8 @@ export default function Sidebar({ user, currentPage }) {
     { name: "Tüm Testler", page: "ManageTests", icon: BookOpen },
     { name: "İade Talepleri", page: "ManageRefunds", icon: ShoppingBag },
     { name: "Hata Bildirimleri", page: "AdminObjections", icon: AlertTriangle },
+    { name: "Komisyon Raporu", page: "AdminCommissionReport", icon: Banknote },
+    { name: "Sistem Kontrolleri", page: "AdminSystemControls", icon: ShieldAlert },
   ];
 
   let links = candidateLinks;

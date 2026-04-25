@@ -49,6 +49,8 @@
  */
 import About from './pages/About';
 import AdminCandidateReport from './pages/AdminCandidateReport';
+import AdminCommissionReport from './pages/AdminCommissionReport';
+import AdminSystemControls from './pages/AdminSystemControls';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminEducatorReport from './pages/AdminEducatorReport';
 import AdminObjections from './pages/AdminObjections';
@@ -91,6 +93,8 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "About": About,
     "AdminCandidateReport": AdminCandidateReport,
+    "AdminCommissionReport": AdminCommissionReport,
+    "AdminSystemControls": AdminSystemControls,
     "AdminDashboard": AdminDashboard,
     "AdminEducatorReport": AdminEducatorReport,
     "AdminObjections": AdminObjections,

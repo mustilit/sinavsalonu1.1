@@ -8,6 +8,14 @@ import { GetTestAttemptUseCase } from '../../application/use-cases/GetTestAttemp
 import { SubmitAnswerUseCase } from '../../application/use-cases/SubmitAnswerUseCase';
 import { PrismaService } from '../modules/prisma/prisma.service';
 
+/**
+ * Test denemesi yaşam döngüsünü yönetir: başlatma, duraklatma, devam etme,
+ * cevap gönderme ve mevcut deneme durumunu sorgulama.
+ * Tüm endpoint'ler CANDIDATE rolüne kısıtlıdır.
+ *
+ * Not: Bu controller use-case'leri Prisma inject ile manuel olarak oluşturur
+ * (NestJS modül DI yerine); tutarlılık için ileride modüle taşınabilir.
+ */
 @Controller()
 export class AttemptsController {
   private readonly startUC: StartTestAttemptUseCase;
@@ -25,6 +33,7 @@ export class AttemptsController {
     this.submitAnswerUC = new SubmitAnswerUseCase(prisma);
   }
 
+  /** Yeni deneme başlatır — tenantId çoklu kiracı senaryosu için iletilir */
   @Post('tests/:id/start')
   @Roles('CANDIDATE')
   async start(@Param('id') testId: string, @Req() req: any) {

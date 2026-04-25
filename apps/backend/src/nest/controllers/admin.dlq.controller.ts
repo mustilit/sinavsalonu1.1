@@ -6,6 +6,10 @@ import { prisma } from '../../infrastructure/database/prisma';
 /** FR-Y-04: Hata bilgisi görüntüleme - email hataları ve diğer kritik loglar */
 const ERROR_ACTIONS = ['EMAIL_FAILED', 'CSP_VIOLATION', 'SUSPICIOUS_RATE_LIMIT'] as const;
 
+/**
+ * Dead Letter Queue (DLQ) izleme — başarısız e-postaları ve kritik hata loglarını listeler.
+ * Swagger dökümantasyonundan gizlenmiştir (@ApiExcludeController); sadece ADMIN rolüne açıktır.
+ */
 @ApiExcludeController()
 @Controller('admin/dlq')
 export class AdminDlqController {

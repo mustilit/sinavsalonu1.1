@@ -1,3 +1,4 @@
+/** Admin uygulama ayarları güncelleme DTO'su — özellik bayrakları */
 import { IsOptional, IsInt, Min, Max, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -20,4 +21,19 @@ export class UpdateAdminSettingsDto {
   @IsOptional()
   @IsBoolean()
   purchasesEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Paket/test oluşturma açık/kapalı' })
+  @IsOptional()
+  @IsBoolean()
+  packageCreationEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Test yayınlama (canlı test) açık/kapalı' })
+  @IsOptional()
+  @IsBoolean()
+  testPublishingEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Test çözüm başlatma açık/kapalı' })
+  @IsOptional()
+  @IsBoolean()
+  testAttemptsEnabled?: boolean;
 }

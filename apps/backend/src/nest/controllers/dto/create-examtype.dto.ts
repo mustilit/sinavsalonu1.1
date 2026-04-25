@@ -1,3 +1,4 @@
+/** Sınav türü oluşturma isteği DTO'su */
 import { IsString, MinLength, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateExamTypeDto {
@@ -17,4 +18,3 @@ export class CreateExamTypeDto {
   @IsBoolean()
   active?: boolean;
 }
-

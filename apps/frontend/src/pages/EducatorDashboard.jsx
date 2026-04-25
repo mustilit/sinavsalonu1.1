@@ -2,6 +2,9 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
+import OnboardingTour from "@/components/onboarding/OnboardingTour";
+import { useShouldShowTour, useCompleteTour, TOUR_KEYS } from "@/lib/useOnboarding";
+import { EDUCATOR_WELCOME_STEPS } from "@/components/onboarding/tourSteps";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +23,8 @@ import { tr } from "date-fns/locale";
 
 export default function EducatorDashboard() {
   const { user } = useAuth();
+  const showWelcomeTour = useShouldShowTour(TOUR_KEYS.EDUCATOR_WELCOME);
+  const completeTour = useCompleteTour();
 
   const { data: myTests = [], isLoading: loadingTests } = useQuery({
     queryKey: ["myTests", user?.email],
@@ -57,6 +62,15 @@ export default function EducatorDashboard() {
 
   return (
     <div>
+      {/* Educator welcome onboarding tour */}
+      {showWelcomeTour && (
+        <OnboardingTour
+          steps={EDUCATOR_WELCOME_STEPS}
+          onComplete={() => completeTour(TOUR_KEYS.EDUCATOR_WELCOME)}
+          onSkip={() => completeTour(TOUR_KEYS.EDUCATOR_WELCOME)}
+        />
+      )}
+
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Hoş Geldin, {user?.full_name?.split(" ")[0]}</h1>
