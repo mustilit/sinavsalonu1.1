@@ -50,6 +50,7 @@
 import About from './pages/About';
 import AdminCandidateReport from './pages/AdminCandidateReport';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminEducatorReport from './pages/AdminEducatorReport';
 import AdminObjections from './pages/AdminObjections';
 import CompleteProfile from './pages/CompleteProfile';
 import Contact from './pages/Contact';
@@ -91,6 +92,7 @@ export const PAGES = {
     "About": About,
     "AdminCandidateReport": AdminCandidateReport,
     "AdminDashboard": AdminDashboard,
+    "AdminEducatorReport": AdminEducatorReport,
     "AdminObjections": AdminObjections,
     "CompleteProfile": CompleteProfile,
     "Contact": Contact,

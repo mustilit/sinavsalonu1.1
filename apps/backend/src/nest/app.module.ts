@@ -107,6 +107,9 @@ import { AdminCandidatesController } from './controllers/admin.candidates.contro
 import { GetCandidateReportUseCase } from '../application/use-cases/GetCandidateReportUseCase';
 import { SendBulkCandidateEmailUseCase } from '../application/use-cases/SendBulkCandidateEmailUseCase';
 import { MockEmailProvider } from '../infrastructure/services/MockEmailProvider';
+import { AdminEducatorReportController } from './controllers/admin.educator-report.controller';
+import { GetEducatorReportUseCase } from '../application/use-cases/GetEducatorReportUseCase';
+import { SendBulkEducatorEmailUseCase } from '../application/use-cases/SendBulkEducatorEmailUseCase';
 
 const THROTTLE_TTL_SECONDS = Number(process.env.THROTTLE_TTL_SECONDS ?? '60') || 60;
 
@@ -173,7 +176,7 @@ const throttleDisabled =
     (require('./modules/refunds/refunds.module').RefundsModule),
     ContractsModule,
   ],
-  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AdminCandidatesController],
+  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AdminCandidatesController, AdminEducatorReportController],
   providers: [
     SeedService,
     ...(throttleDisabled ? [] : [{ provide: APP_GUARD, useClass: CustomThrottlerGuard }]),
@@ -360,6 +363,12 @@ const throttleDisabled =
     {
       provide: SendBulkCandidateEmailUseCase,
       useFactory: (emailProvider: MockEmailProvider) => new SendBulkCandidateEmailUseCase(emailProvider),
+      inject: [MockEmailProvider],
+    },
+    GetEducatorReportUseCase,
+    {
+      provide: SendBulkEducatorEmailUseCase,
+      useFactory: (emailProvider: MockEmailProvider) => new SendBulkEducatorEmailUseCase(emailProvider),
       inject: [MockEmailProvider],
     },
   ],
