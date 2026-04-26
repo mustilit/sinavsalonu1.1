@@ -79,9 +79,33 @@ export class SubmitAttemptUseCase {
     const blank = Math.max(0, totalQuestions - answeredCount);
     const score = correct;
 
+    // ─── Süre aşımı hesapla ─────────────────────────────────────────────────
+    // Süreli testte izin verilen süre dolmuşsa kaç saniye geç teslim edildiğini hesapla.
+    // null → süre aşımı yok (zamanında teslim veya süreli olmayan test).
+    let overtimeSeconds: number | null = null;
+    const testMeta = await this.prisma.examTest.findUnique({
+      where: { id: attempt.testId },
+      select: { isTimed: true, duration: true },
+    });
+    if (testMeta?.isTimed && testMeta.duration && attempt.startedAt) {
+      // Teorik bitiş: başlangıç + süre (dakika → milisaniye)
+      const deadlineMs = new Date(attempt.startedAt).getTime() + testMeta.duration * 60 * 1000;
+      const nowMs      = Date.now();
+      if (nowMs > deadlineMs) {
+        // En az 1 saniye gecikmeli sayılır
+        overtimeSeconds = Math.max(1, Math.round((nowMs - deadlineMs) / 1000));
+      }
+    }
+
     const updated = await this.prisma.testAttempt.update({
       where: { id: attemptId },
-      data: { score, status: 'SUBMITTED', submittedAt: new Date(), completedAt: new Date() },
+      data: {
+        score,
+        status: 'SUBMITTED',
+        submittedAt: new Date(),
+        completedAt: new Date(),
+        ...(overtimeSeconds !== null ? { overtimeSeconds } : {}),
+      },
     });
 
     try {
@@ -91,14 +115,14 @@ export class SubmitAttemptUseCase {
           entityType: 'TestAttempt',
           entityId: attemptId,
           actorId: actorId ?? null,
-          metadata: { correct, wrong, blank, score },
+          metadata: { correct, wrong, blank, score, overtimeSeconds },
         },
       });
     } catch {
       // ignore audit failures
     }
 
-    return { correct, wrong, blank, score, updated };
+    return { correct, wrong, blank, score, overtimeSeconds, updated };
   }
 }
 

@@ -20,6 +20,8 @@ interface RawAttemptRow {
   correct: bigint;
   wrong: bigint;
   blank: bigint;
+  /** Süre aşımı (saniye); null = zamanında teslim veya süreli olmayan test */
+  overtimeSeconds: number | null;
 }
 
 // ─── Dışa açık çıktı arayüzleri ──────────────────────────────────────────────
@@ -37,6 +39,8 @@ export interface TopicTimelinePoint {
   total: number;
   /** Doğru / toplam * 100, 2 ondalık basamakla yuvarlanmış */
   pct: number;
+  /** Süre aşımı saniyesi; null = zamanında teslim */
+  overtimeSeconds: number | null;
 }
 
 /**
@@ -60,6 +64,10 @@ export interface TopicGroup {
    */
   trend: number | null;
   timeline: TopicTimelinePoint[];
+  /** Bu gruptaki denemelerden herhangi birinde süre aşımı olduysa true */
+  hasOvertime: boolean;
+  /** Gruba ait toplam süre aşımı sayısı */
+  overtimeCount: number;
 }
 
 /**
@@ -113,6 +121,7 @@ export class GetTopicPerformanceUseCase {
           COALESCE(eta.name, 'Türsüz')              AS "examTypeName",
           ta.id                                      AS "attemptId",
           COALESCE(ta."submittedAt", ta."finishedAt", ta."completedAt") AS "completedAt",
+          ta."overtimeSeconds"                       AS "overtimeSeconds",
           COUNT(aa.id)::bigint                       AS "totalQuestions",
           COUNT(aa.id) FILTER (
             WHERE aa."selectedOptionId" IS NOT NULL AND eo."isCorrect" = true
@@ -172,6 +181,8 @@ export class GetTopicPerformanceUseCase {
           overallPct: 0,
           trend: null,
           timeline: [],
+          hasOvertime: false,
+          overtimeCount: 0,
         });
       }
 
@@ -181,6 +192,13 @@ export class GetTopicPerformanceUseCase {
       group.totalCorrect += correct;
       group.totalWrong += wrong;
       group.totalBlank += blank;
+
+      // Süre aşımı sayacını güncelle
+      const overtime = row.overtimeSeconds != null ? Number(row.overtimeSeconds) : null;
+      if (overtime !== null && overtime > 0) {
+        group.hasOvertime   = true;
+        group.overtimeCount += 1;
+      }
 
       // completedAt varsa zaman serisi noktası ekle
       if (row.completedAt) {
@@ -197,6 +215,7 @@ export class GetTopicPerformanceUseCase {
           blank,
           total,
           pct,
+          overtimeSeconds: overtime,
         });
       }
 

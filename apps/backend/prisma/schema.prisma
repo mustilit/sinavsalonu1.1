@@ -287,6 +287,14 @@ model TestAttempt {
   finishedAt    DateTime?
   remainingSec  Int?
 
+  /**
+   * Süre aşımı süresi (saniye).
+   * Süreli testte aday izin verilen süreden sonra teslim ettiyse
+   * kaç saniye geç teslim ettiği burada saklanır.
+   * null → süre aşımı yok (zamanında teslim veya süreli olmayan test).
+   */
+  overtimeSeconds Int?
+
   test       ExamTest        @relation(fields: [testId], references: [id], onDelete: Cascade)
   candidate  User            @relation("userAttempts", fields: [candidateId], references: [id], onDelete: Cascade)
   answers    AttemptAnswer[]

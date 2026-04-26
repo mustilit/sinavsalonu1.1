@@ -18,14 +18,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StatCard from "@/components/ui/StatCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { 
-  BarChart3, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
+import {
+  BarChart3,
+  CheckCircle,
+  XCircle,
+  Clock,
   TrendingUp,
   Award,
-  Filter
+  Filter,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function MyResults() {
@@ -114,6 +115,19 @@ export default function MyResults() {
     if (score >= 60) return <Badge className="bg-blue-100 text-blue-700">İyi</Badge>;
     if (score >= 40) return <Badge className="bg-amber-100 text-amber-700">Orta</Badge>;
     return <Badge className="bg-rose-100 text-rose-700">Geliştirilmeli</Badge>;
+  };
+
+  // Gecikmeli teslim edilen testleri filtrele — "gelişime açık" bölümü için
+  const overtimeResults = filteredResults.filter((r) => r.overtime_seconds > 0);
+
+  // Süre aşımını okunabilir göster (örn: "2 dk 15 sn")
+  const formatOvertime = (seconds) => {
+    if (!seconds) return "-";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    if (m === 0) return `${s} sn`;
+    if (s === 0) return `${m} dk`;
+    return `${m} dk ${s} sn`;
   };
 
   if (!user) {
@@ -352,6 +366,7 @@ export default function MyResults() {
                     <TableHead className="text-center">Boş</TableHead>
                     <TableHead className="text-center">Süre</TableHead>
                     <TableHead>Tarih</TableHead>
+                    <TableHead className="text-center">Gecikme</TableHead>
                     <TableHead>Durum</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -385,6 +400,17 @@ export default function MyResults() {
                       <TableCell className="text-slate-500">
                         {safeFormatDate(result.created_date)}
                       </TableCell>
+                      {/* Gecikme sütunu — süre aşımı olduysa amber badge */}
+                      <TableCell className="text-center">
+                        {result.overtime_seconds > 0 ? (
+                          <Badge className="bg-amber-100 text-amber-700 gap-1">
+                            <Clock className="w-3 h-3" />
+                            +{formatOvertime(result.overtime_seconds)}
+                          </Badge>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {getScoreBadge(result.score ?? 0)}
                       </TableCell>
@@ -396,6 +422,53 @@ export default function MyResults() {
           )}
         </CardContent>
       </Card>
+
+      {/* ─── Gelişime Açık Yönler — süre aşımı olan testler ─── */}
+      {overtimeResults.length > 0 && (
+        <Card className="mt-6 border-amber-200 bg-amber-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-amber-800 text-base">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              Gelişime Açık Yön: Süre Yönetimi
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-amber-700 mb-4">
+              Aşağıdaki {overtimeResults.length} testte izin verilen süreden daha geç teslim yaptın.
+              Sınav koşullarında gecikmeli teslim mümkün değildir — süre yönetimine odaklanmak
+              performansını önemli ölçüde artırabilir.
+            </p>
+            <div className="space-y-2">
+              {overtimeResults.map((result, idx) => (
+                <div
+                  key={result?.id ? String(result.id) : "ot-" + idx}
+                  className="flex items-center justify-between bg-white border border-amber-200 rounded-xl px-4 py-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">{getTestTitle(result)}</p>
+                    <p className="text-xs text-slate-500">{safeFormatDate(result.created_date)}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500">Gecikme</p>
+                      <p className="text-sm font-bold text-amber-700">
+                        +{formatOvertime(result.overtime_seconds)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500">Puan</p>
+                      <p className="text-sm font-bold text-slate-700">{result.score}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-amber-600 mt-4 italic">
+              💡 İpucu: Her soruya ortalama {Math.round((filteredResults[0]?.time_spent_seconds ?? 0) / Math.max(1, (filteredResults[0]?.correct_count ?? 0) + (filteredResults[0]?.wrong_count ?? 0))) || "?"} saniye ayırmayı hedefle. Zorlandığın soruları işaretleyip geç, sonunda dön.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -103,6 +103,10 @@ export default function TakeTest() {
   const [educatorRating, setEducatorRating] = useState(0);
   const [testComment, setTestComment] = useState("");
   const [educatorComment, setEducatorComment] = useState("");
+  // Süre aşımı modu: timer sıfıra geldiğinde true, test hâlâ çözülebilir
+  const [isOvertime, setIsOvertime] = useState(false);
+  // Süre aşımı sayacı (saniye cinsinden, timer'ın üstüne eklenir)
+  const [overtimeElapsed, setOvertimeElapsed] = useState(0);
 
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases", user?.id, testId],
@@ -337,15 +341,16 @@ export default function TakeTest() {
   useEffect(() => {
     if (!testStarted || testFinished || isReviewMode) return;
     if (!test?.is_timed || !test?.duration_minutes) return;
+    // Zaten overtime modundaysa bu timer'ı çalıştırma (ayrı overtime timer var)
+    if (isOvertime) return;
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          base44.entities.Attempt.timeout(resolvedAttemptId).then(() => {
-            setTestFinished(true);
-            queryClient.invalidateQueries({ queryKey: ["attemptState", resolvedAttemptId] });
-          });
+          // Süre bitti: timeout() ÇAĞRILMIYOR — aday teste devam edebilir
+          // Overtime modu aktifleştirilir ve ayrı sayaç başlar
+          setIsOvertime(true);
           return 0;
         }
         return prev - 1;
@@ -353,7 +358,18 @@ export default function TakeTest() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [testStarted, testFinished, test, isReviewMode, resolvedAttemptId]);
+  }, [testStarted, testFinished, test, isReviewMode, resolvedAttemptId, isOvertime]);
+
+  // Overtime sayacı — süre dolduktan sonra kaç saniye geçtiğini gösterir
+  useEffect(() => {
+    if (!isOvertime || testFinished || isReviewMode) return;
+
+    const overtimeTimer = setInterval(() => {
+      setOvertimeElapsed((prev) => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(overtimeTimer);
+  }, [isOvertime, testFinished, isReviewMode]);
 
   // answerMutation yerine useAnswerQueue kullanılıyor — localStorage yedekli, retry'lı
 
@@ -508,7 +524,7 @@ export default function TakeTest() {
             </p>
           )}
 
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-emerald-50 rounded-xl p-4">
               <p className="text-2xl font-bold text-emerald-600">{correctCount}</p>
               <p className="text-sm text-emerald-700">Doğru</p>
@@ -522,6 +538,25 @@ export default function TakeTest() {
               <p className="text-sm text-slate-700">Boş</p>
             </div>
           </div>
+
+          {/* Süre aşımı uyarısı — gecikmeli teslim bilgisi */}
+          {displayResult?.attempt?.overtimeSeconds > 0 && (
+            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 text-left">
+              <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">
+                  {Math.ceil(displayResult.attempt.overtimeSeconds / 60)} dakika{" "}
+                  {displayResult.attempt.overtimeSeconds % 60 > 0
+                    ? `${displayResult.attempt.overtimeSeconds % 60} saniye `
+                    : ""}
+                  gecikmeli teslim edildi
+                </p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  Süre yönetimi sınav performansının önemli bir parçasıdır. Gelişim raporlarında bu bilgiyi takip edebilirsin.
+                </p>
+              </div>
+            </div>
+          )}
 
           {!existingTestReview && (
             <div className="mt-8 bg-amber-50 border border-amber-200 rounded-2xl p-6">
@@ -680,6 +715,16 @@ export default function TakeTest() {
 
           {!isReviewMode && testStarted && (
             test?.is_timed && timeLeft !== null ? (
+              isOvertime ? (
+                /* Süre aşımı sayacı */
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-100 text-rose-700 animate-pulse border border-rose-300">
+                  <Clock className="w-4 h-4" />
+                  <div className="flex flex-col leading-none">
+                    <span className="font-mono font-bold text-sm">+{formatTime(overtimeElapsed)}</span>
+                    <span className="text-xs font-normal">Süre aşıldı</span>
+                  </div>
+                </div>
+              ) : (
               <div
                 className={cn(
                   "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors",
@@ -693,6 +738,7 @@ export default function TakeTest() {
                 <Clock className="w-4 h-4" />
                 <span className="font-mono font-semibold">{formatTime(timeLeft)}</span>
               </div>
+              )
             ) : (
               startTime && (
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg">

@@ -31,6 +31,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Clock,
 } from "lucide-react";
 
 // ─── Yardımcı bileşenler ──────────────────────────────────────────────────────
@@ -123,15 +124,24 @@ function TopicGroupCard({ group }) {
               <h3 className="font-semibold text-slate-900 text-sm leading-tight">
                 {group.topicName}
               </h3>
-              {/* Sınav türünü ayırt edici rozet olarak göster */}
-              {group.examTypeId !== "__none__" && (
-                <Badge
-                  variant="secondary"
-                  className="mt-1 text-xs bg-indigo-50 text-indigo-700 border-0"
-                >
-                  {group.examTypeName}
-                </Badge>
-              )}
+              <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                {/* Sınav türünü ayırt edici rozet olarak göster */}
+                {group.examTypeId !== "__none__" && (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs bg-indigo-50 text-indigo-700 border-0"
+                  >
+                    {group.examTypeName}
+                  </Badge>
+                )}
+                {/* Süre aşımı uyarı rozeti — gelişime açık yön */}
+                {group.hasOvertime && (
+                  <Badge className="text-xs bg-amber-100 text-amber-700 border-0 gap-1">
+                    <Clock className="w-3 h-3" />
+                    {group.overtimeCount}x süre aşımı
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {/* Genel başarı yüzdesi + trend */}
@@ -171,6 +181,17 @@ function TopicGroupCard({ group }) {
               {group.totalAttempts} deneme · {group.totalQuestions} soru
             </span>
           </div>
+
+          {/* Süre yönetimi uyarı bandı — gelişime açık yön */}
+          {group.hasOvertime && (
+            <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+              <Clock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
+              <span>
+                Bu konuda {group.overtimeCount} denemende süre aşımı yaşandı.
+                <strong> Süre yönetimi</strong> gelişime açık bir yön olarak öne çıkıyor.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ─── Grafik toggle düğmesi (timeline varsa göster) ─── */}
@@ -228,6 +249,11 @@ function TopicGroupCard({ group }) {
                             <p className="text-slate-500 border-t border-slate-100 pt-1">
                               Toplam: {d.total} soru
                             </p>
+                            {d.overtimeSeconds > 0 && (
+                              <p className="text-amber-600 font-medium">
+                                ⏱ +{Math.floor(d.overtimeSeconds / 60)}dk {d.overtimeSeconds % 60}sn gecikme
+                              </p>
+                            )}
                           </div>
                         );
                       }}

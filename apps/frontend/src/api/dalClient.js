@@ -354,6 +354,8 @@ export const entities = {
               wrong_count: attempt.wrongCount ?? attempt.wrong_count ?? null,
               empty_count: attempt.emptyCount ?? attempt.empty_count ?? null,
               time_spent_seconds: timeSpent,
+              // Gecikmeli teslim süresi (saniye); null = zamanında
+              overtime_seconds: attempt.overtimeSeconds ?? null,
               created_date: attempt.completedAt ?? attempt.submittedAt ?? p.createdAt ?? p.created_date,
             });
           }

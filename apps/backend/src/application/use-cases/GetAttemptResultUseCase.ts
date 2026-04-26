@@ -54,7 +54,16 @@ export class GetAttemptResultUseCase {
     const percentage = total > 0 ? Math.round((correct / total) * 10000) / 100 : 0;
 
     return {
-      attempt: { id: attempt.id, testId: attempt.testId, status: attempt.status, score: attempt.score ?? null, submittedAt: attempt.submittedAt ?? null, completedAt: attempt.completedAt ?? null },
+      attempt: {
+        id: attempt.id,
+        testId: attempt.testId,
+        status: attempt.status,
+        score: attempt.score ?? null,
+        submittedAt: attempt.submittedAt ?? null,
+        completedAt: attempt.completedAt ?? null,
+        // Süre aşımı bilgisi: null = zamanında / süreli olmayan test
+        overtimeSeconds: (attempt as any).overtimeSeconds ?? null,
+      },
       summary: { correct, wrong, blank, total, percentage },
       questions,
     };

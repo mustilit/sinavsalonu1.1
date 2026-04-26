@@ -31,7 +31,7 @@ export class PrismaPurchaseRepository implements IPurchaseRepository {
     });
     const attempts = await prisma.testAttempt.findMany({
       where: { candidateId },
-      select: { id: true, testId: true, status: true, startedAt: true, completedAt: true, score: true },
+      select: { id: true, testId: true, status: true, startedAt: true, completedAt: true, submittedAt: true, score: true, overtimeSeconds: true },
     });
     const attemptByTest = new Map(attempts.map((a) => [a.testId, a]));
     return withTest.map((p) => ({
