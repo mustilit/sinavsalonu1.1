@@ -42,6 +42,8 @@ export class AdminSettingsController {
       packageCreationEnabled: dto.packageCreationEnabled,
       testPublishingEnabled: dto.testPublishingEnabled,
       testAttemptsEnabled: dto.testAttemptsEnabled,
+      // Reklam satın alma kill-switch
+      adPurchasesEnabled: dto.adPurchasesEnabled,
     });
   }
 }

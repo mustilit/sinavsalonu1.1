@@ -545,6 +545,7 @@ model AdminSettings {
   packageCreationEnabled Boolean  @default(true)  // Paket Durdur (test oluşturma)
   testPublishingEnabled  Boolean  @default(true)  // Canlı Test Durdur (yayınlama)
   testAttemptsEnabled    Boolean  @default(true)  // Test Durdur (çözüm başlatma)
+  adPurchasesEnabled     Boolean  @default(true)  // Reklam Satın Alma Durdur
   updatedAt              DateTime @updatedAt
 
   @@map("admin_settings")

@@ -1,7 +1,8 @@
 /**
- * useServiceStatus — fetches the 4 kill-switch flags from the backend.
- * Returns { purchasesEnabled, packageCreationEnabled, testPublishingEnabled, testAttemptsEnabled }
- * All default to true (open) while loading or on error (fail-open strategy).
+ * useServiceStatus — backend'deki kill-switch bayraklarını çeker.
+ * Döndürür: { purchasesEnabled, packageCreationEnabled, testPublishingEnabled,
+ *             testAttemptsEnabled, adPurchasesEnabled }
+ * Yüklenirken veya hata durumunda tümü true döner (fail-open stratejisi).
  */
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api/apiClient';
@@ -11,6 +12,8 @@ const DEFAULTS = {
   packageCreationEnabled: true,
   testPublishingEnabled: true,
   testAttemptsEnabled: true,
+  // Reklam satın alma kill-switch — varsayılan açık
+  adPurchasesEnabled: true,
 };
 
 export function useServiceStatus() {

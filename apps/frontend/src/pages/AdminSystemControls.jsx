@@ -7,6 +7,7 @@ import {
   Package,
   Radio,
   PlayCircle,
+  Megaphone,
   AlertTriangle,
   CheckCircle2,
   Loader2,
@@ -55,6 +56,16 @@ const CONTROLS = [
     affectedAction: "Yeni test oturumu başlatma",
     color: "rose",
   },
+  {
+    key: "adPurchasesEnabled",
+    label: "Reklam Satın Alma",
+    description: "Eğiticilerin kendilerini veya test paketlerini öne çıkarmak için reklam satın almasını kontrol eder.",
+    disabledMessage: "Reklam satın alma geçici olarak durdurulmuştur.",
+    icon: Megaphone,
+    audience: "Eğiticiler",
+    affectedAction: "Yeni reklam/öne çıkarma satın alma",
+    color: "orange",
+  },
 ];
 
 const COLOR_MAP = {
@@ -81,6 +92,13 @@ const COLOR_MAP = {
     badge: "bg-rose-100 text-rose-700",
     ring: "ring-rose-500",
     switch: "bg-rose-600",
+  },
+  // Reklam kill-switch rengi
+  orange: {
+    icon: "bg-orange-50 text-orange-600",
+    badge: "bg-orange-100 text-orange-700",
+    ring: "ring-orange-500",
+    switch: "bg-orange-600",
   },
 };
 

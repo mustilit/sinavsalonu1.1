@@ -61,10 +61,12 @@ export class SiteController {
   async getServiceStatus() {
     const row = await this.prisma.adminSettings.findFirst({ where: { id: 1 } });
     return {
-      purchasesEnabled:       row?.purchasesEnabled       ?? true,
-      packageCreationEnabled: row?.packageCreationEnabled ?? true,
-      testPublishingEnabled:  row?.testPublishingEnabled  ?? true,
-      testAttemptsEnabled:    row?.testAttemptsEnabled    ?? true,
+      purchasesEnabled:       row?.purchasesEnabled                    ?? true,
+      packageCreationEnabled: row?.packageCreationEnabled              ?? true,
+      testPublishingEnabled:  row?.testPublishingEnabled               ?? true,
+      testAttemptsEnabled:    row?.testAttemptsEnabled                 ?? true,
+      // Eğitici reklam satın alma kill-switch'i
+      adPurchasesEnabled:     (row as any)?.adPurchasesEnabled         ?? true,
     };
   }
 

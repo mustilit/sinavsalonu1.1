@@ -87,11 +87,13 @@ export type DiscountCode = {
 export type AdminSettings = {
   commissionPercent: number;
   vatPercent: number;
-  // Kill switches
+  // Kill switch'ler — false yapıldığında ilgili işlem anında engellenir
   purchasesEnabled: boolean;
   packageCreationEnabled: boolean;
   testPublishingEnabled: boolean;
   testAttemptsEnabled: boolean;
+  /** Eğitici reklam satın alma kill-switch'i */
+  adPurchasesEnabled: boolean;
 };
 
 export type SiteSettings = {

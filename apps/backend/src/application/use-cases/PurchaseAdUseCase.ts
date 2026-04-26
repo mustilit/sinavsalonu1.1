@@ -27,6 +27,12 @@ export class PurchaseAdUseCase {
    * @param targetType   - 'TEST' | 'EDUCATOR'; varsayılan 'TEST'
    */
   async execute(educatorId: string, adPackageId: string, testId: string | null, targetType: 'TEST' | 'EDUCATOR' = 'TEST') {
+    // Admin reklam kill-switch kontrolü — false ise satın alma engellenir (fail-open: satır yoksa izin verilir)
+    const settings = await prisma.adminSettings.findFirst({ where: { id: 1 } });
+    if (settings && (settings as any).adPurchasesEnabled === false) {
+      throw new BadRequestException({ code: 'AD_PURCHASES_DISABLED', message: 'Ad purchases are temporarily suspended' });
+    }
+
     const user = await this.userRepo.findById(educatorId);
     if (!user) throw new AppError('USER_NOT_FOUND', 'User not found', 404);
     // Eğitici askıya alınmış veya onaylanmamışsa işlemi engelle

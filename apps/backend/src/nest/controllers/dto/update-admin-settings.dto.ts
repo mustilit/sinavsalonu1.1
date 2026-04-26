@@ -36,4 +36,9 @@ export class UpdateAdminSettingsDto {
   @IsOptional()
   @IsBoolean()
   testAttemptsEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Eğitici reklam satın alma açık/kapalı' })
+  @IsOptional()
+  @IsBoolean()
+  adPurchasesEnabled?: boolean;
 }

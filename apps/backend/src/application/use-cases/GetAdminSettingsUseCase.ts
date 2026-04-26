@@ -5,7 +5,8 @@ export class GetAdminSettingsUseCase {
   async execute(prisma: { adminSettings: { findUnique: (args: any) => Promise<any> } }): Promise<AdminSettings> {
     const row = await prisma.adminSettings.findUnique({ where: { id: 1 } });
     if (!row) {
-      return { commissionPercent: 20, vatPercent: 18, purchasesEnabled: true, packageCreationEnabled: true, testPublishingEnabled: true, testAttemptsEnabled: true };
+      // Satır henüz oluşturulmamışsa tüm özellikler açık döner (fail-open)
+      return { commissionPercent: 20, vatPercent: 18, purchasesEnabled: true, packageCreationEnabled: true, testPublishingEnabled: true, testAttemptsEnabled: true, adPurchasesEnabled: true };
     }
     return {
       commissionPercent: row.commissionPercent ?? 20,
@@ -14,6 +15,8 @@ export class GetAdminSettingsUseCase {
       packageCreationEnabled: row.packageCreationEnabled ?? true,
       testPublishingEnabled: row.testPublishingEnabled ?? true,
       testAttemptsEnabled: row.testAttemptsEnabled ?? true,
+      // Reklam satın alma kill-switch'i — varsayılan açık
+      adPurchasesEnabled: (row as any).adPurchasesEnabled ?? true,
     };
   }
 }

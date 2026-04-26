@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
+import { useServiceStatus } from "@/lib/useServiceStatus";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,10 +30,13 @@ import {
   User,
   Package,
   Info,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function MyAds() {
   const { user } = useAuth();
+  // Admin kill-switch: adPurchasesEnabled false ise satın alma formu devre dışı kalır
+  const { adPurchasesEnabled } = useServiceStatus();
   // Aktif sekme: 'stats' | 'purchases' | 'buy'
   const [activeTab, setActiveTab] = useState("stats");
   // Yeni reklam formu alanları
@@ -376,6 +380,20 @@ export default function MyAds() {
       {/* ─── Yeni Reklam Satın Al ─── */}
       {activeTab === "buy" && (
         <div className="max-w-xl space-y-6">
+          {/* Admin kill-switch aktifse uyarı bandı — form içeriği gizlenir */}
+          {!adPurchasesEnabled && (
+            <div className="flex items-start gap-3 p-4 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-800">
+              <AlertTriangle className="w-5 h-5 text-rose-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Reklam satın alma geçici olarak durdurulmuştur.</p>
+                <p className="text-rose-600 mt-0.5">Lütfen daha sonra tekrar deneyin.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Kill-switch kapalıysa satın alma formu gösterilmez */}
+          {adPurchasesEnabled && (<>
+
           {/* Bilgilendirme kutusu */}
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex gap-3">
             <Info className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
@@ -485,6 +503,7 @@ export default function MyAds() {
           >
             {purchaseMutation.isPending ? "İşleniyor..." : "Reklamı Satın Al"}
           </Button>
+          </>)}
         </div>
       )}
     </div>
