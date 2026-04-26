@@ -61,6 +61,8 @@ export default function Sidebar({ user, currentPage }) {
     { name: "İade Talepleri", page: "ManageRefunds", icon: ShoppingBag },
     { name: "Hata Bildirimleri", page: "AdminObjections", icon: AlertTriangle },
     { name: "Komisyon Raporu", page: "AdminCommissionReport", icon: Banknote },
+    // Reklam satın alım raporu — eğiticilerin öne çıkarma aktivitesini gösterir
+    { name: "Reklam Raporu", page: "AdminAdReport", icon: Megaphone },
     { name: "Sistem Kontrolleri", page: "AdminSystemControls", icon: ShieldAlert },
   ];
 

@@ -114,6 +114,8 @@ import { SendBulkEducatorEmailUseCase } from '../application/use-cases/SendBulkE
 import { AdminCommissionController } from './controllers/admin.commission.controller';
 import { GetCommissionReportUseCase } from '../application/use-cases/GetCommissionReportUseCase';
 import { GetPopularPackagesUseCase } from '../application/use-cases/GetPopularPackagesUseCase';
+import { AdminAdReportController } from './controllers/admin.ad-report.controller';
+import { GetAdminAdReportUseCase } from '../application/use-cases/GetAdminAdReportUseCase';
 
 const THROTTLE_TTL_SECONDS = Number(process.env.THROTTLE_TTL_SECONDS ?? '60') || 60;
 
@@ -180,7 +182,7 @@ const throttleDisabled =
     (require('./modules/refunds/refunds.module').RefundsModule),
     ContractsModule,
   ],
-  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AdminCandidatesController, AdminEducatorReportController, AdminCommissionController],
+  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AdminCandidatesController, AdminEducatorReportController, AdminCommissionController, AdminAdReportController],
   providers: [
     SeedService,
     ...(throttleDisabled ? [] : [{ provide: APP_GUARD, useClass: CustomThrottlerGuard }]),
@@ -379,6 +381,8 @@ const throttleDisabled =
     },
     GetCommissionReportUseCase,
     GetPopularPackagesUseCase,
+    // Reklam satın alım raporu — admin filtrel liste
+    GetAdminAdReportUseCase,
   ],
 })
 export class AppModule {}

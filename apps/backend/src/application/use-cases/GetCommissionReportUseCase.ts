@@ -1,5 +1,9 @@
 import { prisma } from '../../infrastructure/database/prisma';
 
+/**
+ * Komisyon raporunda her eğitici için döndürülen tek kalem.
+ * Normal satışlar (isTimed=false) komisyona tabi; canlı test satışları (isTimed=true) komisyonsuz.
+ */
 export interface CommissionReportItem {
   educatorId: string;
   username: string;
@@ -7,23 +11,42 @@ export interface CommissionReportItem {
   iban: string | null;
   bankName: string | null;
   accountHolder: string | null;
-  saleCount: number;
-  totalSalesCents: number;
+  // Normal paket satışları — komisyon uygulanır
+  normalSaleCount: number;
+  normalSalesCents: number;
   commissionPercent: number;
   commissionCents: number;
-  payoutCents: number;
+  normalPayoutCents: number;
+  // Canlı test satışları — komisyon uygulanmaz, tamamı eğiticiye ödenir
+  liveSaleCount: number;
+  liveSalesCents: number;
+  // Toplam (normal + canlı)
+  totalSaleCount: number;
+  totalSalesCents: number;
+  totalPayoutCents: number; // normalPayoutCents + liveSalesCents
 }
 
+/**
+ * Komisyon raporunun tamamını temsil eder.
+ * Hem kalem bazlı hem de genel toplamları içerir.
+ */
 export interface CommissionReportResult {
   items: CommissionReportItem[];
   commissionPercent: number;
   year: number;
   month: number;
-  totalSalesCents: number;
+  totalNormalSalesCents: number;
   totalCommissionCents: number;
+  totalNormalPayoutCents: number;
+  totalLiveSalesCents: number;
+  totalSalesCents: number;
   totalPayoutCents: number;
 }
 
+/**
+ * Ham SQL sorgusu dönüş tipi — isTimed dahil GROUP BY sonucu.
+ * bigint: Prisma $queryRawUnsafe COUNT/SUM sonuçlarını bigint döndürür.
+ */
 interface RawRow {
   educatorId: string;
   username: string;
@@ -31,19 +54,36 @@ interface RawRow {
   iban: string | null;
   bankName: string | null;
   accountHolder: string | null;
+  isTimed: boolean;
   saleCount: bigint;
   totalSalesCents: bigint;
 }
 
+/**
+ * GetCommissionReportUseCase — aylık eğitici komisyon raporunu üretir.
+ *
+ * İş kuralı:
+ *   - isTimed=false (normal paket) → komisyon uygulanır
+ *   - isTimed=true  (canlı test)   → komisyon uygulanmaz; tutarın tamamı eğiticiye ödenir
+ *
+ * Ön koşullar:
+ *   - year: [2020, 2100] aralığında tam sayı
+ *   - month: [1, 12] aralığında tam sayı
+ *
+ * Hata senaryoları:
+ *   - Invalid year / Invalid month: sınır dışı değer girilirse Error fırlatılır
+ */
 export class GetCommissionReportUseCase {
   async execute(year: number, month: number): Promise<CommissionReportResult> {
-    // validate
+    // Yıl ve ay parametrelerini doğrula
     if (!Number.isInteger(year) || year < 2020 || year > 2100) throw new Error('Invalid year');
     if (!Number.isInteger(month) || month < 1 || month > 12) throw new Error('Invalid month');
 
+    // Admin ayarlarından komisyon yüzdesini oku; kayıt yoksa %20 varsayılan
     const settings = await prisma.adminSettings.findFirst({ where: { id: 1 } });
     const commissionPercent = settings?.commissionPercent ?? 20;
 
+    // isTimed sütunu GROUP BY'a eklendi — aynı eğitici için iki satır gelebilir (normal + canlı)
     const rows = await prisma.$queryRawUnsafe<RawRow[]>(`
       SELECT
         u.id               AS "educatorId",
@@ -52,6 +92,7 @@ export class GetCommissionReportUseCase {
         up.preferences->>'iban'           AS iban,
         up.preferences->>'bankName'       AS "bankName",
         up.preferences->>'accountHolder'  AS "accountHolder",
+        et."isTimed",
         COUNT(p.id)::bigint               AS "saleCount",
         COALESCE(SUM(p."amountCents"), 0)::bigint AS "totalSalesCents"
       FROM users u
@@ -64,51 +105,102 @@ export class GetCommissionReportUseCase {
         AND p."deletedAt" IS NULL
         AND p.status = 'ACTIVE'
         AND u."deletedAt" IS NULL
-      GROUP BY u.id, u.username, u.email, up.preferences
+      GROUP BY u.id, u.username, u.email, up.preferences, et."isTimed"
       ORDER BY "totalSalesCents" DESC
     `);
 
-    let sumSales = 0;
+    // Eğitici bazlı birleştirme: Map<educatorId, CommissionReportItem>
+    const map = new Map<string, CommissionReportItem>();
+
+    for (const r of rows) {
+      const saleCount = Number(r.saleCount);
+      const salesCents = Number(r.totalSalesCents);
+
+      if (!map.has(r.educatorId)) {
+        // Eğitici ilk kez görülüyor — başlangıç değerleriyle kaydı oluştur
+        map.set(r.educatorId, {
+          educatorId: r.educatorId,
+          username: r.username,
+          email: r.email,
+          iban: r.iban ?? null,
+          bankName: r.bankName ?? null,
+          accountHolder: r.accountHolder ?? null,
+          normalSaleCount: 0,
+          normalSalesCents: 0,
+          commissionPercent,
+          commissionCents: 0,
+          normalPayoutCents: 0,
+          liveSaleCount: 0,
+          liveSalesCents: 0,
+          totalSaleCount: 0,
+          totalSalesCents: 0,
+          totalPayoutCents: 0,
+        });
+      }
+
+      const item = map.get(r.educatorId)!;
+
+      if (r.isTimed) {
+        // Canlı test satışı — komisyon uygulanmaz
+        item.liveSaleCount += saleCount;
+        item.liveSalesCents += salesCents;
+      } else {
+        // Normal paket satışı — komisyon uygulanır
+        item.normalSaleCount += saleCount;
+        item.normalSalesCents += salesCents;
+      }
+    }
+
+    // Komisyon ve toplam alanlarını hesapla; genel toplamları biriktir
+    let sumNormalSales = 0;
     let sumCommission = 0;
-    let sumPayout = 0;
+    let sumNormalPayout = 0;
+    let sumLiveSales = 0;
 
-    const items: CommissionReportItem[] = rows.map((r) => {
-      const totalSalesCents = Number(r.totalSalesCents);
-      const commissionCents = Math.round((totalSalesCents * commissionPercent) / 100);
-      const payoutCents = totalSalesCents - commissionCents;
+    const items: CommissionReportItem[] = [];
 
-      sumSales += totalSalesCents;
-      sumCommission += commissionCents;
-      sumPayout += payoutCents;
+    for (const item of map.values()) {
+      // Komisyon yalnızca normal satışlar üzerinden hesaplanır
+      item.commissionCents = Math.round((item.normalSalesCents * commissionPercent) / 100);
+      item.normalPayoutCents = item.normalSalesCents - item.commissionCents;
 
-      return {
-        educatorId: r.educatorId,
-        username: r.username,
-        email: r.email,
-        iban: r.iban ?? null,
-        bankName: r.bankName ?? null,
-        accountHolder: r.accountHolder ?? null,
-        saleCount: Number(r.saleCount),
-        totalSalesCents,
-        commissionPercent,
-        commissionCents,
-        payoutCents,
-      };
-    });
+      item.totalSaleCount = item.normalSaleCount + item.liveSaleCount;
+      item.totalSalesCents = item.normalSalesCents + item.liveSalesCents;
+      // Toplam ödeme: komisyon düşülmüş normal + komisyonsuz canlı test tutarı
+      item.totalPayoutCents = item.normalPayoutCents + item.liveSalesCents;
+
+      sumNormalSales += item.normalSalesCents;
+      sumCommission += item.commissionCents;
+      sumNormalPayout += item.normalPayoutCents;
+      sumLiveSales += item.liveSalesCents;
+
+      items.push(item);
+    }
+
+    // Toplam satış tutarına göre azalan sıralama
+    items.sort((a, b) => b.totalSalesCents - a.totalSalesCents);
 
     return {
       items,
       commissionPercent,
       year,
       month,
-      totalSalesCents: sumSales,
+      totalNormalSalesCents: sumNormalSales,
       totalCommissionCents: sumCommission,
-      totalPayoutCents: sumPayout,
+      totalNormalPayoutCents: sumNormalPayout,
+      totalLiveSalesCents: sumLiveSales,
+      totalSalesCents: sumNormalSales + sumLiveSales,
+      totalPayoutCents: sumNormalPayout + sumLiveSales,
     };
   }
 
+  /**
+   * CSV dışa aktarımı — Türkçe başlıklar + UTF-8 BOM (Excel uyumlu).
+   * Kolon sırası: eğitici bilgileri → normal satış → komisyon → canlı test → toplam.
+   */
   async exportCsv(year: number, month: number): Promise<string> {
     const report = await this.execute(year, month);
+    // Dönem etiketi: YYYY-MM formatı
     const monthStr = String(month).padStart(2, '0');
     const period = `${year}-${monthStr}`;
 
@@ -119,13 +211,18 @@ export class GetCommissionReportUseCase {
       'Hesap Sahibi',
       'Banka',
       'Dönem',
-      'Satış Adedi',
-      'Toplam Satış (TL)',
+      'Normal Satış Adedi',
+      'Normal Satış (TL)',
       'Komisyon (%)',
-      'Komisyon Tutarı (TL)',
-      'Ödenecek Tutar (TL)',
+      'Komisyon (TL)',
+      'Normal Ödenecek (TL)',
+      'Canlı Test Adedi',
+      'Canlı Test Satış (TL)',
+      'Canlı Test Ödenecek (TL)',
+      'Toplam Ödenecek (TL)',
     ];
 
+    // Değer içindeki çift tırnak karakterlerini kaçır (CSV standartı)
     const escape = (v: string | number | null) =>
       `"${String(v ?? '').replace(/"/g, '""')}"`;
 
@@ -136,14 +233,19 @@ export class GetCommissionReportUseCase {
       escape(item.accountHolder),
       escape(item.bankName),
       escape(period),
-      escape(item.saleCount),
-      escape((item.totalSalesCents / 100).toFixed(2)),
+      escape(item.normalSaleCount),
+      escape((item.normalSalesCents / 100).toFixed(2)),
       escape(report.commissionPercent),
       escape((item.commissionCents / 100).toFixed(2)),
-      escape((item.payoutCents / 100).toFixed(2)),
+      escape((item.normalPayoutCents / 100).toFixed(2)),
+      escape(item.liveSaleCount),
+      escape((item.liveSalesCents / 100).toFixed(2)),
+      // Canlı test ödenecek = canlı satış tutarının tamamı (komisyon yok)
+      escape((item.liveSalesCents / 100).toFixed(2)),
+      escape((item.totalPayoutCents / 100).toFixed(2)),
     ]);
 
-    // totals row
+    // Özet satırı — tüm eğiticilerin toplamı
     dataRows.push([
       escape('TOPLAM'),
       escape(''),
@@ -151,15 +253,19 @@ export class GetCommissionReportUseCase {
       escape(''),
       escape(''),
       escape(period),
-      escape(report.items.reduce((s, i) => s + i.saleCount, 0)),
-      escape((report.totalSalesCents / 100).toFixed(2)),
+      escape(report.items.reduce((s, i) => s + i.normalSaleCount, 0)),
+      escape((report.totalNormalSalesCents / 100).toFixed(2)),
       escape(report.commissionPercent),
       escape((report.totalCommissionCents / 100).toFixed(2)),
+      escape((report.totalNormalPayoutCents / 100).toFixed(2)),
+      escape(report.items.reduce((s, i) => s + i.liveSaleCount, 0)),
+      escape((report.totalLiveSalesCents / 100).toFixed(2)),
+      escape((report.totalLiveSalesCents / 100).toFixed(2)),
       escape((report.totalPayoutCents / 100).toFixed(2)),
     ]);
 
     const lines = [headers.map(escape).join(','), ...dataRows.map((r) => r.join(','))];
-    // UTF-8 BOM so Excel opens Turkish characters correctly
-    return '\uFEFF' + lines.join('\r\n');
+    // UTF-8 BOM: Excel'in Türkçe karakterleri doğru açması için
+    return '﻿' + lines.join('\r\n');
   }
 }

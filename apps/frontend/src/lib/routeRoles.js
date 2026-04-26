@@ -50,6 +50,8 @@ export const PAGE_ROLES = {
   CreateTest: [ROLES.EDUCATOR],
   EditTest: [ROLES.EDUCATOR],
 
+  // AdminAdReport: Reklam satın alım raporu — yalnızca admin
+  AdminAdReport: [ROLES.ADMIN],
   AdminCandidateReport: [ROLES.ADMIN],
   AdminCommissionReport: [ROLES.ADMIN],
   AdminSystemControls: [ROLES.ADMIN],
