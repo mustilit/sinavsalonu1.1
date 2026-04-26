@@ -34,6 +34,8 @@ export const PAGE_ROLES = {
 
   MyTests: [ROLES.CANDIDATE],
   MyResults: [ROLES.CANDIDATE],
+  // MyTopicReport: Konu bazlı performans raporu — yalnızca adaylar
+  MyTopicReport: [ROLES.CANDIDATE],
   ProfileSettings: [ROLES.CANDIDATE],
   TakeTest: [ROLES.CANDIDATE],
   CompleteProfile: [ROLES.CANDIDATE],

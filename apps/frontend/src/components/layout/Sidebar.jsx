@@ -33,6 +33,8 @@ export default function Sidebar({ user, currentPage }) {
     { name: "Testleri Keşfet", page: "Explore", icon: Search },
     { name: "Satın Alınan Testler", page: "MyTests", icon: BookOpen },
     { name: "Performans Raporları", page: "MyResults", icon: BarChart3 },
+    // Konu bazlı performans raporu — zamana bağlı konu analizi
+    { name: "Konu Performansım", page: "MyTopicReport", icon: BookOpen },
     { name: "Profil Ayarları", page: "ProfileSettings", icon: User },
   ];
 

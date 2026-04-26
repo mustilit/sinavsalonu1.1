@@ -78,6 +78,7 @@ import ManageUsers from './pages/ManageUsers';
 import MyAds from './pages/MyAds';
 import MyDiscountCodes from './pages/MyDiscountCodes';
 import MyResults from './pages/MyResults';
+import MyTopicReport from './pages/MyTopicReport';
 import MySales from './pages/MySales';
 import MyTestPackages from './pages/MyTestPackages';
 import MyTests from './pages/MyTests';
@@ -124,6 +125,7 @@ export const PAGES = {
     "MyAds": MyAds,
     "MyDiscountCodes": MyDiscountCodes,
     "MyResults": MyResults,
+    "MyTopicReport": MyTopicReport,
     "MySales": MySales,
     "MyTestPackages": MyTestPackages,
     "MyTests": MyTests,
