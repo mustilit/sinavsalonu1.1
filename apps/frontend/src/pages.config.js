@@ -74,6 +74,7 @@ import ManageRefunds from './pages/ManageRefunds';
 import ManageTests from './pages/ManageTests';
 import ManageTopics from './pages/ManageTopics';
 import ManageUsers from './pages/ManageUsers';
+import MyAds from './pages/MyAds';
 import MyDiscountCodes from './pages/MyDiscountCodes';
 import MyResults from './pages/MyResults';
 import MySales from './pages/MySales';
@@ -118,6 +119,7 @@ export const PAGES = {
     "ManageTests": ManageTests,
     "ManageTopics": ManageTopics,
     "ManageUsers": ManageUsers,
+    "MyAds": MyAds,
     "MyDiscountCodes": MyDiscountCodes,
     "MyResults": MyResults,
     "MySales": MySales,

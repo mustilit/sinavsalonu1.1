@@ -87,6 +87,12 @@ enum ContractType {
   EDUCATOR
 }
 
+/** Reklam satın alma hedef türü: belirli test paketi veya eğiticinin kendisi */
+enum AdTargetType {
+  TEST
+  EDUCATOR
+}
+
 // --- Multi-tenant foundation ---
 
 model Tenant {
@@ -137,6 +143,8 @@ model User {
   contractAcceptances     ContractAcceptance[]
   userPreference          UserPreference?
   adPurchases             AdPurchase[]             @relation("educatorAdPurchases")
+  adImpressions           AdImpression[]           @relation("AdImpressionEducator")
+  viewedAdImpressions     AdImpression[]           @relation("AdImpressionViewer")
 
   @@index([tenantId])
   @@map("users")
@@ -586,17 +594,23 @@ model AdPackage {
 }
 
 model AdPurchase {
-  id                   String   @id @default(uuid())
+  id                   String       @id @default(uuid())
   educatorId           String
   adPackageId          String
-  testId               String
+  /** TEST: belirli bir paket öne çıkar; EDUCATOR: eğiticinin kendisi öne çıkar */
+  targetType           AdTargetType @default(TEST)
+  /** TEST türünde zorunlu; EDUCATOR türünde null olabilir */
+  testId               String?
   validUntil           DateTime
-  impressionsRemaining Int      @default(0)
-  createdAt            DateTime @default(now())
+  impressionsRemaining Int          @default(0)
+  /** Şimdiye kadar gerçekleşen toplam gösterim sayısı */
+  impressionsDelivered Int          @default(0)
+  createdAt            DateTime     @default(now())
 
-  educator  User      @relation("educatorAdPurchases", fields: [educatorId], references: [id], onDelete: Cascade)
-  adPackage AdPackage @relation(fields: [adPackageId], references: [id], onDelete: Cascade)
-  test      ExamTest  @relation(fields: [testId], references: [id], onDelete: Cascade)
+  educator    User           @relation("educatorAdPurchases", fields: [educatorId], references: [id], onDelete: Cascade)
+  adPackage   AdPackage      @relation(fields: [adPackageId], references: [id], onDelete: Cascade)
+  test        ExamTest?      @relation(fields: [testId], references: [id], onDelete: Cascade)
+  impressions AdImpression[]
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
@@ -606,6 +620,28 @@ model AdPurchase {
   @@index([testId])
   @@index([validUntil])
   @@map("ad_purchases")
+}
+
+/**
+ * Her ana sayfa yüklemesinde gerçekleşen reklam gösterimini kaydeder.
+ * viewerUserId: giriş yapmış kullanıcı; null ise anonim ziyaretçi.
+ */
+model AdImpression {
+  id           String   @id @default(uuid())
+  purchaseId   String
+  educatorId   String
+  testId       String?
+  viewerUserId String?
+  createdAt    DateTime @default(now())
+
+  purchase AdPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  educator User       @relation("AdImpressionEducator", fields: [educatorId], references: [id])
+  viewer   User?      @relation("AdImpressionViewer", fields: [viewerUserId], references: [id])
+
+  @@index([purchaseId])
+  @@index([educatorId])
+  @@index([createdAt])
+  @@map("ad_impressions")
 }
 
 model Subscription {

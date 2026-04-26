@@ -98,6 +98,7 @@ import { UpdateAdPackageUseCase } from '../application/use-cases/UpdateAdPackage
 import { DeleteAdPackageUseCase } from '../application/use-cases/DeleteAdPackageUseCase';
 import { PurchaseAdUseCase } from '../application/use-cases/PurchaseAdUseCase';
 import { ListEducatorAdPurchasesUseCase } from '../application/use-cases/ListEducatorAdPurchasesUseCase';
+import { GetEducatorAdStatsUseCase } from '../application/use-cases/GetEducatorAdStatsUseCase';
 import { ListEducatorTestsUseCase } from '../application/use-cases/ListEducatorTestsUseCase';
 import { ListEducatorPurchasesUseCase } from '../application/use-cases/ListEducatorPurchasesUseCase';
 import { DeleteDiscountCodeUseCase } from '../application/use-cases/DeleteDiscountCodeUseCase';
@@ -346,6 +347,8 @@ const throttleDisabled =
       provide: ListEducatorAdPurchasesUseCase,
       useFactory: (userRepo: PrismaUserRepository) => new ListEducatorAdPurchasesUseCase(userRepo),
     },
+    // GetEducatorAdStatsUseCase bağımlılık gerektirmiyor — doğrudan prisma kullanır
+    GetEducatorAdStatsUseCase,
     {
       provide: ListEducatorTestsUseCase,
       useFactory: (examRepo: PrismaExamRepository) => new ListEducatorTestsUseCase(examRepo),

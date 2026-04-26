@@ -15,6 +15,7 @@ import { ListEducatorDiscountCodesUseCase } from '../../application/use-cases/Li
 import { GetEducatorSalesReportUseCase } from '../../application/use-cases/GetEducatorSalesReportUseCase';
 import { PurchaseAdUseCase } from '../../application/use-cases/PurchaseAdUseCase';
 import { ListEducatorAdPurchasesUseCase } from '../../application/use-cases/ListEducatorAdPurchasesUseCase';
+import { GetEducatorAdStatsUseCase } from '../../application/use-cases/GetEducatorAdStatsUseCase';
 import { ListEducatorTestsUseCase } from '../../application/use-cases/ListEducatorTestsUseCase';
 import { ListEducatorPurchasesUseCase } from '../../application/use-cases/ListEducatorPurchasesUseCase';
 import { DeleteDiscountCodeUseCase } from '../../application/use-cases/DeleteDiscountCodeUseCase';
@@ -112,16 +113,26 @@ export class EducatorsController {
     return this.getSalesReportUC.execute(educatorId);
   }
 
+  /**
+   * FR-E-07: Reklam satın alma — TEST (belirli paket) veya EDUCATOR (kendisi) türünde.
+   * targetType 'EDUCATOR' ise testId göndermek gerekmez.
+   */
   @Post('me/ads')
   @Roles('EDUCATOR')
   @ApiBearerAuth('bearer')
-  @ApiOkResponse({ description: 'FR-E-07: Purchase ad for test' })
+  @ApiOkResponse({ description: 'FR-E-07: Purchase ad for test or educator profile' })
   @ApiErrorResponses()
   async purchaseAd(@Req() req: any, @Body() dto: PurchaseAdDto) {
     const educatorId = (req as any).user?.id;
-    return this.purchaseAdUC.execute(educatorId, dto.adPackageId, dto.testId);
+    return this.purchaseAdUC.execute(
+      educatorId,
+      dto.adPackageId,
+      dto.testId ?? null,
+      (dto as any).targetType ?? 'TEST',
+    );
   }
 
+  /** Eğiticinin satın aldığı reklam paketlerini listeler */
   @Get('me/ads')
   @Roles('EDUCATOR')
   @ApiBearerAuth('bearer')
@@ -130,6 +141,21 @@ export class EducatorsController {
   async listAdPurchases(@Req() req: any) {
     const educatorId = (req as any).user?.id;
     return this.listAdPurchasesUC.execute(educatorId);
+  }
+
+  /**
+   * Eğiticinin reklam istatistiklerini döndürür:
+   * toplam gösterim, kalan gösterim, son 30 günün günlük dağılımı.
+   */
+  @Get('me/ads/stats')
+  @Roles('EDUCATOR')
+  @ApiBearerAuth('bearer')
+  @ApiOkResponse({ description: 'Educator ad impression stats (per purchase + daily breakdown)' })
+  @ApiErrorResponses()
+  async adStats(@Req() req: any) {
+    const educatorId = (req as any).user?.id;
+    const uc = new GetEducatorAdStatsUseCase();
+    return uc.execute(educatorId);
   }
 
   @Get('me/tests')

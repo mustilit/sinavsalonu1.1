@@ -44,6 +44,8 @@ export const PAGE_ROLES = {
   MyTestPackages: [ROLES.EDUCATOR],
   MySales: [ROLES.EDUCATOR],
   MyDiscountCodes: [ROLES.EDUCATOR],
+  // MyAds: Eğiticinin reklam satın alma ve istatistik sayfası
+  MyAds: [ROLES.EDUCATOR],
   QuestionReports: [ROLES.EDUCATOR],
   CreateTest: [ROLES.EDUCATOR],
   EditTest: [ROLES.EDUCATOR],

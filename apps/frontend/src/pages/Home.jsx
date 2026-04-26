@@ -33,6 +33,7 @@ import {
   Briefcase,
   Clock,
   Sparkles,
+  Megaphone,
 } from "lucide-react";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -50,20 +51,33 @@ function starStr(avg) {
 
 // ── inline package card (uses backend PopularPackageItem format) ───────────
 
+/**
+ * Tek bir test paketi kartı.
+ * tags dizisinde 'AD_BOOSTED' varsa "Öne Çıkan" rozeti gösterilir.
+ */
 function PackageCard({ pkg }) {
+  // Reklam destekli öne çıkarma kontrolü
+  const isBoosted = Array.isArray(pkg.tags) && pkg.tags.includes('AD_BOOSTED');
+
   return (
     <Link
       to={createPageUrl("TestDetail") + `?id=${pkg.id}`}
       className="group bg-white rounded-2xl border border-slate-100 hover:shadow-lg hover:shadow-slate-200/60 transition-all duration-300 flex flex-col overflow-hidden"
     >
-      {/* coloured top bar */}
+      {/* Renkli üst şerit — reklam destekliyse turuncu, aksi hâlde mavi */}
       <div
         className="h-2 w-full"
-        style={{ backgroundColor: "#0000CD", opacity: 0.85 }}
+        style={{ backgroundColor: isBoosted ? "#f97316" : "#0000CD", opacity: 0.85 }}
       />
       <div className="p-5 flex flex-col flex-1 gap-3">
         {/* badge row */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Reklam öne çıkarma rozeti */}
+          {isBoosted && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200">
+              <Megaphone className="w-3 h-3" /> Öne Çıkan
+            </span>
+          )}
           {pkg.examTypeName && (
             <span
               className="text-xs font-medium px-2 py-0.5 rounded-full"
@@ -133,7 +147,14 @@ function PackageCard({ pkg }) {
 
 // ── inline educator card ────────────────────────────────────────────────────
 
+/**
+ * Tek bir eğitici kartı.
+ * tags dizisinde 'AD_BOOSTED' varsa "Öne Çıkan" rozeti gösterilir.
+ */
 function EducatorCard({ educator }) {
+  // Reklam destekli öne çıkarma kontrolü
+  const isBoosted = Array.isArray(educator.tags) && educator.tags.includes('AD_BOOSTED');
+
   return (
     <Link
       to={createPageUrl("EducatorProfile") + `?id=${educator.id}`}
@@ -143,9 +164,17 @@ function EducatorCard({ educator }) {
         <User className="w-7 h-7 text-indigo-500" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-slate-900 truncate group-hover:text-indigo-700 transition-colors">
-          {educator.username}
-        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-semibold text-slate-900 truncate group-hover:text-indigo-700 transition-colors">
+            {educator.username}
+          </p>
+          {/* Reklam öne çıkarma rozeti */}
+          {isBoosted && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200 flex-shrink-0">
+              <Megaphone className="w-3 h-3" /> Öne Çıkan
+            </span>
+          )}
+        </div>
         <div className="flex items-center flex-wrap gap-3 mt-1.5 text-sm text-slate-500">
           <span className="flex items-center gap-1">
             <BookOpen className="w-3.5 h-3.5" />

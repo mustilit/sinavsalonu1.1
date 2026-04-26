@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Banknote,
   ShieldAlert,
+  Megaphone,
 } from "lucide-react";
 
 export default function Sidebar({ user, currentPage }) {
@@ -41,6 +42,8 @@ export default function Sidebar({ user, currentPage }) {
     { name: "Yeni Test Oluştur", page: "CreateTest", icon: Plus },
     { name: "Satışlarım", page: "MySales", icon: ShoppingBag },
     { name: "İndirim Kodları", page: "MyDiscountCodes", icon: Award },
+    // Reklam yönetimi: eğiticinin öne çıkarma satın alması ve gösterim takibi
+    { name: "Reklamlarım", page: "MyAds", icon: Megaphone },
     { name: "Hata Bildirimleri", page: "QuestionReports", icon: Settings },
     { name: "Profil Ayarları", page: "EducatorSettings", icon: User },
   ] : [
