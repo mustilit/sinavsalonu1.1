@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
@@ -15,9 +15,14 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   ArrowLeft, Save, Plus, GripVertical, BookOpen,
-  Image, Lightbulb, Upload, X, Loader2, CheckCircle2
+  Image, Lightbulb, Upload, X, Loader2, CheckCircle2, History
 } from "lucide-react";
 import { useServiceStatus } from "@/lib/useServiceStatus";
+// Test meta verisindeki kaydedilmemiş değişiklikler için otomatik yedek
+import { useAutoSave } from "@/lib/useAutoSave";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { format } from "date-fns";
+import { tr } from "date-fns/locale";
 
 // ─── Image upload helper ──────────────────────────────────────────────────────
 function ImageUploadButton({ value, onChange, label = "Görsel ekle" }) {
@@ -219,6 +224,20 @@ export default function EditTest() {
   const [currentPage, setCurrentPage] = useState(1);
   const questionsPerPage = 50;
 
+  // ─── Auto-save: test meta verisindeki kaydedilmemiş değişiklikler ─────────
+  const [showDraftDialog, setShowDraftDialog] = useState(false);
+  const [draftInfo, setDraftInfo]             = useState(null);
+
+  // formData her render'da güncel olsun
+  const getFormData = useCallback(() => formData, [formData]);
+
+  const { hasDraft, loadDraft, clearDraft } = useAutoSave(
+    testId ? `editTest_${testId}` : '__noop__',
+    getFormData,
+    // formData yüklenene kadar (null) auto-save çalışmasın
+    { enabled: !!testId && !!formData },
+  );
+
   const { data: testDetail, isLoading } = useQuery({
     queryKey: ["test", testId],
     queryFn: async () => {
@@ -249,7 +268,21 @@ export default function EditTest() {
       };
       setFormData(fd);
       setOriginalFormData(fd);
+
+      // Sunucu verisi yüklendi — kaydedilmemiş taslak var mı kontrol et
+      if (testId && hasDraft()) {
+        const draft = loadDraft();
+        // Taslak sunucu verisinden farklıysa kurtarma teklif et
+        if (draft?.data && draft.data.title !== fd.title) {
+          setDraftInfo(draft);
+          setShowDraftDialog(true);
+        } else {
+          // Taslak güncel sunucu verisiyle örtüşüyor — sessizce temizle
+          clearDraft();
+        }
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testDetail]);
 
   const updateTestMutation = useMutation({
@@ -268,6 +301,8 @@ export default function EditTest() {
     },
     onSuccess: () => {
       toast.success("Test güncellendi");
+      // Başarılı kayıt — yerel taslağa gerek yok artık
+      clearDraft();
       queryClient.invalidateQueries({ queryKey: ["test", testId] });
       setOriginalFormData(formData);
     },
@@ -368,8 +403,61 @@ export default function EditTest() {
     done: questions.filter(q => q.solutionText?.trim() || q.solutionMediaUrl?.trim()).length,
   } : null;
 
+  // Taslak zaman bilgisini okunabilir göster
+  const draftSavedAt = draftInfo?.savedAt
+    ? (() => {
+        try { return format(new Date(draftInfo.savedAt), "d MMM yyyy HH:mm", { locale: tr }); }
+        catch { return draftInfo.savedAt; }
+      })()
+    : null;
+
   return (
     <div className="max-w-6xl mx-auto">
+      {/* ─── Taslak kurtarma diyaloğu ─── */}
+      <Dialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5 text-indigo-600" />
+              Kaydedilmemiş Değişiklikler
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Bu test için kaydedilmemiş değişiklikler bulundu.
+              {draftSavedAt && (
+                <span className="text-slate-400"> ({draftSavedAt})</span>
+              )}
+            </p>
+            <p className="text-sm text-slate-500">
+              Taslak başlığı: <strong>"{draftInfo?.data?.title}"</strong>
+            </p>
+            <div className="flex gap-3">
+              <Button
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                onClick={() => {
+                  if (draftInfo?.data) setFormData(draftInfo.data);
+                  toast.success("Taslak yüklendi");
+                  setShowDraftDialog(false);
+                }}
+              >
+                Devam Et
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  clearDraft();
+                  setShowDraftDialog(false);
+                }}
+              >
+                Yoksay
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <Link to={createPageUrl("MyTestPackages")} className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
@@ -9,21 +9,32 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ArrowLeft, Save, WrenchIcon } from "lucide-react";
+import { ArrowLeft, Save, WrenchIcon, History } from "lucide-react";
 import { Link } from "react-router-dom";
 import { buildPageUrl, useAppNavigate } from "@/lib/navigation";
 import { useServiceStatus } from "@/lib/useServiceStatus";
 import OnboardingTour from "@/components/onboarding/OnboardingTour";
 import { useShouldShowTour, useCompleteTour, TOUR_KEYS } from "@/lib/useOnboarding";
 import { EDUCATOR_CREATE_STEPS } from "@/components/onboarding/tourSteps";
+// Sayfa kapatma / yenileme durumunda form verisi kaybolmasın
+import { useAutoSave } from "@/lib/useAutoSave";
+import { format } from "date-fns";
+import { tr } from "date-fns/locale";
 
+/**
+ * CreateTest — Eğiticinin yeni test paketi oluşturduğu sayfa.
+ * useAutoSave ile form verisi 30 saniyede bir ve sayfa kapatılırken localStorage'a yedeklenir.
+ * Kaza ile kapatma / yenileme sonrası taslak kurtarma diyaloğu gösterilir.
+ */
 export default function CreateTest() {
   const { user } = useAuth();
   const navigate = useAppNavigate();
   const { packageCreationEnabled } = useServiceStatus();
   const showCreateTour = useShouldShowTour(TOUR_KEYS.EDUCATOR_CREATE);
   const completeTour = useCompleteTour();
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -33,6 +44,51 @@ export default function CreateTest() {
     duration_minutes: 60,
     is_timed: false,
   });
+
+  // Taslak kurtarma diyaloğu gösterilsin mi
+  const [showDraftDialog, setShowDraftDialog] = useState(false);
+  const [draftInfo, setDraftInfo] = useState(null);
+
+  // Kullanıcıya özel taslak anahtarı; test ID yoktur henüz
+  const draftKey = user?.id ? `createTest_${user.id}` : null;
+
+  // formData'yı her zaman güncel almak için callback — re-render'da yeniden oluşmaz
+  const getFormData = useCallback(() => formData, [formData]);
+
+  const { hasDraft, loadDraft, clearDraft } = useAutoSave(
+    draftKey ?? '__noop__',
+    getFormData,
+    { enabled: !!draftKey },
+  );
+
+  // Mount'ta taslak kontrolü
+  useEffect(() => {
+    if (!draftKey) return;
+    if (hasDraft()) {
+      const draft = loadDraft();
+      if (draft?.data?.title) {
+        // Başlık dolu bir taslak var — kurtarma teklifini göster
+        setDraftInfo(draft);
+        setShowDraftDialog(true);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+
+  // Taslaktan devam et
+  const handleRestoreDraft = () => {
+    if (draftInfo?.data) {
+      setFormData(draftInfo.data);
+      toast.success("Taslak yüklendi");
+    }
+    setShowDraftDialog(false);
+  };
+
+  // Taslağı sil, sıfırdan başla
+  const handleDiscardDraft = () => {
+    clearDraft();
+    setShowDraftDialog(false);
+  };
 
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
@@ -63,6 +119,8 @@ export default function CreateTest() {
       });
     },
     onSuccess: (newTest) => {
+      // Başarılı oluşturma — taslağa gerek yok artık
+      clearDraft();
       toast.success("Test oluşturuldu!");
       navigate(buildPageUrl("EditTest", { id: newTest.id }), { replace: true });
     },
@@ -120,8 +178,57 @@ export default function CreateTest() {
     );
   }
 
+  // Taslak zamanını okunabilir formatta göster
+  const draftSavedAt = draftInfo?.savedAt
+    ? (() => {
+        try {
+          return format(new Date(draftInfo.savedAt), "d MMM yyyy HH:mm", { locale: tr });
+        } catch {
+          return draftInfo.savedAt;
+        }
+      })()
+    : null;
+
   return (
     <div className="max-w-2xl mx-auto">
+      {/* ─── Taslak kurtarma diyaloğu ─── */}
+      <Dialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5 text-indigo-600" />
+              Kaydedilmemiş Taslak
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              <strong>"{draftInfo?.data?.title}"</strong> başlıklı kaydedilmemiş bir taslak bulundu.
+              {draftSavedAt && (
+                <span className="text-slate-400"> ({draftSavedAt} tarihinde)</span>
+              )}
+            </p>
+            <p className="text-sm text-slate-500">
+              Kaldığınız yerden devam etmek ister misiniz?
+            </p>
+            <div className="flex gap-3">
+              <Button
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                onClick={handleRestoreDraft}
+              >
+                Devam Et
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={handleDiscardDraft}
+              >
+                Sil, Yeniden Başla
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Educator test-creation onboarding tour */}
       {showCreateTour && (
         <OnboardingTour

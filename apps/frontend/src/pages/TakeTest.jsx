@@ -32,6 +32,12 @@ import { useServiceStatus } from "@/lib/useServiceStatus";
 import OnboardingTour from "@/components/onboarding/OnboardingTour";
 import { useShouldShowTour, useCompleteTour, TOUR_KEYS } from "@/lib/useOnboarding";
 import { CANDIDATE_TEST_STEPS } from "@/components/onboarding/tourSteps";
+// Offline koruma: bağlantı koptuğunda otomatik kaydet ve çık
+import { useOffline } from "@/lib/useOffline";
+// Cevap kuyruğu: offline iken cevapları localStorage'da beklet
+import { useAnswerQueue } from "@/lib/useAnswerQueue";
+// Offline overlay bileşeni
+import OfflineBanner from "@/components/ui/OfflineBanner";
 
 // Map Dal question/options to Sınav Salonu format
 function toUIStyle(questions, stateQuestions) {
@@ -282,10 +288,35 @@ export default function TakeTest() {
 
   const queryClient = useQueryClient();
 
+  // ─── Offline & cevap kuyruğu ─────────────────────────────────────────────
+
+  // saveAndExit tanımı — offline auto-exit callback'i için önceden tanımla
+  const handleSaveAndExit = useCallback(() => {
+    toast.info("Bağlantı kesildi — ilerlemeniz kaydedildi, çıkılıyor...");
+    setTimeout(() => {
+      navigate(createPageUrl("MyTests"), { replace: true });
+    }, 1500);
+  }, [navigate]);
+
+  // Bağlantı kesintisi yönetimi: 30 saniye bağlanamazsa otomatik çık
+  const { isOffline, remainingSeconds } = useOffline({
+    // Test aktifken (başladıktan sonra, bitmeden önce) offline koruması çalışsın
+    enabled: testStarted && !testFinished && !isReviewMode,
+    onAutoExit: handleSaveAndExit,
+    autoExitSeconds: 30,
+  });
+
+  // localStorage destekli cevap kuyruğu
+  const { submitAnswer: queuedSubmitAnswer, pendingCount, isFlushing, clearQueue } = useAnswerQueue(
+    resolvedAttemptId ?? null,
+  );
+
   const finishMutation = useMutation({
     mutationFn: () => base44.entities.Attempt.finish(resolvedAttemptId),
     onSuccess: (data) => {
       setResult(data);
+      // Test bitti — localStorage cevap kuyruğunu temizle
+      clearQueue();
       queryClient.invalidateQueries({ queryKey: ["attemptState", resolvedAttemptId] });
       queryClient.invalidateQueries({ queryKey: ["myResults", user?.email] });
       queryClient.invalidateQueries({ queryKey: ["purchases", user?.id, testId] });
@@ -324,13 +355,7 @@ export default function TakeTest() {
     return () => clearInterval(timer);
   }, [testStarted, testFinished, test, isReviewMode, resolvedAttemptId]);
 
-  const answerMutation = useMutation({
-    mutationFn: ({ questionId, optionId }) =>
-      base44.entities.Attempt.submitAnswer(resolvedAttemptId, questionId, optionId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["attemptState", resolvedAttemptId] });
-    },
-  });
+  // answerMutation yerine useAnswerQueue kullanılıyor — localStorage yedekli, retry'lı
 
   const { testAttemptsEnabled } = useServiceStatus();
 
@@ -361,8 +386,10 @@ export default function TakeTest() {
     const letter = q.options?.find((o) => o.id === optionId)
       ? ["A", "B", "C", "D", "E"][q.options.findIndex((o) => o.id === optionId)]
       : null;
+    // Önce React state güncelle (anlık UI geri bildirimi)
     setAnswers((prev) => ({ ...prev, [q.id]: letter }));
-    answerMutation.mutate({ questionId: q.id, optionId });
+    // Kuyruğa ekle + API'ye gönder (offline ise kuyrukta bekler)
+    queuedSubmitAnswer(q.id, optionId);
   };
 
   const clearAnswer = () => {
@@ -374,7 +401,8 @@ export default function TakeTest() {
       delete next[q.id];
       return next;
     });
-    answerMutation.mutate({ questionId: q.id, optionId: undefined });
+    // Boş bırakma — optionId undefined olarak kuyruğa ekle
+    queuedSubmitAnswer(q.id, undefined);
   };
 
   const toggleFlag = () => {
@@ -622,6 +650,15 @@ export default function TakeTest() {
 
   return (
     <div className="max-w-4xl mx-auto">
+      {/* Offline overlay — bağlantı koptuğunda tüm test arayüzünü kapatır */}
+      <OfflineBanner
+        isOffline={isOffline}
+        remainingSeconds={remainingSeconds}
+        pendingCount={pendingCount}
+        isFlushing={isFlushing}
+        onManualExit={saveAndExit}
+      />
+
       <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4 flex-wrap">
           {isReviewMode && (

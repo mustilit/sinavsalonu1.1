@@ -134,7 +134,11 @@ export async function apiRequest(path, opts = {}) {
       e.code = 'TIMEOUT';
       throw e;
     }
-    throw err;
+    // Ağ hatası: sunucu hiç cevap vermedi (hat kopması, DNS, vb.)
+    // Bu hata 401 değildir — kullanıcı oturumu kapatılmamalı
+    const netErr = err instanceof Error ? err : new Error(String(err));
+    if (!netErr.code) netErr.code = 'NETWORK_ERROR';
+    throw netErr;
   }
   clearTimeout(timeoutId);
 
