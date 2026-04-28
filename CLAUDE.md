@@ -1,168 +1,152 @@
-# Sınav Salonu — Claude Code Proje Kuralları
+# Sinav Salonu
 
-Bu dosya, Claude Code'un bu projede çalışırken uyması gereken proje standartlarını tanımlar.
-Her oturumda otomatik olarak okunur.
+Test marketplace uygulaması. Eğiticiler (educators) sınav (test) oluşturur ve satar; öğrenciler satın alır, çözer, skorlarını takip eder.
 
----
+## Stack
 
-## 🌐 Dil: Türkçe Yorum Zorunluluğu
+- **Frontend:** React 18 + Vite, JavaScript (JSX), Tailwind CSS, React Router DOM v6, TanStack Query
+- **Backend:** NestJS (REST + DTO + Validation), Clean Architecture (Use Cases katmanı)
+- **Veritabanı:** PostgreSQL + Prisma ORM
+- **Test:** Vitest + Testing Library (frontend), Jest (NestJS), Playwright (e2e)
+- **Paket yöneticisi:** npm (backend ve frontend ayrı `package.json`; kök `package.json` yalnızca Husky + lint-staged içerir)
+- **Konteyner:** Docker Compose (geliştirme + üretim + yerel staging)
 
-**Her yeni veya değiştirilen kod parçasına Türkçe açıklama yorumu eklemek zorunludur.**
-
-Bu kural aşağıdaki tüm kod elementleri için geçerlidir:
-
-### Backend (TypeScript)
-
-```typescript
-// ─── Doğru yorum stili ───────────────────────────────────────────────────
-
-/**
- * Kullanıcının satın aldığı test paketlerini listeler.
- * Eğitici sahipliğine göre filtreleme yapılabilir.
- */
-export class ListMyPurchasesUseCase { ... }
-
-// Sayfa boyutu: varsayılan 20, maksimum 100
-const PAGE_SIZE = parseInt(process.env.PAGE_SIZE ?? '20', 10);
-
-// Kullanıcı rollerini normalize et — backend bazen küçük harf döndürür
-function normalizeRole(role: string) { ... }
-```
-
-### Frontend (JSX / JavaScript)
-
-```jsx
-// Sınav türü ID'lerini virgülle birleştir; API query parametresi olarak kullanılır
-const examTypeIdsParam = examTypeIds.join(',');
-
-/**
- * Onboarding turunu tamamlandı olarak işaretler.
- * Backend'e kaydeder + session storage'a yazar (aynı oturumda tekrar açılmasın).
- */
-export function useCompleteTour() { ... }
-
-{/* Bakım modu aktifken satın alma butonu yerine uyarı bandı göster */}
-{!purchasesEnabled && (
-  <MaintenanceBanner />
-)}
-```
-
-### Kural Detayları
-
-| Element | Yorum Tipi | Zorunluluk |
-|---------|------------|------------|
-| Class / UseCase | JSDoc `/** */` | ✅ Zorunlu |
-| Fonksiyon / Hook | JSDoc veya `//` | ✅ Zorunlu |
-| Sabit (const/let, önemsiz olmayan) | `//` satır yorumu | ✅ Zorunlu |
-| Interface / Type | JSDoc `/** */` | ✅ Zorunlu |
-| React component | JSDoc veya satır yorumu | ✅ Zorunlu |
-| JSX blokları (koşullu render vb.) | `{/* */}` | ✅ Önemli bloklara |
-| shadcn/ui wrapper (accordion, badge…) | — | ❌ Gerekmez |
-| Prisma migration SQL | `--` SQL yorumu | ✅ Zorunlu |
-
-### Neyi Yorumlamak Gerekir?
-
-- **Niçin** yapıldığı açık değilse (iş kuralı, edge case, workaround)
-- Parametre **ne anlama geliyor** (özellikle boolean flag'ler)
-- **Hata yönetimi** mantığı (neden bu hata fırlatılıyor?)
-- **Performans kararları** (neden bu indeks, neden bu cache süresi?)
-- **Sıralama / limit** gibi magic number'lar
-- Karmaşık SQL / Prisma sorguları
-
-### Neyi Yorumlamak Gerekmez?
-
-- Kendini açıklayan basit atamalar (`const name = user.name`)
-- Standart React hook kullanımları (`useState`, `useEffect` gibi)
-- Import satırları (açık olmadıkça)
-- shadcn/ui bileşen implementasyonları
-
----
-
-## 🏗️ Mimari
+## Dizin Yapısı (gerçek)
 
 ```
-dal/
-├── apps/
-│   ├── backend/          # NestJS + Prisma + Clean Architecture
-│   │   ├── src/
-│   │   │   ├── application/   # Use-case'ler, servisler, policy'ler
-│   │   │   ├── domain/        # Entity'ler, interface'ler, tip tanımları
-│   │   │   ├── infrastructure/# Prisma repository implementasyonları
-│   │   │   ├── nest/          # Controller'lar, DTO'lar, Guard'lar, Module
-│   │   │   └── config/        # Ortam değişkenleri, DB URL, Redis
-│   │   └── prisma/            # Schema ve migration'lar
-│   └── frontend/         # Vite + React + TailwindCSS
-│       └── src/
-│           ├── api/       # Backend API istemcileri
-│           ├── components/# Paylaşılan bileşenler
-│           ├── lib/       # Hook'lar, context, yardımcı fonksiyonlar
-│           └── pages/     # Sayfa bileşenleri (route başına 1 dosya)
-├── infra/                # Docker, nginx
-└── docs/                 # Geliştirici belgeleri
+apps/
+  backend/               → NestJS backend
+    src/
+      application/
+        use-cases/       → İş mantığı buradadır (UseCase sınıfları)
+        services/        → Yardımcı servisler (ReviewAggregation vb.)
+      domain/
+        interfaces/      → Repository arayüzleri
+        types.ts         → Domain tipleri (AdminSettings vb.)
+      infrastructure/
+        repositories/    → Prisma repository implementasyonları
+        database/        → Prisma client singleton
+      nest/
+        controllers/     → HTTP katmanı (ince — iş mantığı YOK)
+        controllers/dto/ → DTO sınıfları (class-validator)
+        guards/          → JWT, Roles, WorkerPermissions
+        decorators/      → @Public, @Roles, @WorkerPermissions
+        modules/         → NestJS modülleri (cron, vb.)
+        services/        → BackupSchedulerService vb. NestJS servisleri
+    prisma/
+      schema.prisma      → Tek şema dosyası
+      migrations/        → Numbered migration SQL dosyaları
+  frontend/              → React/Vite frontend
+    src/
+      pages/             → Sayfa bileşenleri (Her route bir dosya)
+      components/        → Paylaşılan React bileşenleri
+        layout/          → Sidebar, Header, Layout
+        ui/              → Radix UI primitive'leri (shadcn tarzı)
+        test/            → Test'e özgü bileşenler
+      api/
+        dalClient.js     → Tüm API çağrıları burada merkezi
+      lib/               → Util fonksiyonları, hook'lar
+      pages.config.js    → Sayfa-route eşlemesi
+      lib/routeRoles.js  → Sayfa bazlı rol erişim kontrolü
+infra/
+  docker/
+    docker-compose.yml            → Geliştirme ortamı
+    docker-compose.prod.yml       → Üretim ortamı
+    docker-compose.local-staging.yml → Yerel staging ortamı
+    backend.Dockerfile
+    frontend.Dockerfile           → Nginx tabanlı (CSP başlıkları dahil)
+  nginx/
+    default.conf         → CSP-Report-Only, SPA fallback, gzip, asset cache
+scripts/
+  staging.sh             → Yerel staging ortamı yönetim betiği
+.github/
+  dependabot.yml         → Otomatik bağımlılık güncelleme (haftalık, gruplu)
+  workflows/             → CI/CD
+.husky/
+  pre-commit             → Backend tsc + frontend lint-staged
+.lintstagedrc.cjs        → Staged JS/JSX dosyaları için ESLint
 ```
 
----
+## Domain Sözlüğü
 
-## 🔑 Temel Kurallar
+- **Test (ExamTest):** Satılabilir sınav paketi. Alanlar: `title`, `description`, `price`, `durationMinutes`, `questions[]`
+- **TestPackage:** Birden fazla Test'i bir araya getiren paket. `maxTestsPerPackage` admin ayarı ile sınırlandırılır.
+- **ExamQuestion (Soru):** Teste ait çoktan seçmeli soru. Alanlar: `content`, `choices[]`, `correctIndex`, `explanation`
+- **Attempt (Deneme):** Kullanıcının bir sınavı çözme oturumu.
+- **User:** Rol `STUDENT | EDUCATOR | ADMIN`. Educator sınav yazar ve satar. AUTHOR terimi kullanılmaz.
+- **Purchase:** Kullanıcı-Test ilişkisi, ödeme kaydı.
+- **AdminSettings:** Admin panelinden yönetilen global ayarlar (komisyon, içerik limitleri, **yedekleme zamanlayıcısı**).
+- **BackupLog:** Veritabanı yedekleme sonuçlarının audit log kaydı.
+- **DiscountCode:** Eğiticinin oluşturduğu indirim kodu.
+- **AdPackage / AdPurchase:** Reklam paketi ve satın alma kaydı.
 
-### Backend
+## Komutlar
 
-- **Clean Architecture**: Use-case'ler domain'e bağımlı, controller'lar use-case'e bağımlı
-- **AppError**: İş kuralı hataları `AppError` ile fırlatılır, HTTP koduna controller'da dönüşür
-- **Prisma singleton**: Constructor injection yoksa `import { prisma } from '../../infrastructure/database/prisma'` kullan
-- **Kill-switch pattern**: Admin ayarları `adminSettings.purchasesEnabled` gibi boolean flag'ler; `=== false` kontrol et (fail-open)
-- **Migrations**: Her şema değişikliği için `apps/backend/prisma/migrations/` altına SQL migration ekle
+```bash
+# Backend
+cd apps/backend
+npm run dev           # tsx watch ile geliştirme
+npm test              # Jest unit testleri
+npm run db:migrate    # prisma migrate dev
 
-### Frontend
+# Frontend
+cd apps/frontend
+npm run dev           # Vite dev server
+npm test              # Vitest
+npm run lint          # ESLint
+npm run typecheck     # tsc --noEmit (jsconfig.json)
 
-- **useServiceStatus()**: Kill-switch flag'lerini `staleTime: 60s`, `placeholderData: DEFAULTS` (fail-open) ile çek
-- **useOnboarding**: Tur durumu `user[tourKey]` + sessionStorage; tamamlama `PATCH /me/preferences`
-- **api client**: Tüm backend istekleri `@/lib/api/apiClient` üzerinden; doğrudan `fetch` kullanma
-- **routeRoles.js**: Her yeni sayfa `PAGE_ROLES` nesnesine eklenmeli
-- **pages.config.js**: Her yeni sayfa bu dosyaya import + PAGES nesnesine eklenmeli
-
----
-
-## 📋 Yorum Şablonları
-
-### UseCase
-
-```typescript
-/**
- * [İşlem adı] — [kısaca ne yapar]
- *
- * Ön koşullar:
- *   - [gerekli durum / permission]
- *
- * Hata senaryoları:
- *   - [AppError kodu]: [ne zaman fırlatılır]
- */
-export class XyzUseCase {
-  async execute(...) { ... }
-}
+# Yerel Staging (repo kökünden)
+./scripts/staging.sh up          # Derle ve başlat
+./scripts/staging.sh down        # Durdur
+./scripts/staging.sh reset       # DB sıfırla
+./scripts/staging.sh logs        # Canlı log
 ```
 
-### React Hook
+## Kodlama Kuralları
 
-```js
-/**
- * [Hook adı] — [ne döndürür / ne yapar]
- *
- * @param {string} tourKey - TOUR_KEYS sabitlerinden biri
- * @returns {boolean} - tur gösterilmeli mi
- */
-export function useXyz(param) { ... }
-```
+**Backend**
+- Controller ince — yalnızca HTTP ↔ UseCase köprüsü. İş mantığı Use Case'te.
+- Her endpoint için `Use Case` sınıfı (`apps/backend/src/application/use-cases/`).
+- DTO'lar `class-validator` ile, her endpoint için ayrı. `apps/backend/src/nest/controllers/dto/`.
+- Prisma query'leri yalnızca Repository veya Use Case içinde — controller'da direkt Prisma yasak.
+- Birden fazla tablo değişiyorsa `prisma.$transaction`.
+- Async fonksiyonlar `try/catch` yerine NestJS exception filter'a güvensin.
 
-### React Component
+**Frontend**
+- Fonksiyonel component, named export. Varsayılan export yok.
+- API çağrıları yalnızca `dalClient.js` üzerinden — component'te direkt `fetch`/`axios` yasak.
+- Sayfalar `apps/frontend/src/pages/` altında; her route bir `.jsx` dosyası.
+- Rol kontrolü `apps/frontend/src/lib/routeRoles.js` ile merkezi yapılır.
+- Tailwind utility-first. Dinamik class ismi üretme (`bg-${color}-500`) yasak.
 
-```jsx
-/**
- * [Bileşen adı] — [ne gösterir / hangi sayfada kullanılır]
- *
- * Props:
- *   steps    : adım tanımları dizisi
- *   onComplete: son adımda tetiklenir
- */
-export default function XyzComponent({ steps, onComplete }) { ... }
-```
+**Genel**
+- Türkçe/İngilizce: kod İngilizce, UI Türkçe, yorumlar Türkçe olabilir.
+- Pre-commit hook otomatik çalışır: backend `tsc --noEmit` + frontend ESLint (staged dosyalar).
+
+## Yeni Özellikler (son eklenenler)
+
+- **Yedekleme zamanlayıcısı:** Admin panelinden saat ve dizin seçilerek otomatik `pg_dump` → gzip yedekleme. Son 2 gün saklanır. `BackupLog` tablosuna sonuç yazılır.
+- **Kopya soru tespiti:** Eğitici soru girerken (blur), aynı eğiticinin diğer sorularıyla Jaccard benzerliği ≥ %75 ise amber uyarı gösterilir. Israr ederek devam edilebilir.
+- **Nginx (CSP):** Frontend `Content-Security-Policy-Report-Only` başlığıyla sunulur. `infra/nginx/default.conf`.
+- **Yerel staging:** `docker-compose.local-staging.yml` + `scripts/staging.sh` ile izole lokal test ortamı.
+
+## Delege Rehberi
+
+| Task tipi | Agent |
+|---|---|
+| Kod inceleme / PR review | `code-reviewer` |
+| Unit/integration test | `test-writer` |
+| Playwright e2e test | `e2e-writer` |
+| Yeni sayfa, form, UI bileşeni | `ui-builder` |
+| Yeni endpoint, şema, Use Case | `backend-architect` |
+| Duplikasyon temizliği, isim refaktörü | `refactor-specialist` |
+| Mimari karar, kütüphane seçimi | `advisor` |
+
+## Slash Komutlar
+
+- `/ship "<commit-mesajı>"` — typecheck + lint + test + commit + push zinciri
+
+## İmportlar
+
+@.claude/skills/exam-domain/SKILL.md  <!-- domain modeli detayları -->
