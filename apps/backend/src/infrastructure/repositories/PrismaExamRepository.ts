@@ -250,8 +250,8 @@ export class PrismaExamRepository implements IExamRepository {
           testId,
           content: question.content,
           order: question.order,
-          ...(question.solutionText !== undefined && { solutionText: question.solutionText }),
-          ...(question.solutionMediaUrl !== undefined && { solutionMediaUrl: question.solutionMediaUrl }),
+          ...((question as any).solutionText !== undefined && { solutionText: (question as any).solutionText }),
+          ...((question as any).solutionMediaUrl !== undefined && { solutionMediaUrl: (question as any).solutionMediaUrl }),
           options: {
             create: question.options.map((o) => ({
               id: o.id,
@@ -325,7 +325,7 @@ export class PrismaExamRepository implements IExamRepository {
   async publish(id: string): Promise<ExamWithQuestions | null> {
     const updated = await prisma.examTest.update({
       where: { id },
-      data: { publishedAt: new Date() },
+      data: { status: 'PUBLISHED', publishedAt: new Date() },
       include: {
         questions: { include: { options: true }, orderBy: { order: 'asc' } },
       },
@@ -336,7 +336,7 @@ export class PrismaExamRepository implements IExamRepository {
   async unpublish(id: string): Promise<ExamWithQuestions | null> {
     const updated = await prisma.examTest.update({
       where: { id },
-      data: { publishedAt: null },
+      data: { status: 'DRAFT', publishedAt: null },
       include: {
         questions: { include: { options: true }, orderBy: { order: 'asc' } },
       },

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { entities, auth } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -28,7 +28,7 @@ export default function SelectExamTypes() {
   // Sadece aktif sınav türlerini listele
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
   });
 
   // Kullanıcı durumuna göre yönlendirme mantığı:
@@ -70,7 +70,7 @@ export default function SelectExamTypes() {
 
     setSaving(true);
     try {
-      await base44.auth.updateMe({ interested_exam_types: selectedExams });
+      await auth.updateMe({ interested_exam_types: selectedExams });
       toast.success("Tercihleriniz kaydedildi");
       navigate(createPageUrl("Explore"));
     } catch (error) {

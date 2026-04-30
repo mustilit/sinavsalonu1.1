@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import api from "@/lib/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Edit2, Trash2, Award } from "lucide-react";
 import {
   Dialog,
@@ -32,49 +32,55 @@ export default function ManageExamTypes() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingExam, setEditingExam] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
-  const [formData, setFormData] = useState({ name: "", description: "", is_active: true });
+  const [formData, setFormData] = useState({ name: "", description: "", active: true });
   const queryClient = useQueryClient();
 
   const { data: examTypes = [], isLoading } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.list("-created_date"),
+    queryFn: async () => {
+      const { data } = await api.get("/admin/exam-types", { params: { activeOnly: "false" } });
+      return Array.isArray(data) ? data : (data?.items ?? []);
+    },
     enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.ExamType.create(data),
+    mutationFn: (data) => api.post("/admin/exam-types", data),
     onSuccess: () => {
       toast.success("Sınav türü oluşturuldu");
       queryClient.invalidateQueries({ queryKey: ["examTypes"] });
       closeDialog();
     },
+    onError: (e) => toast.error(e?.response?.data?.message ?? "Oluşturma başarısız"),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.ExamType.update(id, data),
+    mutationFn: ({ id, data }) => api.patch(`/admin/exam-types/${id}`, data),
     onSuccess: () => {
       toast.success("Sınav türü güncellendi");
       queryClient.invalidateQueries({ queryKey: ["examTypes"] });
       closeDialog();
     },
+    onError: (e) => toast.error(e?.response?.data?.message ?? "Güncelleme başarısız"),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.ExamType.delete(id),
+    mutationFn: (id) => api.delete(`/admin/exam-types/${id}`),
     onSuccess: () => {
       toast.success("Sınav türü silindi");
       queryClient.invalidateQueries({ queryKey: ["examTypes"] });
       setDeleteId(null);
     },
+    onError: (e) => toast.error(e?.response?.data?.message ?? "Silme başarısız"),
   });
 
   const openDialog = (exam = null) => {
     if (exam) {
       setEditingExam(exam);
-      setFormData({ name: exam.name, description: exam.description || "", is_active: exam.is_active });
+      setFormData({ name: exam.name, description: exam.description || "", active: exam.active ?? true });
     } else {
       setEditingExam(null);
-      setFormData({ name: "", description: "", is_active: true });
+      setFormData({ name: "", description: "", active: true });
     }
     setShowDialog(true);
   };
@@ -82,7 +88,7 @@ export default function ManageExamTypes() {
   const closeDialog = () => {
     setShowDialog(false);
     setEditingExam(null);
-    setFormData({ name: "", description: "", is_active: true });
+    setFormData({ name: "", description: "", active: true });
   };
 
   const handleSubmit = () => {
@@ -149,11 +155,11 @@ export default function ManageExamTypes() {
                   </div>
                   <div className="flex items-center gap-4">
                     <span className={`text-sm px-3 py-1 rounded-full ${
-                      exam.is_active 
+                      exam.active 
                         ? "bg-emerald-100 text-emerald-700" 
                         : "bg-slate-100 text-slate-600"
                     }`}>
-                      {exam.is_active ? "Aktif" : "Pasif"}
+                      {exam.active ? "Aktif" : "Pasif"}
                     </span>
                     <Button variant="ghost" size="sm" onClick={() => openDialog(exam)}>
                       <Edit2 className="w-4 h-4" />
@@ -203,8 +209,8 @@ export default function ManageExamTypes() {
             <div className="flex items-center justify-between">
               <Label>Aktif</Label>
               <Switch
-                checked={formData.is_active}
-                onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
+                checked={formData.active}
+                onCheckedChange={(v) => setFormData({ ...formData, active: v })}
               />
             </div>
             <div className="flex gap-3 justify-end pt-4">

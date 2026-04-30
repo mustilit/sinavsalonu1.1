@@ -1,8 +1,8 @@
-// Load env from .env only if not already provided by the environment (e.g. Docker compose)
-if (!process.env.DATABASE_URL || !process.env.JWT_SECRET) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require('dotenv').config();
-}
+// dotenv/config must be the FIRST import so DATABASE_URL is available
+// when PrismaClient is instantiated in subsequent module imports.
+// tsx (esbuild) hoists static imports, so require('dotenv').config()
+// in synchronous code would run AFTER prisma.ts is evaluated — too late.
+import 'dotenv/config';
 
 // Entrypoint: bootstrap Nest application
 import './nest/main';

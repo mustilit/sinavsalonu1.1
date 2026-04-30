@@ -17,10 +17,10 @@ import type { PrismaClient } from '@prisma/client';
 export class SiteController {
   constructor(
     @Inject('PRISMA') private readonly prisma: PrismaClient,
-    private readonly getSiteSettings: GetSiteSettingsUseCase,
-    private readonly listExamTypes: ListExamTypesUseCase,
-    private readonly listFeaturedEducators: ListFeaturedEducatorsUseCase,
-    private readonly getPopularPackages: GetPopularPackagesUseCase,
+    @Inject(GetSiteSettingsUseCase) private readonly getSiteSettings: GetSiteSettingsUseCase,
+    @Inject(ListExamTypesUseCase) private readonly listExamTypes: ListExamTypesUseCase,
+    @Inject(ListFeaturedEducatorsUseCase) private readonly listFeaturedEducators: ListFeaturedEducatorsUseCase,
+    @Inject(GetPopularPackagesUseCase) private readonly getPopularPackages: GetPopularPackagesUseCase,
   ) {}
 
   @Get('settings')
@@ -73,7 +73,7 @@ export class SiteController {
   @Get('popular-packages')
   @Public()
   @ApiOkResponse({ description: 'Popular test packages sorted by purchase count' })
-  async getPopularPackages(
+  async listPopularPackages(
     @Query('examTypeIds') examTypeIds?: string,
     @Query('limit') limit?: string,
   ) {

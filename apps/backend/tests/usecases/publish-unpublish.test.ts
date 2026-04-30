@@ -1,6 +1,14 @@
 import { PublishTestUseCase } from '../../src/application/use-cases/PublishTestUseCase';
 import { UnpublishTestUseCase } from '../../src/application/use-cases/UnpublishTestUseCase';
 
+// QueueService mock — UnpublishTestUseCase içinde dinamik require ile çağrılır;
+// gerçek bağlantı olmadığında 20sn timeout'a düşmemesi için mock edilir.
+jest.mock('../../src/infrastructure/queue/queue.service', () => ({
+  QueueService: jest.fn().mockImplementation(() => ({
+    enqueueJob: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
+
 class FakeExamRepo {
   private store: any = {};
   async findById(id: string) {
@@ -57,4 +65,3 @@ describe('Publish/Unpublish UseCases', () => {
     expect(res.publishedAt).toBeNull();
   });
 });
-

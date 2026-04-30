@@ -4,7 +4,7 @@ import { prisma } from '../database/prisma';
 import { processTestStatsRefresh } from './stats.processor';
 import { getRedisConnectionOptions, validateRedisUrl } from '../../config/redis';
 
-if (process.env.REDIS_DISABLED === '1' || process.env.REDIS_DISABLED === 'true') {
+if ((process.env.REDIS_DISABLED === '1' || process.env.REDIS_DISABLED === 'true') && require.main === module) {
   // eslint-disable-next-line no-console
   console.log('[WORKER] Redis disabled; exiting.');
   process.exit(0);

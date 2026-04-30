@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Body, Req } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Req, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiNotFoundResponse, ApiConflictResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Public } from '../../decorators/public.decorator';
 import { Roles } from '../../decorators/roles.decorator';
@@ -24,6 +24,7 @@ export class ContractsController {
   }
 
   @Post('accept')
+  @HttpCode(200)
   @Roles('CANDIDATE', 'EDUCATOR', 'ADMIN')
   @ApiBearerAuth('bearer')
   @ApiOkResponse({ description: 'Contract accepted (or already accepted)' })

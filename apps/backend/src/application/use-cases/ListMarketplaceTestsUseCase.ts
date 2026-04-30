@@ -72,11 +72,20 @@ export class ListMarketplaceTestsUseCase {
     // Test ID'lerine göre toplu puan ortalamaları çekilerek her teste eklenir
     const items = res.items;
     const ids = items.map((t) => t.id);
+    // Önce testStats tablosundaki önceden hesaplanmış değerleri çek
+    const { prisma } = require('../../infrastructure/database/prisma');
+    const statsRows: Array<{ testId: string; ratingAvg: number | null; ratingCount: number }> =
+      ids.length > 0
+        ? await prisma.testStats.findMany({ where: { testId: { in: ids } }, select: { testId: true, ratingAvg: true, ratingCount: true } })
+        : [];
+    const statsMap: Record<string, { ratingAvg: number | null; ratingCount: number }> = {};
+    for (const s of statsRows) statsMap[s.testId] = { ratingAvg: s.ratingAvg, ratingCount: s.ratingCount };
+    // Fallback: testStats yoksa canlı review toplamlarından hesapla
     const aggs = await this.agg.getAggregatesForTestIds(ids);
     const enriched = items.map((t) => ({
       ...t,
-      ratingAvg: aggs[t.id]?.avg ?? null,
-      ratingCount: aggs[t.id]?.count ?? 0,
+      ratingAvg: statsMap[t.id]?.ratingAvg ?? aggs[t.id]?.avg ?? null,
+      ratingCount: statsMap[t.id]?.ratingCount ?? aggs[t.id]?.count ?? 0,
     }));
 
     // Sadece gerekli alanlar istemciye döner (bilgi minimizasyonu)

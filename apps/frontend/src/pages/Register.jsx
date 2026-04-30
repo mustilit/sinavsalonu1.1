@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { auth } from '@/api/dalClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createPageUrl } from '@/utils';
@@ -20,13 +20,13 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const navigate = useAppNavigate();
 
-  // base44 auth API'si üzerinden kayıt oluşturur; hata varsa ekranda gösterir
+  // Auth API'si üzerinden kayıt oluşturur; hata varsa ekranda gösterir
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await base44.auth.register(email, username, password);
+      await auth.register(email, username, password);
       navigate(createPageUrl('Login'), { replace: true });
     } catch (err) {
       setError(err?.response?.data?.error || 'Kayıt başarısız.');

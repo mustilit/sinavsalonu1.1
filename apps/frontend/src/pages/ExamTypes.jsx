@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -12,12 +12,12 @@ export default function ExamTypes() {
 
   const { data: examTypes = [], isLoading } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
   });
 
   const { data: allTests = [] } = useQuery({
     queryKey: ["allPublishedTests"],
-    queryFn: () => base44.entities.TestPackage.filter({ is_published: true }),
+    queryFn: () => entities.TestPackage.filter({ is_published: true }),
   });
 
   // Count tests for each exam type

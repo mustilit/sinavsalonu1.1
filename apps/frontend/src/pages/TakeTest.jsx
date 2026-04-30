@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
-import api from "@/api/dalClient";
+import { entities } from "@/api/dalClient";
+import api from "@/lib/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -110,7 +110,7 @@ export default function TakeTest() {
 
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases", user?.id, testId],
-    queryFn: () => base44.entities.Purchase.filter({ test_package_id: testId }),
+    queryFn: () => entities.Purchase.filter({ test_package_id: testId }),
     enabled: !!user && !!testId,
   });
 
@@ -126,7 +126,7 @@ export default function TakeTest() {
 
   const { data: attemptState } = useQuery({
     queryKey: ["attemptState", resolvedAttemptId],
-    queryFn: () => base44.entities.Attempt.getState(resolvedAttemptId),
+    queryFn: () => entities.Attempt.getState(resolvedAttemptId),
     enabled: !!resolvedAttemptId && !!user,
   });
 
@@ -169,20 +169,20 @@ export default function TakeTest() {
 
   const { data: resultData } = useQuery({
     queryKey: ["attemptResult", resolvedAttemptId],
-    queryFn: () => base44.entities.Attempt.getResult(resolvedAttemptId),
+    queryFn: () => entities.Attempt.getResult(resolvedAttemptId),
     enabled: !!resolvedAttemptId && !!user && testFinished,
   });
 
   const { data: allResults = [] } = useQuery({
     queryKey: ["testAverages", testId],
-    queryFn: () => base44.entities.TestResult.filter({ user_email: user?.email, test_package_id: testId }),
+    queryFn: () => entities.TestResult.filter({ user_email: user?.email, test_package_id: testId }),
     enabled: !!testId && !!user && testFinished,
   });
 
   const { data: existingTestReview } = useQuery({
     queryKey: ["testReview", testId, user?.id],
     queryFn: async () => {
-      const reviews = await base44.entities.Review.filter({
+      const reviews = await entities.Review.filter({
         test_package_id: testId,
         reviewer_email: user.email,
         review_type: "test",
@@ -195,7 +195,7 @@ export default function TakeTest() {
   const { data: existingEducatorReview } = useQuery({
     queryKey: ["educatorReview", testPackage?.educator_email, user?.email],
     queryFn: async () => {
-      const reviews = await base44.entities.Review.filter({
+      const reviews = await entities.Review.filter({
         educator_email: testPackage?.educator_email,
         reviewer_email: user.email,
         review_type: "educator",
@@ -239,7 +239,7 @@ export default function TakeTest() {
 
   const reportQuestionMutation = useMutation({
     mutationFn: (data) =>
-      base44.entities.Objection.create({
+      entities.Objection.create({
         attempt_id: resolvedAttemptId,
         question_id: questions[currentIndex]?.id,
         reason: (data.reason || data.description || '').trim() || `Hata türü: ${data.report_type || 'diğer'}`,
@@ -253,7 +253,7 @@ export default function TakeTest() {
   const handleSubmitTestReview = async () => {
     if (testRating === 0) return;
     try {
-      await base44.entities.Review.create({
+      await entities.Review.create({
         reviewer_email: user.email,
         reviewer_name: user.username || user.full_name,
         review_type: "test",
@@ -274,7 +274,7 @@ export default function TakeTest() {
   const handleSubmitEducatorReview = async () => {
     if (educatorRating === 0) return;
     try {
-      await base44.entities.Review.create({
+      await entities.Review.create({
         reviewer_email: user.email,
         reviewer_name: user.username || user.full_name,
         review_type: "educator",
@@ -316,7 +316,7 @@ export default function TakeTest() {
   );
 
   const finishMutation = useMutation({
-    mutationFn: () => base44.entities.Attempt.finish(resolvedAttemptId),
+    mutationFn: () => entities.Attempt.finish(resolvedAttemptId),
     onSuccess: (data) => {
       setResult(data);
       // Test bitti — localStorage cevap kuyruğunu temizle

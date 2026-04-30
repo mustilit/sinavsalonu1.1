@@ -158,11 +158,18 @@ export class PrismaUserRepository implements IUserRepository {
         ...(role && { role: role as any }),
         ...(status && { status: toPrismaStatus(status) as any }),
       } as any,
+      include: { workerPermission: true },
       orderBy: { createdAt: sort === 'createdAt' ? 'asc' : 'desc' } as any,
       take: limit,
       skip: offset,
     });
-    return rows.map((r) => this.toDomain(r as any));
+    return rows.map((r) => {
+      const base = this.toDomain(r as any);
+      if (r.role === 'WORKER') {
+        (base as any).workerPages = (r as any).workerPermission?.pages ?? [];
+      }
+      return base;
+    });
   }
 
   async updateByAdmin(

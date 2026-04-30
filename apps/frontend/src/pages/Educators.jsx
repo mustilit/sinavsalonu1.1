@@ -1,20 +1,19 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Search, BookOpen, Star, User, TrendingUp } from "lucide-react";
-import api from "@/api/dalClient";
+import api from "@/lib/api/apiClient";
 
 export default function Educators() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: allTests = [], isLoading } = useQuery({
     queryKey: ["allPublishedTests"],
-    queryFn: () => base44.entities.TestPackage.filter({ is_published: true }),
+    queryFn: () => entities.TestPackage.filter({ is_published: true }),
   });
 
   // Public educators (backend supports featured educators)

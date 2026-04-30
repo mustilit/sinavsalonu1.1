@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { api } from "@/api/dalClient";
+import { useState } from "react";
+import api from "@/lib/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Users, Mail, Star, ChevronUp, ChevronDown } from "lucide-react";
+import { Users, Mail, Star, ChevronUp, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { toast } from "sonner";

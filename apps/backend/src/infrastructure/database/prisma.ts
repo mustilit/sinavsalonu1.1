@@ -1,3 +1,12 @@
+// DATABASE_URL'in PrismaClient oluşturulmadan önce yüklü olduğunu garantile.
+// tsx (esbuild) statik importları hoist eder — index.ts'deki dotenv yüklemesi
+// bu modülün import edilmesinden SONRA çalışır.
+import { config as dotenvConfig } from 'dotenv';
+import { resolve as pathResolve } from 'path';
+
+// Kesin yol ile .env yükle (tsx watch modunda __dirname güvenilir)
+dotenvConfig({ path: pathResolve(__dirname, '../../../.env') });
+
 import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
@@ -8,8 +17,18 @@ let lastReconnectAttemptAt = 0;
 let reconnectInFlight: Promise<void> | null = null;
 
 function shouldAttemptReconnect(now = Date.now()) {
-  // 5 saniyede bir dene
   return now - lastReconnectAttemptAt > 5000;
+}
+
+// DATABASE_URL doğrudan datasource override olarak verilir;
+// bu sayede env okuma zamanlaması sorunları ortadan kalkar.
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  console.error(
+    '[prisma] DATABASE_URL bulunamadı. Lütfen .env dosyasını kontrol edin.',
+    'Aranan yol:',
+    pathResolve(__dirname, '../../../.env'),
+  );
 }
 
 export const prisma =
@@ -19,6 +38,9 @@ export const prisma =
       { emit: 'event', level: 'error' },
       { emit: 'event', level: 'warn' },
     ],
+    ...(databaseUrl && {
+      datasources: { db: { url: databaseUrl } },
+    }),
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
@@ -52,5 +74,3 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
   await reconnectInFlight;
 });
-
-

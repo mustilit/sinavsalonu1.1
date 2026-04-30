@@ -29,25 +29,29 @@ export class SubmitAnswerUseCase {
     }
 
     const now = new Date();
-    // Son devam etme anından bu yana geçen süre kalan süreden düşülür
-    const lastResumedAt = (attempt as any).lastResumedAt ?? attempt.startedAt;
-    let remainingSec = (attempt as any).remainingSec ?? 0;
-    if ((attempt as any).status === 'IN_PROGRESS') {
-      const elapsedSec = Math.max(0, Math.floor((now.getTime() - lastResumedAt.getTime()) / 1000));
-      remainingSec = Math.max(0, remainingSec - elapsedSec);
-    }
+    // remainingSec null ise zamanlayıcı henüz başlatılmamış demektir — süre kontrolü atlanır
+    const rawRemainingSec = (attempt as any).remainingSec;
+    let remainingSec: number | null = rawRemainingSec;
+    if (rawRemainingSec !== null && rawRemainingSec !== undefined) {
+      // Son devam etme anından bu yana geçen süre kalan süreden düşülür
+      const lastResumedAt = (attempt as any).lastResumedAt ?? attempt.startedAt;
+      if ((attempt as any).status === 'IN_PROGRESS') {
+        const elapsedSec = Math.max(0, Math.floor((now.getTime() - lastResumedAt.getTime()) / 1000));
+        remainingSec = Math.max(0, rawRemainingSec - elapsedSec);
+      }
 
-    // Süre bitmişse deneme otomatik EXPIRED durumuna alınır ve hata döndürülür
-    if (remainingSec <= 0 || (attempt as any).status === 'EXPIRED') {
-      await this.prisma.testAttempt.update({
-        where: { id: attemptId },
-        data: {
-          status: 'EXPIRED',
-          remainingSec: 0,
-          finishedAt: now,
-        } as any,
-      });
-      throw new BadRequestException({ code: 'ATTEMPT_EXPIRED', message: 'Attempt has expired' });
+      // Süre bitmişse deneme otomatik TIMEOUT durumuna alınır ve hata döndürülür
+      if ((remainingSec as number) <= 0) {
+        await this.prisma.testAttempt.update({
+          where: { id: attemptId },
+          data: {
+            status: 'TIMEOUT',
+            remainingSec: 0,
+            finishedAt: now,
+          } as any,
+        });
+        throw new BadRequestException({ code: 'ATTEMPT_EXPIRED', message: 'Attempt has expired' });
+      }
     }
 
     if ((attempt as any).status !== 'IN_PROGRESS') {

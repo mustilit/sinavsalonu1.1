@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
-import api from "@/api/dalClient";
+import { entities } from "@/api/dalClient";
+import api from "@/lib/api/apiClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Save, Plus, GripVertical, BookOpen,
-  Image, Lightbulb, Upload, X, Loader2, CheckCircle2, History
+  ArrowLeft, Save, Plus, GripVertical, BookOpen, Lightbulb, Upload, X, Loader2, CheckCircle2, History
 } from "lucide-react";
 import { useServiceStatus } from "@/lib/useServiceStatus";
 // Test meta verisindeki kaydedilmemiş değişiklikler için otomatik yedek
@@ -249,7 +248,7 @@ export default function EditTest() {
 
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
   });
 
   const questions = testDetail?.questions || [];

@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Percent, Copy } from "lucide-react";
@@ -41,20 +41,20 @@ export default function MyDiscountCodes() {
   // Giriş yapan eğiticinin indirim kodlarını yükle; cache key'e e-posta eklendi (çoklu kullanıcı senaryosu)
   const { data: codes = [], isLoading } = useQuery({
     queryKey: ["discountCodes", user?.email],
-    queryFn: () => base44.entities.DiscountCode.filter({ educator_email: user.email }, "-created_date"),
+    queryFn: () => entities.DiscountCode.filter({ educator_email: user.email }, "-created_date"),
     enabled: !!user,
   });
 
   // Kod oluşturma formunda belirli bir teste kısıtlama yapılabilmesi için eğiticinin testleri
   const { data: myTests = [] } = useQuery({
     queryKey: ["myTests", user?.email],
-    queryFn: () => base44.entities.TestPackage.filter({ educator_owns: true }),
+    queryFn: () => entities.TestPackage.filter({ educator_owns: true }),
     enabled: !!user,
   });
 
   // Kodu backend'e kaydeder; educator_email ve current_uses otomatik atanır
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.DiscountCode.create({
+    mutationFn: (data) => entities.DiscountCode.create({
       ...data,
       educator_email: user.email,
       current_uses: 0,
@@ -69,7 +69,7 @@ export default function MyDiscountCodes() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.DiscountCode.delete(id),
+    mutationFn: (id) => entities.DiscountCode.delete(id),
     onSuccess: () => {
       toast.success("İndirim kodu silindi");
       queryClient.invalidateQueries({ queryKey: ["discountCodes"] });

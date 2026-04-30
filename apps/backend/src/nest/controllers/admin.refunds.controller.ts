@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Req, Query } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Req, Query, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiConflictResponse, ApiBadRequestResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { ParseUUIDPipe } from '../pipes/parse-uuid.pipe';
@@ -32,6 +32,7 @@ export class AdminRefundsController {
   }
 
   @Post(':id/approve')
+  @HttpCode(200)
   @Roles('ADMIN')
   @ApiBearerAuth('bearer')
   @ApiOkResponse({ description: 'Refund approved' })
@@ -45,6 +46,7 @@ export class AdminRefundsController {
   }
 
   @Post(':id/reject')
+  @HttpCode(200)
   @Roles('ADMIN')
   @ApiBearerAuth('bearer')
   @ApiOkResponse({ description: 'Refund rejected' })

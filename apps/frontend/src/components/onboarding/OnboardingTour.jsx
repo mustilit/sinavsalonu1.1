@@ -13,15 +13,22 @@ import { cn } from "@/lib/utils";
 
 export default function OnboardingTour({ steps = [], onComplete, onSkip }) {
   const [current, setCurrent] = useState(0);
+  const [visible, setVisible] = useState(true);
 
-  if (!steps.length) return null;
+  if (!visible || !steps.length) return null;
 
   const step = steps[current];
   const isLast = current === steps.length - 1;
   const isFirst = current === 0;
 
+  const handleClose = () => {
+    setVisible(false);
+    onSkip?.();
+  };
+
   const handleNext = () => {
     if (isLast) {
+      setVisible(false);
       onComplete?.();
     } else {
       setCurrent((c) => c + 1);
@@ -38,7 +45,7 @@ export default function OnboardingTour({ steps = [], onComplete, onSkip }) {
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
         {/* Skip button */}
         <button
-          onClick={onSkip}
+          onClick={handleClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors z-10"
           aria-label="Turu atla"
         >
@@ -81,7 +88,7 @@ export default function OnboardingTour({ steps = [], onComplete, onSkip }) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={onSkip}
+            onClick={handleClose}
             className="text-slate-400 hover:text-slate-600"
           >
             Atla

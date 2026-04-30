@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Req, Query, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Req, Query, Param, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse, ApiForbiddenResponse, ApiConflictResponse, ApiNotFoundResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { CreateExamTypeDto } from './dto/create-examtype.dto';
@@ -17,10 +17,10 @@ import { DeleteExamTypeUseCase } from '../../application/use-cases/DeleteExamTyp
 @ApiTags('admin/exam-types')
 export class AdminExamTypesController {
   constructor(
-    private readonly listExamTypes: ListExamTypesUseCase,
-    private readonly createExamType: CreateExamTypeUseCase,
-    private readonly updateExamType: UpdateExamTypeUseCase,
-    private readonly deleteExamType: DeleteExamTypeUseCase,
+    @Inject(ListExamTypesUseCase) private readonly listExamTypes: ListExamTypesUseCase,
+    @Inject(CreateExamTypeUseCase) private readonly createExamType: CreateExamTypeUseCase,
+    @Inject(UpdateExamTypeUseCase) private readonly updateExamType: UpdateExamTypeUseCase,
+    @Inject(DeleteExamTypeUseCase) private readonly deleteExamType: DeleteExamTypeUseCase,
   ) {}
 
   @Get()

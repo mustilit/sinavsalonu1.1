@@ -24,7 +24,8 @@ export default defineConfig({
     ],
   },
   server: {
-    port: 5174,
+    host: true,
+    port: Number(process.env.PORT) || 5174,
     proxy: {
       '/auth': { target: backendTarget, changeOrigin: true },
       '/marketplace': { target: backendTarget, changeOrigin: true },

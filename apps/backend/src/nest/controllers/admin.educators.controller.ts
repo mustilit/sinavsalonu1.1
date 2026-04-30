@@ -1,4 +1,4 @@
-import { Controller, Post, Param, Req } from '@nestjs/common';
+import { Controller, Post, Param, Req, HttpCode, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiConflictResponse, ApiBadRequestResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { ParseUUIDPipe } from '../pipes/parse-uuid.pipe';
@@ -14,12 +14,13 @@ import { UnsuspendEducatorUseCase } from '../../application/use-cases/UnsuspendE
 @ApiTags('admin/educators')
 export class AdminEducatorsController {
   constructor(
-    private readonly approveEducator: ApproveEducatorUseCase,
-    private readonly suspendEducator: SuspendEducatorUseCase,
-    private readonly unsuspendEducator: UnsuspendEducatorUseCase,
+    @Inject(ApproveEducatorUseCase) private readonly approveEducator: ApproveEducatorUseCase,
+    @Inject(SuspendEducatorUseCase) private readonly suspendEducator: SuspendEducatorUseCase,
+    @Inject(UnsuspendEducatorUseCase) private readonly unsuspendEducator: UnsuspendEducatorUseCase,
   ) {}
 
   @Post(':id/approve')
+  @HttpCode(200)
   @Roles('ADMIN')
   @ApiBearerAuth('bearer')
   @ApiOkResponse({ description: 'Educator approved (or already approved)' })
@@ -33,6 +34,7 @@ export class AdminEducatorsController {
   }
 
   @Post(':id/suspend')
+  @HttpCode(200)
   @Roles('ADMIN')
   @ApiBearerAuth('bearer')
   @ApiOkResponse({ description: 'Educator suspended' })
@@ -46,6 +48,7 @@ export class AdminEducatorsController {
   }
 
   @Post(':id/unsuspend')
+  @HttpCode(200)
   @Roles('ADMIN')
   @ApiBearerAuth('bearer')
   @ApiOkResponse({ description: 'Educator unsuspended' })

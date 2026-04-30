@@ -5,7 +5,7 @@ export type UserStatus =
   | 'SUSPENDED'
   | 'PENDING_EDUCATOR_APPROVAL';
 
-export type UserRole = 'ADMIN' | 'EDUCATOR' | 'CANDIDATE';
+export type UserRole = 'ADMIN' | 'EDUCATOR' | 'CANDIDATE' | 'WORKER';
 
 export type AttemptStatus = 'IN_PROGRESS' | 'SUBMITTED' | 'TIMEOUT';
 

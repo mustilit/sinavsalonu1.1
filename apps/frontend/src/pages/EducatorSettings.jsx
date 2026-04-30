@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { entities, auth } from "@/api/dalClient";
+import api from "@/lib/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ export default function EducatorSettings() {
 
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
   });
 
   useEffect(() => {
@@ -77,12 +78,12 @@ export default function EducatorSettings() {
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      await base44.auth.updateMe(formData);
+      await auth.updateMe(formData);
       // Eğitici profil bilgilerini EducatorProfile entitesine kaydet
       try {
-        const existingProfiles = await base44.entities.EducatorProfile.filter({ educator_email: user.email });
+        const existingProfiles = await entities.EducatorProfile.filter({ educator_email: user.email });
         if (existingProfiles.length > 0) {
-          await base44.entities.EducatorProfile.update(existingProfiles[0].id, {
+          await entities.EducatorProfile.update(existingProfiles[0].id, {
             educator_email: user.email,
             educator_name: user.full_name,
             bio: formData.bio,
@@ -93,7 +94,7 @@ export default function EducatorSettings() {
             profile_image_url: formData.profile_image_url
           });
         } else {
-          await base44.entities.EducatorProfile.create({
+          await entities.EducatorProfile.create({
             educator_email: user.email,
             educator_name: user.full_name,
             bio: formData.bio,
@@ -120,7 +121,7 @@ export default function EducatorSettings() {
 
   const resubmitApplicationMutation = useMutation({
     mutationFn: async () => {
-      await base44.auth.updateMe({ 
+      await auth.updateMe({ 
         educator_status: "pending",
         rejection_reason: null 
       });
@@ -151,7 +152,10 @@ export default function EducatorSettings() {
 
     setUploadingCV(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const file_url = res.data.url || res.data.fileUrl || res.data.file_url;
       setFormData({ ...formData, cv_url: file_url });
       toast.success("CV başarıyla yüklendi");
     } catch (error) {
@@ -180,7 +184,10 @@ export default function EducatorSettings() {
 
     setUploadingImage(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const file_url = res.data.url || res.data.fileUrl || res.data.file_url;
       setFormData({ ...formData, profile_image_url: file_url });
       toast.success("Profil resmi başarıyla yüklendi");
     } catch (error) {

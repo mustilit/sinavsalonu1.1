@@ -1,33 +1,153 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="2" failures="2" errors="0" time="46.043">
-  <testsuite name="Publish/Unpublish UseCases" errors="0" failures="2" skipped="0" timestamp="2026-02-28T10:26:25" time="44.66" tests="2">
-    <testcase classname="Publish/Unpublish UseCases publishes when rules satisfied and logs audit" name="Publish/Unpublish UseCases publishes when rules satisfied and logs audit" time="20.01">
-      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a test.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\mtulu\dal\apps\backend\tests\usecases\publish-unpublish.test.ts:37:3
-    at _dispatchDescribe (C:\Users\mtulu\dal\apps\backend\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\mtulu\dal\apps\backend\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\mtulu\dal\apps\backend\tests\usecases\publish-unpublish.test.ts:36:1)
-    at Runtime._execModule (C:\Users\mtulu\dal\apps\backend\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\mtulu\dal\apps\backend\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\mtulu\dal\apps\backend\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\mtulu\dal\apps\backend\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\mtulu\dal\apps\backend\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\mtulu\dal\apps\backend\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+<testsuites name="jest tests" tests="54" failures="0" errors="0" time="22.875">
+  <testsuite name="ListMarketplaceTestsUseCase" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:00" time="6.406" tests="1">
+    <testcase classname="ListMarketplaceTestsUseCase filters by examTypeId and pagination" name="ListMarketplaceTestsUseCase filters by examTypeId and pagination" time="1.505">
     </testcase>
-    <testcase classname="Publish/Unpublish UseCases unpublishes and logs audit" name="Publish/Unpublish UseCases unpublishes and logs audit" time="20.014">
-      <failure>Error: thrown: &quot;Exceeded timeout of 20000 ms for a test.
-Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout.&quot;
-    at C:\Users\mtulu\dal\apps\backend\tests\usecases\publish-unpublish.test.ts:50:3
-    at _dispatchDescribe (C:\Users\mtulu\dal\apps\backend\node_modules\jest-circus\build\index.js:91:26)
-    at describe (C:\Users\mtulu\dal\apps\backend\node_modules\jest-circus\build\index.js:55:5)
-    at Object.&lt;anonymous&gt; (C:\Users\mtulu\dal\apps\backend\tests\usecases\publish-unpublish.test.ts:36:1)
-    at Runtime._execModule (C:\Users\mtulu\dal\apps\backend\node_modules\jest-runtime\build\index.js:1439:24)
-    at Runtime._loadModule (C:\Users\mtulu\dal\apps\backend\node_modules\jest-runtime\build\index.js:1022:12)
-    at Runtime.requireModule (C:\Users\mtulu\dal\apps\backend\node_modules\jest-runtime\build\index.js:882:12)
-    at jestAdapter (C:\Users\mtulu\dal\apps\backend\node_modules\jest-circus\build\legacy-code-todo-rewrite\jestAdapter.js:77:13)
-    at runTestInternal (C:\Users\mtulu\dal\apps\backend\node_modules\jest-runner\build\runTest.js:367:16)
-    at runTest (C:\Users\mtulu\dal\apps\backend\node_modules\jest-runner\build\runTest.js:444:34)</failure>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:00" time="6.411" tests="2">
+    <testcase classname=" minRating filters correctly" name=" minRating filters correctly" time="2.682">
+    </testcase>
+    <testcase classname=" GetRecommended returns items with required fields" name=" GetRecommended returns items with required fields" time="0.005">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:06" time="3.788" tests="2">
+    <testcase classname=" returns limited when participants &lt;5" name=" returns limited when participants &lt;5" time="0.009">
+    </testcase>
+    <testcase classname=" computes histogram and percentiles" name=" computes histogram and percentiles" time="0.689">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:06" time="3.966" tests="5">
+    <testcase classname=" create refund fails if objections &lt;10" name=" create refund fails if objections &lt;10" time="0.094">
+    </testcase>
+    <testcase classname=" create refund succeeds if objections &gt;=10" name=" create refund succeeds if objections &gt;=10" time="0.004">
+    </testcase>
+    <testcase classname=" duplicate refund -&gt; conflict" name=" duplicate refund -&gt; conflict" time="0.003">
+    </testcase>
+    <testcase classname=" admin approve -&gt; status updated" name=" admin approve -&gt; status updated" time="0.001">
+    </testcase>
+    <testcase classname=" admin reject -&gt; status updated" name=" admin reject -&gt; status updated" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="Publish/Unpublish UseCases" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:00" time="10.972" tests="2">
+    <testcase classname="Publish/Unpublish UseCases publishes when rules satisfied and logs audit" name="Publish/Unpublish UseCases publishes when rules satisfied and logs audit" time="2.254">
+    </testcase>
+    <testcase classname="Publish/Unpublish UseCases unpublishes and logs audit" name="Publish/Unpublish UseCases unpublishes and logs audit" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="TimeoutAttemptUseCase" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:11" time="1.272" tests="2">
+    <testcase classname="TimeoutAttemptUseCase throws if not owner" name="TimeoutAttemptUseCase throws if not owner" time="0.034">
+    </testcase>
+    <testcase classname="TimeoutAttemptUseCase is idempotent when already timed out" name="TimeoutAttemptUseCase is idempotent when already timed out" time="0.004">
+    </testcase>
+  </testsuite>
+  <testsuite name="PurchaseUseCase" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:10" time="2.808" tests="4">
+    <testcase classname="PurchaseUseCase creates purchase and attempt and audit" name="PurchaseUseCase creates purchase and attempt and audit" time="0.206">
+    </testcase>
+    <testcase classname="PurchaseUseCase throws conflict on duplicate (P2002)" name="PurchaseUseCase throws conflict on duplicate (P2002)" time="0.038">
+    </testcase>
+    <testcase classname="PurchaseUseCase FR-Y-05: rejects when purchasesEnabled=false" name="PurchaseUseCase FR-Y-05: rejects when purchasesEnabled=false" time="0.003">
+    </testcase>
+    <testcase classname="PurchaseUseCase rejects discount over 50%" name="PurchaseUseCase rejects discount over 50%" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="stats worker handler" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:10" time="2.942" tests="2">
+    <testcase classname="stats worker handler calls processor with prisma and testId" name="stats worker handler calls processor with prisma and testId" time="0.003">
+    </testcase>
+    <testcase classname="stats worker handler throws when missing testId" name="stats worker handler throws when missing testId" time="0.024">
+    </testcase>
+  </testsuite>
+  <testsuite name="SubmitAnswerUseCase" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:12" time="1.351" tests="4">
+    <testcase classname="SubmitAnswerUseCase creates attempt answer when not existing" name="SubmitAnswerUseCase creates attempt answer when not existing" time="0.003">
+    </testcase>
+    <testcase classname="SubmitAnswerUseCase updates attempt answer when exists" name="SubmitAnswerUseCase updates attempt answer when exists" time="0.002">
+    </testcase>
+    <testcase classname="SubmitAnswerUseCase rejects when option does not belong to question" name="SubmitAnswerUseCase rejects when option does not belong to question" time="0.044">
+    </testcase>
+    <testcase classname="SubmitAnswerUseCase deletes existing answer when optionId missing" name="SubmitAnswerUseCase deletes existing answer when optionId missing" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:13" time="0.986" tests="3">
+    <testcase classname=" cannot create review without purchase" name=" cannot create review without purchase" time="0.031">
+    </testcase>
+    <testcase classname=" cannot create review without submitted attempt" name=" cannot create review without submitted attempt" time="0.002">
+    </testcase>
+    <testcase classname=" upsert review works" name=" upsert review works" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="GetAttemptStateUseCase" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:13" time="2.011" tests="3">
+    <testcase classname="GetAttemptStateUseCase throws when not owner" name="GetAttemptStateUseCase throws when not owner" time="0.033">
+    </testcase>
+    <testcase classname="GetAttemptStateUseCase maps answered and blank counts correctly" name="GetAttemptStateUseCase maps answered and blank counts correctly" time="0.006">
+    </testcase>
+    <testcase classname="GetAttemptStateUseCase computes remainingSeconds for timed test" name="GetAttemptStateUseCase computes remainingSeconds for timed test" time="0.146">
+    </testcase>
+  </testsuite>
+  <testsuite name="GetAttemptResultUseCase" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:13" time="2.207" tests="3">
+    <testcase classname="GetAttemptResultUseCase throws when not owner" name="GetAttemptResultUseCase throws when not owner" time="0.018">
+    </testcase>
+    <testcase classname="GetAttemptResultUseCase throws when attempt not finalized" name="GetAttemptResultUseCase throws when attempt not finalized" time="0.002">
+    </testcase>
+    <testcase classname="GetAttemptResultUseCase computes summary and question analysis" name="GetAttemptResultUseCase computes summary and question analysis" time="0.037">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:16" time="0.224" tests="1">
+    <testcase classname=" worker health endpoint placeholder" name=" worker health endpoint placeholder" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="GetQuestionSolutionUseCase" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:14" time="2.12" tests="5">
+    <testcase classname="GetQuestionSolutionUseCase throws when not owner" name="GetQuestionSolutionUseCase throws when not owner" time="0.019">
+    </testcase>
+    <testcase classname="GetQuestionSolutionUseCase throws when attempt not submitted" name="GetQuestionSolutionUseCase throws when attempt not submitted" time="0.002">
+    </testcase>
+    <testcase classname="GetQuestionSolutionUseCase throws when solutions disabled" name="GetQuestionSolutionUseCase throws when solutions disabled" time="0.002">
+    </testcase>
+    <testcase classname="GetQuestionSolutionUseCase returns solution when ok" name="GetQuestionSolutionUseCase returns solution when ok" time="0.028">
+    </testcase>
+    <testcase classname="GetQuestionSolutionUseCase allows TIMEOUT attempts to read solutions" name="GetQuestionSolutionUseCase allows TIMEOUT attempts to read solutions" time="0.011">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:16" time="0.526" tests="2">
+    <testcase classname=" educator not found throws" name=" educator not found throws" time="0.061">
+    </testcase>
+    <testcase classname=" returns published tests and pagination meta with enrichment preferring TestStats" name=" returns published tests and pagination meta with enrichment preferring TestStats" time="0.01">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:16" time="0.46" tests="2">
+    <testcase classname=" follow idempotent" name=" follow idempotent" time="0.003">
+    </testcase>
+    <testcase classname=" unfollow idempotent" name=" unfollow idempotent" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="SubmitAttemptUseCase" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:15" time="1.45" tests="2">
+    <testcase classname="SubmitAttemptUseCase finalizes attempt using stored answers" name="SubmitAttemptUseCase finalizes attempt using stored answers" time="0.063">
+    </testcase>
+    <testcase classname="SubmitAttemptUseCase is idempotent when already submitted" name="SubmitAttemptUseCase is idempotent when already submitted" time="0.004">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:17" time="0.504" tests="1">
+    <testcase classname=" update notification preferences creates or updates" name=" update notification preferences creates or updates" time="0.06">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:17" time="0.424" tests="1">
+    <testcase classname=" weekly digest enqueues emails" name=" weekly digest enqueues emails" time="0.004">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:17" time="0.535" tests="6">
+    <testcase classname=" no follows -&gt; fallback only" name=" no follows -&gt; fallback only" time="0.009">
+    </testcase>
+    <testcase classname=" educator follow -&gt; followed boosted" name=" educator follow -&gt; followed boosted" time="0.002">
+    </testcase>
+    <testcase classname=" examType follow -&gt; followed examType boosted" name=" examType follow -&gt; followed examType boosted" time="0.002">
+    </testcase>
+    <testcase classname=" dedupe when both follow types include same test" name=" dedupe when both follow types include same test" time="0.014">
+    </testcase>
+    <testcase classname=" fallback only when no follows" name=" fallback only when no follows" time="0.001">
+    </testcase>
+    <testcase classname=" limit respected and dedupe" name=" limit respected and dedupe" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-04-30T06:47:17" time="0.257" tests="1">
+    <testcase classname=" publish invalidates follower caches" name=" publish invalidates follower caches" time="0.006">
     </testcase>
   </testsuite>
 </testsuites>

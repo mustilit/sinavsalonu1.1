@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Req, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Req, HttpException, HttpStatus, UseGuards, HttpCode } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { RegisterUseCase } from '../../application/use-cases/RegisterUseCase';
 import { RegisterEducatorUseCase } from '../../application/use-cases/RegisterEducatorUseCase';
@@ -14,6 +14,7 @@ import { PrismaUserRepository } from '../../infrastructure/repositories/PrismaUs
 import { PasswordService } from '../../infrastructure/services/PasswordService';
 import { JwtService } from '../../infrastructure/services/JwtService';
 import { LoginBruteforceGuard } from '../guards/login-bruteforce.guard';
+import { prisma } from '../../infrastructure/database/prisma';
 
 /**
  * Kimlik doğrulama işlemlerini yönetir: kayıt, giriş, şifre sıfırlama ve oturum bilgisi.
@@ -37,17 +38,24 @@ export class AuthController {
     if (!sub) throw new HttpException({ error: 'Unauthorized' }, HttpStatus.UNAUTHORIZED);
     const user = await this.userRepo.findById(sub);
     if (!user) throw new HttpException({ error: 'User not found' }, HttpStatus.NOT_FOUND);
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        role: user.role,
-        status: user.status,
-        educatorApprovedAt: user.educatorApprovedAt ?? undefined,
-        createdAt: user.createdAt,
-      },
+
+    const userResponse = {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+      status: user.status,
+      educatorApprovedAt: user.educatorApprovedAt ?? undefined,
+      createdAt: user.createdAt,
     };
+
+    // WORKER rolü ise sayfa izinlerini de ekle
+    if (user.role === 'WORKER') {
+      const wp = await prisma.workerPermission.findUnique({ where: { userId: user.id } });
+      return { user: { ...userResponse, workerPages: wp?.pages ?? [] } };
+    }
+
+    return { user: userResponse };
   }
 
   /** Yeni aday kaydı — e-posta ve kullanıcı adı benzersizliği use-case tarafından doğrulanır */
@@ -95,6 +103,7 @@ export class AuthController {
 
   /** Giriş — BruteforceGuard ile korunur; e-posta küçük harfe normalize edilir */
   @Post('login')
+  @HttpCode(200)
   @Public()
   @UseGuards(LoginBruteforceGuard)
   async login(@Body() body: any) {

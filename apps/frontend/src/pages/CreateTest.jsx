@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -92,13 +92,13 @@ export default function CreateTest() {
 
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
   });
 
   const { data: topics = [] } = useQuery({
     queryKey: ["topics", formData.exam_type_id],
     queryFn: async () => {
-      const list = await base44.entities.Topic.list();
+      const list = await entities.Topic.list();
       return formData.exam_type_id
         ? list.filter((t) => t.exam_type_id === formData.exam_type_id)
         : list;
@@ -108,7 +108,7 @@ export default function CreateTest() {
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      return await base44.entities.TestPackage.create({
+      return await entities.TestPackage.create({
         title: data.title,
         exam_type_id: data.exam_type_id || null,
         topic_id: data.topic_id || null,

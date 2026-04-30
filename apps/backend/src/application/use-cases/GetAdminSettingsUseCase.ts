@@ -1,6 +1,8 @@
+import { Injectable } from '@nestjs/common';
 import type { AdminSettings } from '../../domain/types';
 
 /** FR-Y-06: Admin ayarlarını okuma */
+@Injectable()
 export class GetAdminSettingsUseCase {
   async execute(prisma: { adminSettings: { findUnique: (args: any) => Promise<any> } }): Promise<AdminSettings> {
     const row = await prisma.adminSettings.findUnique({ where: { id: 1 } });

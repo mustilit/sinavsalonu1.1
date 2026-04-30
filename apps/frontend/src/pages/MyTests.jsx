@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TestPackageCard from "@/components/ui/TestPackageCard";
-import { BookOpen, Search, ShoppingBag, Filter, X } from "lucide-react";
+import { Search, ShoppingBag, Filter, X } from "lucide-react";
 
 export default function MyTests() {
   const { user } = useAuth();
@@ -18,7 +18,7 @@ export default function MyTests() {
 
   const { data: purchases = [], isLoading: loadingPurchases } = useQuery({
     queryKey: ["myPurchases", user?.id],
-    queryFn: () => base44.entities.Purchase.filter({}),
+    queryFn: () => entities.Purchase.filter({}),
     enabled: !!user,
   });
 
@@ -27,7 +27,7 @@ export default function MyTests() {
     queryFn: async () => {
       if (purchases.length === 0) return [];
       const packageIds = [...new Set(purchases.map(p => p.test_package_id))];
-      const packages = (await Promise.all(packageIds.map(id => base44.entities.TestPackage.filter({ id }).then(r => r[0])))).filter(Boolean);
+      const packages = (await Promise.all(packageIds.map(id => entities.TestPackage.filter({ id }).then(r => r[0])))).filter(Boolean);
       return packages.filter(p => p && p.is_published && p.is_active !== false);
     },
     enabled: purchases.length > 0,
@@ -37,19 +37,19 @@ export default function MyTests() {
 
   const { data: results = [] } = useQuery({
     queryKey: ["myResults", user?.id],
-    queryFn: () => base44.entities.TestResult.filter({ user_email: user?.email }),
+    queryFn: () => entities.TestResult.filter({ user_email: user?.email }),
     enabled: !!user,
   });
 
   const { data: testProgress = [] } = useQuery({
     queryKey: ["testProgress", user?.id],
-    queryFn: () => base44.entities.TestProgress.filter({ user_email: user?.email, is_completed: false }),
+    queryFn: () => entities.TestProgress.filter({ user_email: user?.email, is_completed: false }),
     enabled: !!user,
   });
 
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
   });
 
   const purchasedTestIds = new Set(purchases.map(p => p.test_package_id));

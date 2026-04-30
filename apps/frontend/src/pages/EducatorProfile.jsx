@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { createPageUrl } from '@/utils';
-import api from '@/api/dalClient';
+import api from '@/lib/api/apiClient';
 import TestPackageCard from '@/components/ui/TestPackageCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -38,18 +38,18 @@ export default function ManageTests() {
 
   const { data: tests = [], isLoading } = useQuery({
     queryKey: ["allTests"],
-    queryFn: () => base44.entities.TestPackage.list("-created_date"),
+    queryFn: () => entities.TestPackage.list("-created_date"),
     enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
   });
 
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.list(),
+    queryFn: () => entities.ExamType.list(),
     enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
   });
 
   const toggleActiveMutation = useMutation({
-    mutationFn: ({ id, is_active }) => base44.entities.TestPackage.update(id, { is_active }),
+    mutationFn: ({ id, is_active }) => entities.TestPackage.update(id, { is_active }),
     onSuccess: () => {
       toast.success("Test durumu güncellendi");
       queryClient.invalidateQueries({ queryKey: ["allTests"] });

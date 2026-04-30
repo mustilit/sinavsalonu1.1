@@ -12,6 +12,7 @@ export const ROLES = {
   CANDIDATE: 'CANDIDATE',
   EDUCATOR: 'EDUCATOR',
   ADMIN: 'ADMIN',
+  WORKER: 'WORKER',
 };
 
 /** Sayfa adı -> bu rollerin erişebileceği (public ise giriş gerekmez) */
@@ -82,18 +83,27 @@ export function canAccessPage(pageName, user) {
   if (!roles || roles.includes(ROLES.PUBLIC)) return true;
   if (!user) return false;
   const r = normalizeRole(user.role);
-  if (roles.includes(r)) return true;
   if (r === ROLES.ADMIN) return true;
+  // Worker: yalnızca kendisine atanan sayfalar
+  if (r === ROLES.WORKER) {
+    return Array.isArray(user.workerPages) && user.workerPages.includes(pageName);
+  }
+  if (roles.includes(r)) return true;
   return false;
 }
 
 /**
  * Rol için ana sayfa (giriş sonrası yönlendirme)
  */
-export function getHomeForRole(role) {
+export function getHomeForRole(role, user) {
   const r = normalizeRole(role);
   if (r === ROLES.ADMIN) return 'AdminDashboard';
   if (r === ROLES.EDUCATOR) return 'EducatorDashboard';
+  if (r === ROLES.WORKER) {
+    // Worker için ilk izin verilen sayfayı döndür
+    const pages = Array.isArray(user?.workerPages) ? user.workerPages : [];
+    return pages[0] ?? 'AdminDashboard';
+  }
   return 'Explore';
 }
 

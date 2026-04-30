@@ -8,7 +8,6 @@ import { useShouldShowTour, useCompleteTour, TOUR_KEYS } from "@/lib/useOnboardi
 import { CANDIDATE_WELCOME_STEPS } from "@/components/onboarding/tourSteps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { buildPageUrl, useAppNavigate } from "@/lib/navigation";
 import api from "@/lib/api/apiClient";
 import {
@@ -493,18 +492,6 @@ export default function Home() {
             </div>
           )}
 
-          {!isPersonalized && !user && (
-            <p className="mt-5 text-center text-sm text-slate-500">
-              <button
-                onClick={() => setShowLoginDialog(true)}
-                className="font-medium hover:underline"
-                style={{ color: "#0000CD" }}
-              >
-                Giriş yapın
-              </button>{" "}
-              — ilgi alanlarınıza göre kişiselleştirilmiş öneriler gösterin.
-            </p>
-          )}
         </section>
 
         {/* ── 3. Eğiticiler ─────────────────────────────────────────────── */}

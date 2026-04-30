@@ -1,6 +1,8 @@
+import { Injectable } from '@nestjs/common';
 import type { AdminSettings } from '../../domain/types';
 
 /** FR-Y-06: Komisyon + KDV ayarı */
+@Injectable()
 export class UpdateAdminSettingsUseCase {
   async execute(
     prisma: { adminSettings: { upsert: (args: any) => Promise<any> } },

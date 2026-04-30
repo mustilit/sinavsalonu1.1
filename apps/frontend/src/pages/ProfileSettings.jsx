@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { entities, auth } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -42,26 +42,26 @@ export default function ProfileSettings() {
 
   const { data: purchases = [] } = useQuery({
     queryKey: ["userPurchases", user?.email],
-    queryFn: () => user ? base44.entities.Purchase.filter({ user_email: user.email }, "-created_date") : [],
+    queryFn: () => user ? entities.Purchase.filter({ user_email: user.email }, "-created_date") : [],
     enabled: !!user,
   });
 
   const { data: refundRequests = [] } = useQuery({
     queryKey: ["refundRequests", user?.email],
-    queryFn: () => user ? base44.entities.RefundRequest.filter({ user_email: user.email }, "-created_date") : [],
+    queryFn: () => user ? entities.RefundRequest.filter({ user_email: user.email }, "-created_date") : [],
     enabled: !!user,
   });
 
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
   });
 
   useEffect(() => {
     if (!authUser) return;
     const loadProfile = async () => {
       try {
-        const userData = await base44.auth.me();
+        const userData = await auth.me();
         const initialData = {
           phone: userData.phone || "",
           city: userData.city || "",
@@ -82,7 +82,7 @@ export default function ProfileSettings() {
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      await base44.auth.updateMe(formData);
+      await auth.updateMe(formData);
     },
     onSuccess: () => {
       toast.success("Profil bilgileri güncellendi");
@@ -95,7 +95,7 @@ export default function ProfileSettings() {
   });
 
   const refundMutation = useMutation({
-    mutationFn: (data) => base44.entities.RefundRequest.create({
+    mutationFn: (data) => entities.RefundRequest.create({
       user_email: user.email,
       user_name: user.full_name,
       purchase_id: selectedPurchase.id,

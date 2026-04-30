@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -48,21 +48,21 @@ export default function ManageTopics() {
   // Konuları en yeni-en eski sırasıyla çek; sadece admin rolünde sorgu etkin
   const { data: topics = [], isLoading } = useQuery({
     queryKey: ["topics"],
-    queryFn: () => base44.entities.Topic.list("-created_date"),
+    queryFn: () => entities.Topic.list("-created_date"),
     enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
   });
 
   // Konu formunda sınav türü seçimi için aktif türleri yükle
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
   });
 
   // Konu oluştururken exam_type_name'i de kaydeder (denormalize veri — liste görünümü için)
   const createMutation = useMutation({
     mutationFn: (data) => {
       const examType = examTypes.find(e => e.id === data.exam_type_id);
-      return base44.entities.Topic.create({
+      return entities.Topic.create({
         ...data,
         exam_type_name: examType?.name || ""
       });
@@ -78,7 +78,7 @@ export default function ManageTopics() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => {
       const examType = examTypes.find(e => e.id === data.exam_type_id);
-      return base44.entities.Topic.update(id, {
+      return entities.Topic.update(id, {
         ...data,
         exam_type_name: examType?.name || ""
       });
@@ -91,7 +91,7 @@ export default function ManageTopics() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Topic.delete(id),
+    mutationFn: (id) => entities.Topic.delete(id),
     onSuccess: () => {
       toast.success("Konu silindi");
       queryClient.invalidateQueries({ queryKey: ["topics"] });

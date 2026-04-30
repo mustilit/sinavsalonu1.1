@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Req, Query, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Req, Query, Param, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse, ApiForbiddenResponse, ApiConflictResponse, ApiBadRequestResponse, ApiNotFoundResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { CreateTopicDto } from './dto/create-topic.dto';
@@ -17,10 +17,10 @@ import { DeleteTopicUseCase } from '../../application/use-cases/DeleteTopicUseCa
 @ApiTags('admin/topics')
 export class AdminTopicsController {
   constructor(
-    private readonly listTopics: ListTopicsByExamTypeUseCase,
-    private readonly createTopic: CreateTopicUseCase,
-    private readonly updateTopic: UpdateTopicUseCase,
-    private readonly deleteTopic: DeleteTopicUseCase,
+    @Inject(ListTopicsByExamTypeUseCase) private readonly listTopics: ListTopicsByExamTypeUseCase,
+    @Inject(CreateTopicUseCase) private readonly createTopic: CreateTopicUseCase,
+    @Inject(UpdateTopicUseCase) private readonly updateTopic: UpdateTopicUseCase,
+    @Inject(DeleteTopicUseCase) private readonly deleteTopic: DeleteTopicUseCase,
   ) {}
 
   @Get()

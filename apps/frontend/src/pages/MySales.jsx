@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -35,7 +35,7 @@ export default function MySales() {
 
   const { data: sales = [], isLoading } = useQuery({
     queryKey: ["mySales", user?.email],
-    queryFn: () => base44.entities.Purchase.filter({ educator_email: user.email }, "-created_date"),
+    queryFn: () => entities.Purchase.filter({ educator_email: user.email }, "-created_date"),
     enabled: !!user,
   });
 

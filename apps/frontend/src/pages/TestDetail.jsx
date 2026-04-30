@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import StarRating from "@/components/ui/StarRating";
 import { 
   BookOpen, 
-  Clock, 
   Star, 
   User, 
   CheckCircle, 
@@ -45,7 +44,7 @@ export default function TestDetail() {
 
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases", user?.id, testId],
-    queryFn: () => base44.entities.Purchase.filter({ test_package_id: testId }),
+    queryFn: () => entities.Purchase.filter({ test_package_id: testId }),
     enabled: !!user && !!testId,
   });
 
@@ -62,7 +61,7 @@ export default function TestDetail() {
         };
       }
       // Otherwise fetch current test (for unpurchased tests)
-      const tests = await base44.entities.TestPackage.filter({ id: testId, is_published: true });
+      const tests = await entities.TestPackage.filter({ id: testId, is_published: true });
       return tests[0];
     },
     enabled: !!testId && (purchases !== undefined),
@@ -76,7 +75,7 @@ export default function TestDetail() {
         return purchases[0].questions_snapshot;
       }
       // Otherwise fetch current questions
-      return base44.entities.Question.filter({ test_package_id: testId });
+      return entities.Question.filter({ test_package_id: testId });
     },
     enabled: !!testId && (purchases !== undefined),
   });
@@ -89,7 +88,7 @@ export default function TestDetail() {
         return purchases[0].tests_snapshot;
       }
       // Otherwise fetch current tests
-      return base44.entities.Test.filter({ test_package_id: testId }, "order_index");
+      return entities.Test.filter({ test_package_id: testId }, "order_index");
     },
     enabled: !!testId && (purchases !== undefined),
   });
@@ -98,13 +97,13 @@ export default function TestDetail() {
 
   const { data: allTestResults = [] } = useQuery({
     queryKey: ["allTestResults", user?.id, testId],
-    queryFn: () => base44.entities.TestResult.filter({ user_email: user?.email, test_package_id: testId }),
+    queryFn: () => entities.TestResult.filter({ user_email: user?.email, test_package_id: testId }),
     enabled: !!user && !!testId,
   });
 
   const { data: allTestProgress = [] } = useQuery({
     queryKey: ["allTestProgress", user?.id, testId],
-    queryFn: () => base44.entities.TestProgress.filter({ user_email: user?.email, test_package_id: testId, is_completed: false }),
+    queryFn: () => entities.TestProgress.filter({ user_email: user?.email, test_package_id: testId, is_completed: false }),
     enabled: !!user && !!testId,
   });
 
@@ -113,7 +112,7 @@ export default function TestDetail() {
   const { data: existingTestReview } = useQuery({
     queryKey: ["testReview", testId, user?.id],
     queryFn: async () => {
-      const reviews = await base44.entities.Review.filter({
+      const reviews = await entities.Review.filter({
         test_package_id: testId,
         reviewer_email: user.email,
         review_type: "test",
@@ -125,7 +124,7 @@ export default function TestDetail() {
 
   const { data: reviews = [] } = useQuery({
     queryKey: ["reviews", testId],
-    queryFn: () => base44.entities.Review.filter({ test_package_id: testId, review_type: "test" }, "-created_date", 10),
+    queryFn: () => entities.Review.filter({ test_package_id: testId, review_type: "test" }, "-created_date", 10),
     enabled: !!testId,
   });
 
@@ -136,7 +135,7 @@ export default function TestDetail() {
 
   const { data: follows = [] } = useQuery({
     queryKey: ["follows", user?.id, test?.educator_email],
-    queryFn: () => base44.entities.Follow.filter({ educator_email: test.educator_email }),
+    queryFn: () => entities.Follow.filter({ educator_email: test.educator_email }),
     enabled: !!user && !!test?.educator_email,
   });
 
@@ -147,9 +146,9 @@ export default function TestDetail() {
   const followMutation = useMutation({
     mutationFn: async () => {
       if (isFollowing) {
-        await base44.entities.Follow.delete(follows[0].educatorId ?? follows[0].id);
+        await entities.Follow.delete(follows[0].educatorId ?? follows[0].id);
       } else {
-        await base44.entities.Follow.create({
+        await entities.Follow.create({
           follower_email: user.email,
           follow_type: "educator",
           educator_email: test.educator_email,
@@ -166,7 +165,7 @@ export default function TestDetail() {
 
   const purchaseMutation = useMutation({
     mutationFn: async () => {
-      await base44.entities.Purchase.create({
+      await entities.Purchase.create({
         test_package_id: test.id,
       });
     },
@@ -194,7 +193,7 @@ export default function TestDetail() {
   const handleSubmitTestReview = async () => {
     if (testRating === 0) return;
     try {
-      await base44.entities.Review.create({
+      await entities.Review.create({
         reviewer_email: user.email,
         reviewer_name: user.full_name,
         review_type: "test",
@@ -466,7 +465,7 @@ export default function TestDetail() {
                 })}
               </div>
             ) : (
-              {!purchasesEnabled ? (
+              !purchasesEnabled ? (
                 <div className="w-full rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3 text-center">
                   <p className="text-sm font-semibold text-amber-800">🔧 Satın alma servisleri bakımdadır</p>
                   <p className="text-xs text-amber-600 mt-1">Lütfen daha sonra tekrar deneyin.</p>
@@ -480,7 +479,7 @@ export default function TestDetail() {
                   <ShoppingCart className="w-5 h-5 mr-2" />
                   {purchaseMutation.isPending ? "İşleniyor..." : "Satın Al"}
                 </Button>
-              )}
+              )
             )}
 
             <div className="mt-6 space-y-3">

@@ -66,8 +66,16 @@ export class SeedService implements OnApplicationBootstrap {
     const existing = await this.prisma.user.findFirst({
       where: { email: 'educator@demo.com' },
     });
+
     if (existing) {
-      console.log('Seed: demo users already exist');
+      // Kullanıcılar var — ama test yoksa yine de oluştur
+      const testCount = await this.prisma.examTest.count();
+      if (testCount > 0) {
+        console.log('Seed: demo users and data already exist');
+        return;
+      }
+      console.log('Seed: demo users exist but no tests found, creating test data...');
+      await this.createDemoTestData(existing.id);
       return;
     }
 
@@ -122,6 +130,14 @@ export class SeedService implements OnApplicationBootstrap {
       update: {},
     });
 
+    await this.createDemoTestData(educator.id);
+
+    console.log('Seed: Demo — eğitici: educator@demo.com / aday: aday@demo.com (şifre: demo123)');
+  }
+
+  private async createDemoTestData(educatorId: string) {
+    const tenantId = getDefaultTenantId();
+
     // ExamType + Topic
     const examType = await this.prisma.examType.upsert({
       where: { slug: 'demo-tyt' },
@@ -135,44 +151,39 @@ export class SeedService implements OnApplicationBootstrap {
     });
 
     // Demo test (yayında)
-    const testCount = await this.prisma.examTest.count();
-    if (testCount === 0) {
-      const created = await this.prisma.examTest.create({
+    const created = await this.prisma.examTest.create({
+      data: {
+        tenantId,
+        title: 'Demo TYT Matematik Denemesi',
+        educatorId,
+        examTypeId: examType.id,
+        topicId: topic.id,
+        isTimed: true,
+        duration: 45,
+        priceCents: 1999,
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+        questionCount: 5,
+      },
+    });
+    for (let i = 1; i <= 5; i++) {
+      await this.prisma.examQuestion.create({
         data: {
-          tenantId,
-          title: 'Demo TYT Matematik Denemesi',
-          educatorId: educator.id,
-          examTypeId: examType.id,
-          topicId: topic.id,
-          isTimed: true,
-          duration: 45,
-          priceCents: 1999,
-          status: 'PUBLISHED',
-          publishedAt: new Date(),
-          questionCount: 5,
+          testId: created.id,
+          content: `${i}. Demo soru metni — doğru cevap B seçeneğidir.`,
+          order: i,
+          options: {
+            create: [
+              { content: 'A seçeneği', isCorrect: false },
+              { content: 'B seçeneği', isCorrect: true },
+              { content: 'C seçeneği', isCorrect: false },
+              { content: 'D seçeneği', isCorrect: false },
+            ],
+          },
         },
       });
-      for (let i = 1; i <= 5; i++) {
-        await this.prisma.examQuestion.create({
-          data: {
-            testId: created.id,
-            content: `${i}. Demo soru metni — doğru cevap B seçeneğidir.`,
-            order: i,
-            options: {
-              create: [
-                { content: 'A seçeneği', isCorrect: false },
-                { content: 'B seçeneği', isCorrect: true },
-                { content: 'C seçeneği', isCorrect: false },
-                { content: 'D seçeneği', isCorrect: false },
-              ],
-            },
-          },
-        });
-      }
-      console.log('Seed: demo test created (5 soru)');
     }
-
-    console.log('Seed: Demo — eğitici: educator@demo.com / aday: aday@demo.com (şifre: demo123)');
+    console.log('Seed: demo test created (5 soru)');
   }
 
   private async ensureTestQuestions() {

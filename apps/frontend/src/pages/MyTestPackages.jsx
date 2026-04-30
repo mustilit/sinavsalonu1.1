@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -49,13 +49,13 @@ export default function MyTestPackages() {
 
   const { data: tests = [], isLoading, isError } = useQuery({
     queryKey: ["myTestPackages", user?.id],
-    queryFn: () => base44.entities.TestPackage.filter({ educator_owns: true }),
+    queryFn: () => entities.TestPackage.filter({ educator_owns: true }),
     enabled: !!user,
   });
 
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
     enabled: !!user,
   });
 
@@ -65,7 +65,7 @@ export default function MyTestPackages() {
 
   const togglePublishMutation = useMutation({
     mutationFn: ({ id, is_published }) => 
-      base44.entities.TestPackage.update(id, { is_published }),
+      entities.TestPackage.update(id, { is_published }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["myTestPackages"] });
     },

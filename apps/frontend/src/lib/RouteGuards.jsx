@@ -51,7 +51,7 @@ export function ProtectedRoute({ children, pageName }) {
 
   // Rol yetkisi yok
   if (!canAccessPage(pageName, user)) {
-    const home = getHomeForRole(user.role);
+    const home = getHomeForRole(user.role, user);
     return <Navigate to={createPageUrl(home)} replace />;
   }
 

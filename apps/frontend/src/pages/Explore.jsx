@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import TestPackageCard from "@/components/ui/TestPackageCard";
 import { Search, SlidersHorizontal, X, Star } from "lucide-react";
-import { createPageUrl } from "@/utils";
 import { buildPageUrl, useAppNavigate } from "@/lib/navigation";
 
 export default function Explore() {
@@ -28,28 +27,28 @@ export default function Explore() {
 
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.filter({ is_active: true }),
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
   });
 
   const { data: allTests = [], isLoading } = useQuery({
     queryKey: ["tests"],
-    queryFn: () => base44.entities.TestPackage.filter({ is_published: true, is_active: true }, "-created_date"),
+    queryFn: () => entities.TestPackage.filter({ is_published: true, is_active: true }, "-created_date"),
   });
 
   const { data: allQuestions = [] } = useQuery({
     queryKey: ["allQuestions"],
-    queryFn: () => base44.entities.Question.list(),
+    queryFn: () => entities.Question.list(),
   });
 
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases", user?.id],
-    queryFn: () => base44.entities.Purchase.filter({}),
+    queryFn: () => entities.Purchase.filter({}),
     enabled: !!user,
   });
 
   const { data: results = [] } = useQuery({
     queryKey: ["results", user?.email],
-    queryFn: () => user ? base44.entities.TestResult.filter({ user_email: user.email }) : [],
+    queryFn: () => user ? entities.TestResult.filter({ user_email: user.email }) : [],
     enabled: !!user,
   });
 

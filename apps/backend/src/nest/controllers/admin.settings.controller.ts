@@ -1,7 +1,6 @@
-import { Controller, Get, Patch, Body, Req } from '@nestjs/common';
+import { Controller, Get, Patch, Body, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiForbiddenResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
-import { Inject } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { GetAdminSettingsUseCase } from '../../application/use-cases/GetAdminSettingsUseCase';
 import { UpdateAdminSettingsUseCase } from '../../application/use-cases/UpdateAdminSettingsUseCase';
@@ -16,8 +15,8 @@ import { UpdateAdminSettingsDto } from './dto/update-admin-settings.dto';
 export class AdminSettingsController {
   constructor(
     @Inject('PRISMA') private readonly prisma: PrismaClient,
-    private readonly getSettings: GetAdminSettingsUseCase,
-    private readonly updateSettings: UpdateAdminSettingsUseCase,
+    @Inject(GetAdminSettingsUseCase) private readonly getSettings: GetAdminSettingsUseCase,
+    @Inject(UpdateAdminSettingsUseCase) private readonly updateSettings: UpdateAdminSettingsUseCase,
   ) {}
 
   @Get()
@@ -42,7 +41,6 @@ export class AdminSettingsController {
       packageCreationEnabled: dto.packageCreationEnabled,
       testPublishingEnabled: dto.testPublishingEnabled,
       testAttemptsEnabled: dto.testAttemptsEnabled,
-      // Reklam satın alma kill-switch
       adPurchasesEnabled: dto.adPurchasesEnabled,
     });
   }

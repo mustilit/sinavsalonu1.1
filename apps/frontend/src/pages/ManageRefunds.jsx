@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { RefreshCw, CheckCircle, XCircle, AlertTriangle, Filter } from "lucide-react";
+import { RefreshCw, CheckCircle, XCircle, Filter } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,8 +17,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 
 export default function ManageRefunds() {
   const { user } = useAuth();
@@ -34,12 +32,12 @@ export default function ManageRefunds() {
 
   const { data: refunds = [], isLoading } = useQuery({
     queryKey: ["refunds"],
-    queryFn: () => base44.entities.RefundRequest.list("-created_date"),
+    queryFn: () => entities.RefundRequest.list("-created_date"),
     enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.RefundRequest.update(id, data),
+    mutationFn: ({ id, data }) => entities.RefundRequest.update(id, data),
     onSuccess: () => {
       toast.success("İade talebi güncellendi");
       queryClient.invalidateQueries({ queryKey: ["refunds"] });

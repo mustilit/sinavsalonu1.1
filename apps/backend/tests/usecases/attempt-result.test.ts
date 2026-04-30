@@ -29,6 +29,10 @@ describe('GetAttemptResultUseCase', () => {
   });
 
   it('computes summary and question analysis', async () => {
+    // Arrange: att-mix için q1 cevabı var (o1), q2 null seçenekle var, q3 hiç cevap yok
+    // q1: doğru (o1 seçildi, correct=[o1]) → correct=1
+    // q2: yanlış (null seçildi → blank sayılır) → blank=1
+    // q3: hiç cevap yok → blank=1  ⟹ toplam blank=2, correct=1, wrong=0
     const attemptRepo = makeAttemptRepo({ findAttemptById: async () => makeAttempt({ id: 'att-mix', candidateId: 'u1', testId: 't1', status: 'SUBMITTED' }) });
     const examRepo: any = {
       findById: fakeExamRepo.findById,
@@ -36,8 +40,11 @@ describe('GetAttemptResultUseCase', () => {
     };
     const uc = new GetAttemptResultUseCase(attemptRepo as any, examRepo, fakeAnswerRepo);
     const res = await uc.execute('att-mix', 'u1');
+    // 3 soruluk test: q1 doğru, q2 ve q3 blank (null seçenek veya cevap yok)
     expect(res.summary.total).toBe(3);
-    expect(res.summary.blank).toBe(1);
+    expect(res.summary.correct).toBe(1);
+    expect(res.summary.blank).toBe(2);
+    expect(res.summary.wrong).toBe(0);
     expect(Array.isArray(res.questions)).toBeTruthy();
     const q1 = res.questions.find((q: any) => q.id === 'q1');
     expect(q1.correctOptionIds).toContain('o1');

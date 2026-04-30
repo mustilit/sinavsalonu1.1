@@ -45,6 +45,11 @@ export class PublishTestUseCase {
       throw new AppError('TEST_NOT_FOUND', 'Test not found', 400);
     }
 
+    // Taxonomy: examTypeId required for publish (FR-E-03); topic optional — check first
+    if (!(test as any).examTypeId) {
+      throw new AppError('TEST_TAXONOMY_REQUIRED', 'Test must have an exam type to be published', 409);
+    }
+
     // Minimum questions
     const qCount = test.questions?.length ?? 0;
     if (qCount < PublishTestUseCase.MIN_QUESTIONS) {
@@ -97,11 +102,6 @@ export class PublishTestUseCase {
           400,
         );
       }
-    }
-
-    // Taxonomy: examTypeId required for publish (FR-E-03); topic optional
-    if (!(test as any).examTypeId) {
-      throw new AppError('TEST_TAXONOMY_REQUIRED', 'Test must have an exam type to be published', 409);
     }
 
     // Ownership check: if actorId provided, must match educatorId

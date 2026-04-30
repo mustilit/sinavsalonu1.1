@@ -15,6 +15,7 @@ enum UserRole {
   ADMIN
   EDUCATOR
   CANDIDATE
+  WORKER
 }
 
 enum UserStatus {
@@ -87,7 +88,7 @@ enum ContractType {
   EDUCATOR
 }
 
-/** Reklam satın alma hedef türü: belirli test paketi veya eğiticinin kendisi */
+// Reklam satın alma hedef türü: belirli test paketi veya eğiticinin kendisi
 enum AdTargetType {
   TEST
   EDUCATOR
@@ -145,6 +146,7 @@ model User {
   adPurchases             AdPurchase[]             @relation("educatorAdPurchases")
   adImpressions           AdImpression[]           @relation("AdImpressionEducator")
   viewedAdImpressions     AdImpression[]           @relation("AdImpressionViewer")
+  workerPermission        WorkerPermission?
 
   @@index([tenantId])
   @@map("users")
@@ -287,12 +289,10 @@ model TestAttempt {
   finishedAt    DateTime?
   remainingSec  Int?
 
-  /**
-   * Süre aşımı süresi (saniye).
-   * Süreli testte aday izin verilen süreden sonra teslim ettiyse
-   * kaç saniye geç teslim ettiği burada saklanır.
-   * null → süre aşımı yok (zamanında teslim veya süreli olmayan test).
-   */
+  // Süre aşımı süresi (saniye).
+  // Süreli testte aday izin verilen süreden sonra teslim ettiyse
+  // kaç saniye geç teslim ettiği burada saklanır.
+  // null → süre aşımı yok (zamanında teslim veya süreli olmayan test).
   overtimeSeconds Int?
 
   test       ExamTest        @relation(fields: [testId], references: [id], onDelete: Cascade)
@@ -606,13 +606,13 @@ model AdPurchase {
   id                   String       @id @default(uuid())
   educatorId           String
   adPackageId          String
-  /** TEST: belirli bir paket öne çıkar; EDUCATOR: eğiticinin kendisi öne çıkar */
+  // TEST: belirli bir paket öne çıkar; EDUCATOR: eğiticinin kendisi öne çıkar
   targetType           AdTargetType @default(TEST)
-  /** TEST türünde zorunlu; EDUCATOR türünde null olabilir */
+  // TEST türünde zorunlu; EDUCATOR türünde null olabilir
   testId               String?
   validUntil           DateTime
   impressionsRemaining Int          @default(0)
-  /** Şimdiye kadar gerçekleşen toplam gösterim sayısı */
+  // Şimdiye kadar gerçekleşen toplam gösterim sayısı
   impressionsDelivered Int          @default(0)
   createdAt            DateTime     @default(now())
 
@@ -631,10 +631,8 @@ model AdPurchase {
   @@map("ad_purchases")
 }
 
-/**
- * Her ana sayfa yüklemesinde gerçekleşen reklam gösterimini kaydeder.
- * viewerUserId: giriş yapmış kullanıcı; null ise anonim ziyaretçi.
- */
+// Her ana sayfa yüklemesinde gerçekleşen reklam gösterimini kaydeder.
+// viewerUserId: giriş yapmış kullanıcı; null ise anonim ziyaretçi.
 model AdImpression {
   id           String   @id @default(uuid())
   purchaseId   String
@@ -682,4 +680,16 @@ model IdempotencyKey {
   @@unique([userId, route, key])
   @@index([expiresAt])
   @@index([userId, route])
+}
+
+// Worker rolü: sınırlı admin; hangi sayfalara erişebildiği burada saklanır
+model WorkerPermission {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pages     String[] // izin verilen sayfa adları, örn: ["AdminDashboard","ManageTests"]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("worker_permissions")
 }

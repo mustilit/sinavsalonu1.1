@@ -120,12 +120,14 @@ import { MePerformanceController } from './controllers/me.performance.controller
 import { GetTopicPerformanceUseCase } from '../application/use-cases/GetTopicPerformanceUseCase';
 // Heartbeat: istemci bağlantı sağlık kontrolü için kullanır
 import { MeHeartbeatController } from './controllers/me.heartbeat.controller';
+import { AdminWorkersController } from './controllers/admin.workers.controller';
+import { CreateWorkerUseCase } from '../application/use-cases/CreateWorkerUseCase';
+import { GetWorkerPermissionsUseCase } from '../application/use-cases/GetWorkerPermissionsUseCase';
+import { UpdateWorkerPermissionsUseCase } from '../application/use-cases/UpdateWorkerPermissionsUseCase';
 
 const THROTTLE_TTL_SECONDS = Number(process.env.THROTTLE_TTL_SECONDS ?? '60') || 60;
 
-const throttleDisabled =
-  process.env.THROTTLE_DISABLED === '1' &&
-  (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev' || process.env.NODE_ENV === 'local');
+const throttleDisabled = process.env.THROTTLE_DISABLED === '1';
 
 @Module({
   imports: [
@@ -186,7 +188,7 @@ const throttleDisabled =
     (require('./modules/refunds/refunds.module').RefundsModule),
     ContractsModule,
   ],
-  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AdminCandidatesController, AdminEducatorReportController, AdminCommissionController, AdminAdReportController, MePerformanceController, MeHeartbeatController],
+  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AdminCandidatesController, AdminEducatorReportController, AdminCommissionController, AdminAdReportController, MePerformanceController, MeHeartbeatController, AdminWorkersController],
   providers: [
     SeedService,
     ...(throttleDisabled ? [] : [{ provide: APP_GUARD, useClass: CustomThrottlerGuard }]),
@@ -198,8 +200,16 @@ const throttleDisabled =
     PrismaAuditLogRepository,
     PrismaAttemptRepository,
     PrismaExamRepository,
-    ListExamTypesUseCase,
-    CreateExamTypeUseCase,
+    {
+      provide: ListExamTypesUseCase,
+      useFactory: (repo: PrismaExamTypeRepository) => new ListExamTypesUseCase(repo),
+      inject: [EXAM_TYPE_REPO],
+    },
+    {
+      provide: CreateExamTypeUseCase,
+      useFactory: (repo: PrismaExamTypeRepository, audit: PrismaAuditLogRepository) => new CreateExamTypeUseCase(repo, audit),
+      inject: [EXAM_TYPE_REPO, PrismaAuditLogRepository],
+    },
     {
       provide: UpdateExamTypeUseCase,
       useFactory: (repo: PrismaExamTypeRepository, audit: PrismaAuditLogRepository) => new UpdateExamTypeUseCase(repo, audit),
@@ -210,8 +220,16 @@ const throttleDisabled =
       useFactory: (repo: PrismaExamTypeRepository, audit: PrismaAuditLogRepository) => new DeleteExamTypeUseCase(repo, audit),
       inject: [EXAM_TYPE_REPO, PrismaAuditLogRepository],
     },
-    ListTopicsByExamTypeUseCase,
-    CreateTopicUseCase,
+    {
+      provide: ListTopicsByExamTypeUseCase,
+      useFactory: (repo: PrismaTopicRepository) => new ListTopicsByExamTypeUseCase(repo),
+      inject: [TOPIC_REPO],
+    },
+    {
+      provide: CreateTopicUseCase,
+      useFactory: (topicRepo: PrismaTopicRepository, examTypeRepo: PrismaExamTypeRepository, audit: PrismaAuditLogRepository) => new CreateTopicUseCase(topicRepo, examTypeRepo, audit),
+      inject: [TOPIC_REPO, EXAM_TYPE_REPO, PrismaAuditLogRepository],
+    },
     {
       provide: UpdateTopicUseCase,
       useFactory: (repo: PrismaTopicRepository, audit: PrismaAuditLogRepository) => new UpdateTopicUseCase(repo, audit),
@@ -222,9 +240,21 @@ const throttleDisabled =
       useFactory: (repo: PrismaTopicRepository, audit: PrismaAuditLogRepository) => new DeleteTopicUseCase(repo, audit),
       inject: [TOPIC_REPO, PrismaAuditLogRepository],
     },
-    ApproveEducatorUseCase,
-    SuspendEducatorUseCase,
-    UnsuspendEducatorUseCase,
+    {
+      provide: ApproveEducatorUseCase,
+      useFactory: (userRepo: PrismaUserRepository, auditRepo: PrismaAuditLogRepository) => new ApproveEducatorUseCase(userRepo, auditRepo),
+      inject: [USER_REPO, AUDIT_LOG_REPO],
+    },
+    {
+      provide: SuspendEducatorUseCase,
+      useFactory: (userRepo: PrismaUserRepository, auditRepo: PrismaAuditLogRepository) => new SuspendEducatorUseCase(userRepo, auditRepo),
+      inject: [USER_REPO, AUDIT_LOG_REPO],
+    },
+    {
+      provide: UnsuspendEducatorUseCase,
+      useFactory: (userRepo: PrismaUserRepository, auditRepo: PrismaAuditLogRepository) => new UnsuspendEducatorUseCase(userRepo, auditRepo),
+      inject: [USER_REPO, AUDIT_LOG_REPO],
+    },
     {
       provide: CreateObjectionUseCase,
       useFactory: (
@@ -299,8 +329,8 @@ const throttleDisabled =
       useFactory: (refundRepo: PrismaRefundRepository) => new ListPendingRefundsUseCase(refundRepo),
       inject: [PrismaRefundRepository],
     },
-    GetAdminSettingsUseCase,
-    UpdateAdminSettingsUseCase,
+    { provide: GetAdminSettingsUseCase, useFactory: () => new GetAdminSettingsUseCase() },
+    { provide: UpdateAdminSettingsUseCase, useFactory: () => new UpdateAdminSettingsUseCase() },
     GetSiteSettingsUseCase,
     UpdateSiteSettingsUseCase,
     ListFeaturedEducatorsUseCase,
@@ -389,6 +419,10 @@ const throttleDisabled =
     GetAdminAdReportUseCase,
     // Konu bazlı aday performans raporu
     GetTopicPerformanceUseCase,
+    // Worker rol sistemi
+    { provide: CreateWorkerUseCase, useFactory: () => new CreateWorkerUseCase() },
+    { provide: GetWorkerPermissionsUseCase, useFactory: () => new GetWorkerPermissionsUseCase() },
+    { provide: UpdateWorkerPermissionsUseCase, useFactory: () => new UpdateWorkerPermissionsUseCase() },
   ],
 })
 export class AppModule {}

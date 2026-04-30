@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Req, Query, Inject } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Req, Query, Inject, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiConflictResponse, ApiBadRequestResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { ParseUUIDPipe } from '../pipes/parse-uuid.pipe';
@@ -29,6 +29,7 @@ export class EducatorObjectionsController {
   }
 
   @Post(':id/answer')
+  @HttpCode(200)
   @Roles('EDUCATOR')
   @ApiBearerAuth('bearer')
   @ApiOkResponse({ description: 'Objection answered' })

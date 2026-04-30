@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { auth } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -161,7 +161,7 @@ export default function CompleteProfile() {
       const preferredUserType = sessionStorage.getItem('preferred_user_type');
       const role = preferredUserType === 'educator' ? 'educator' : 'user';
       
-      await base44.auth.updateMe({
+      await auth.updateMe({
         ...formData,
         role: role
       });

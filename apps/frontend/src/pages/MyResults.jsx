@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfWeek, endOfWeek, subWeeks } from "date-fns";
@@ -37,7 +37,7 @@ export default function MyResults() {
 
   const { data: rawResults, isLoading, isError } = useQuery({
     queryKey: ["myResults", user?.id],
-    queryFn: () => base44.entities.TestResult.filter({ user_email: user?.email }),
+    queryFn: () => entities.TestResult.filter({ user_email: user?.email }),
     enabled: !!user,
   });
 

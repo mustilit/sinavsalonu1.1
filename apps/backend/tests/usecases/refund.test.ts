@@ -1,6 +1,15 @@
 import { CreateRefundRequestUseCase } from '../../src/application/use-cases/CreateRefundRequestUseCase';
 import { ResolveRefundRequestUseCase } from '../../src/application/use-cases/ResolveRefundRequestUseCase';
 
+// Prisma mock — CreateRefundRequestUseCase.getTestIdFromPurchase içinde require ile kullanılır
+jest.mock('../../src/infrastructure/database/prisma', () => ({
+  prisma: {
+    purchase: {
+      findUnique: jest.fn().mockResolvedValue({ id: 'p1', testId: 't1', userId: 'c1' }),
+    },
+  },
+}));
+
 test('create refund fails if objections <10', async () => {
   const refundRepo: any = { findByPurchaseId: async () => null, create: async () => null };
   const objectionRepo: any = { countByTestAndCandidate: async () => 5 };
@@ -43,4 +52,3 @@ test('admin reject -> status updated', async () => {
   const res = await uc.execute('r1', 'REJECTED', 'admin1');
   expect(res.status).toBe('REJECTED');
 });
-

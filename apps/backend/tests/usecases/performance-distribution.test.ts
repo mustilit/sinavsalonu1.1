@@ -1,5 +1,25 @@
 import { GetPerformanceDistributionUseCase } from '../../src/application/use-cases/GetPerformanceDistributionUseCase';
 
+// Prisma mock — testlerde gerçek DB bağlantısı olmaz
+jest.mock('../../src/infrastructure/database/prisma', () => ({
+  prisma: {
+    examTest: {
+      findUnique: jest.fn().mockResolvedValue({ questionCount: 5 }),
+    },
+    examQuestion: {
+      count: jest.fn().mockResolvedValue(5),
+    },
+  },
+}));
+
+// RedisCache mock — testlerde gerçek Redis bağlantısı olmaz
+jest.mock('../../src/infrastructure/cache/RedisCache', () => ({
+  RedisCache: jest.fn().mockImplementation(() => ({
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
+
 test('returns limited when participants <5', async () => {
   const attemptRepo: any = {
     countSubmittedByTest: async () => 3,
@@ -15,7 +35,14 @@ test('returns limited when participants <5', async () => {
 test('computes histogram and percentiles', async () => {
   const attemptRepo: any = {
     countSubmittedByTest: async () => 10,
-    groupScoresByTest: async () => [{ score: 0, count: 2 }, { score: 1, count: 3 }, { score: 2, count: 5 }, { score: 999, count: 1 }, { score: -1, count: 1 }, { score: null, count: 1 }],
+    groupScoresByTest: async () => [
+      { score: 0, count: 2 },
+      { score: 1, count: 3 },
+      { score: 2, count: 5 },
+      { score: 999, count: 1 },
+      { score: -1, count: 1 },
+      { score: null, count: 1 },
+    ],
     findLatestSubmittedAttempt: async () => ({ id: 'a1', score: 1 }),
     findAttemptById: async () => ({ id: 'a1', candidateId: 'c1', score: 1 }),
   };
@@ -24,6 +51,5 @@ test('computes histogram and percentiles', async () => {
   expect(res.histogram).toBeDefined();
   expect(res.stats).toBeDefined();
   expect(res.my).toBeDefined();
-  expect(res.my.percentile).toBeGreaterThanOrEqual(0);
+  expect(res.my!.percentile).toBeGreaterThanOrEqual(0);
 });
-

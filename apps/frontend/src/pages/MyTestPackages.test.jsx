@@ -11,16 +11,19 @@ const queryClient = new QueryClient({
   },
 });
 
-vi.mock('@/api/base44Client', () => ({
-  base44: {
-    entities: {
-      TestPackage: {
-        filter: vi.fn().mockResolvedValue([]),
-        update: vi.fn().mockResolvedValue({}),
-      },
-      ExamType: {
-        filter: vi.fn().mockResolvedValue([]),
-      },
+vi.mock('@/api/dalClient', () => ({
+  auth: {
+    login: vi.fn(),
+    logout: vi.fn(),
+    getCurrentUser: vi.fn(),
+  },
+  entities: {
+    TestPackage: {
+      filter: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
+    },
+    ExamType: {
+      filter: vi.fn().mockResolvedValue([]),
     },
   },
 }));

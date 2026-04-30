@@ -1,12 +1,11 @@
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
+import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StatCard from "@/components/ui/StatCard";
 import { 
-  Users, 
   BookOpen, 
   ShoppingBag, 
   TrendingUp,
@@ -21,25 +20,25 @@ export default function AdminDashboard() {
 
   const { data: users = [] } = useQuery({
     queryKey: ["allUsers"],
-    queryFn: () => base44.entities.User.list(),
+    queryFn: () => entities.User.list(),
     enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
   });
 
   const { data: tests = [] } = useQuery({
     queryKey: ["allTests"],
-    queryFn: () => base44.entities.TestPackage.list(),
+    queryFn: () => entities.TestPackage.list(),
     enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
   });
 
   const { data: sales = [] } = useQuery({
     queryKey: ["allSales"],
-    queryFn: () => base44.entities.Purchase.list("-created_date", 100),
+    queryFn: () => entities.Purchase.list("-created_date", 100),
     enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
   });
 
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn: () => base44.entities.ExamType.list(),
+    queryFn: () => entities.ExamType.list(),
     enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
   });
 

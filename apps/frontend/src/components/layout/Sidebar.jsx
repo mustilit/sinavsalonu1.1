@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
@@ -27,6 +27,7 @@ export default function Sidebar({ user, currentPage }) {
   const isEducator = role === "EDUCATOR";
   const isApprovedEducator = isEducator && (user?.status === "ACTIVE" || user?.educatorApprovedAt);
   const isAdmin = role === "ADMIN";
+  const isWorker = role === "WORKER";
 
   const candidateLinks = [
     { name: "Ana Sayfa", page: "Home", icon: Home },
@@ -68,19 +69,25 @@ export default function Sidebar({ user, currentPage }) {
     { name: "Sistem Kontrolleri", page: "AdminSystemControls", icon: ShieldAlert },
   ];
 
+  // Worker: yalnızca kendisine atanan admin sayfaları
+  const workerPages = Array.isArray(user?.workerPages) ? user.workerPages : [];
+  const workerLinks = adminLinks.filter(link => link.page && workerPages.includes(link.page));
+
   let links = candidateLinks;
   if (isAdmin) {
     links = [...adminLinks, { divider: true }, ...candidateLinks];
+  } else if (isWorker) {
+    links = workerLinks;
   } else if (isEducator) {
     links = [
       ...educatorLinks,
       ...(isApprovedEducator ? [] : [
         { divider: true },
-        { 
-          name: "⚠️ Hesap Onayı Bekleniyor", 
+        {
+          name: "⚠️ Hesap Onayı Bekleniyor",
           page: "EducatorSettings",
           icon: Settings,
-          isPending: true 
+          isPending: true
         }
       ])
     ];
@@ -134,7 +141,7 @@ export default function Sidebar({ user, currentPage }) {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-slate-900 truncate">{user?.full_name || user?.username}</p>
             <p className="text-xs text-slate-500 truncate">
-              {isAdmin ? "Yönetici" : isEducator ? "Eğitici" : "Aday"}
+              {isAdmin ? "Yönetici" : isWorker ? "Çalışan" : isEducator ? "Eğitici" : "Aday"}
             </p>
           </div>
         </div>
