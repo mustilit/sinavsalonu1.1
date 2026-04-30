@@ -132,14 +132,23 @@ export default function CreateTest() {
   });
 
   // Konu listesi: soru formunda kullanılacak (düz/flat liste)
+  // Admin topics endpoint'i kullanır; eğiticiler için boş döner (403) — graceful fallback
   const { data: topicList = [] } = useQuery({
     queryKey: ["topicsFlat", formData.exam_type_id],
-    queryFn:  () => topicsApi.flat(formData.exam_type_id || undefined),
+    queryFn:  async () => {
+      try {
+        return await topicsApi.flat(formData.exam_type_id || undefined);
+      } catch {
+        return [];
+      }
+    },
     enabled:  step >= 2,
+    retry:    false,
+    staleTime: 60_000,
   });
 
   // Oluşturulan testin soruları
-  const { data: testDetail, refetch: refetchTest } = useQuery({
+  const { data: testDetail } = useQuery({
     queryKey: ["test", testId],
     queryFn:  async () => { const { data } = await api.get(`/tests/${testId}`); return data; },
     enabled:  !!testId,
@@ -152,24 +161,23 @@ export default function CreateTest() {
   const createTestMutation = useMutation({
     mutationFn: async () => {
       if (testId) {
-        // Geri gelindi, sadece güncelle
+        // Kullanıcı geri gelip tekrar ileri tıkladı — testi güncelle
+        // UpdateTestDto: title, priceCents, duration, isTimed, hasSolutions
         await api.patch(`/tests/${testId}`, {
-          title:       formData.title,
-          description: formData.description || undefined,
-          examTypeId:  formData.exam_type_id || undefined,
-          priceCents:  Math.round((formData.price || 0) * 100),
-          isTimed:     formData.is_timed,
-          duration:    formData.duration_minutes || 60,
+          title:      formData.title,
+          priceCents: Math.round((formData.price || 0) * 100),
+          isTimed:    formData.is_timed,
+          duration:   formData.duration_minutes || 60,
         });
         return { id: testId };
       }
+      // CreateTestDto: title, isTimed, duration, price (kuruş cinsinden), examTypeId, topicId
       const { data } = await api.post("/tests", {
-        title:       formData.title,
-        description: formData.description || undefined,
-        examTypeId:  formData.exam_type_id || undefined,
-        priceCents:  Math.round((formData.price || 0) * 100),
-        isTimed:     formData.is_timed,
-        duration:    formData.duration_minutes || 60,
+        title:      formData.title,
+        examTypeId: formData.exam_type_id || undefined,
+        price:      Math.round((formData.price || 0) * 100),
+        isTimed:    formData.is_timed,
+        duration:   formData.duration_minutes || 60,
       });
       return data;
     },
@@ -199,7 +207,7 @@ export default function CreateTest() {
     },
     onSuccess: () => {
       toast.success("Soru eklendi");
-      refetchTest();
+      qc.invalidateQueries({ queryKey: ["test", testId] });
       setShowNewForm(false);
       setEditingQuestion(null);
     },
@@ -230,7 +238,7 @@ export default function CreateTest() {
     },
     onSuccess: () => {
       toast.success("Soru güncellendi");
-      refetchTest();
+      qc.invalidateQueries({ queryKey: ["test", testId] });
       setEditingQuestion(null);
       setShowNewForm(false);
     },
@@ -240,7 +248,7 @@ export default function CreateTest() {
   // Soru sil
   const deleteQuestionMutation = useMutation({
     mutationFn: (qId) => api.delete(`/tests/${testId}/questions/${qId}`),
-    onSuccess:  () => { toast.success("Soru silindi"); refetchTest(); },
+    onSuccess:  () => { toast.success("Soru silindi"); qc.invalidateQueries({ queryKey: ["test", testId] }); },
     onError:    () => toast.error("Soru silinemedi"),
   });
 

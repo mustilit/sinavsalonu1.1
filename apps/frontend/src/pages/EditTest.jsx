@@ -62,10 +62,19 @@ export default function EditTest() {
   });
 
   // Soru bazında konu seçimi için düz liste
+  // /admin/topics endpoint'i ADMIN gerektirir; eğiticiler için boş döner — graceful fallback
   const { data: topicList = [] } = useQuery({
     queryKey: ["topicsFlat", formData?.exam_type_id],
-    queryFn:  () => topicsApi.flat(formData?.exam_type_id || undefined),
-    enabled:  !!formData,
+    queryFn:  async () => {
+      try {
+        return await topicsApi.flat(formData?.exam_type_id || undefined);
+      } catch {
+        return [];
+      }
+    },
+    enabled:   !!formData,
+    retry:     false,
+    staleTime: 60_000,
   });
 
   const questions = testDetail?.questions || [];
