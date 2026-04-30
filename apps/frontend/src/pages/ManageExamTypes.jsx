@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import api from "@/lib/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,7 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Edit2, Trash2, Award } from "lucide-react";
+import { Plus, Edit2, Trash2, Award, Search, X, CalendarDays } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +42,21 @@ export default function ManageExamTypes() {
   const [formData, setFormData] = useState({ name: "", description: "", active: true });
   const queryClient = useQueryClient();
 
+  // Filtreler
+  const [searchName, setSearchName] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all"); // "all" | "active" | "passive"
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+
+  const hasFilter = searchName || filterStatus !== "all" || filterDateFrom || filterDateTo;
+
+  const clearFilters = () => {
+    setSearchName("");
+    setFilterStatus("all");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+  };
+
   const { data: examTypes = [], isLoading } = useQuery({
     queryKey: ["examTypes"],
     queryFn: async () => {
@@ -43,6 +65,27 @@ export default function ManageExamTypes() {
     },
     enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
   });
+
+  // İstemci tarafı filtreleme
+  const filteredExamTypes = useMemo(() => {
+    return examTypes.filter((exam) => {
+      if (searchName && !exam.name.toLowerCase().includes(searchName.toLowerCase())) return false;
+      if (filterStatus === "active" && !exam.active) return false;
+      if (filterStatus === "passive" && exam.active) return false;
+      if (filterDateFrom) {
+        const created = new Date(exam.createdAt);
+        const from = new Date(filterDateFrom);
+        if (created < from) return false;
+      }
+      if (filterDateTo) {
+        const created = new Date(exam.createdAt);
+        const to = new Date(filterDateTo);
+        to.setHours(23, 59, 59, 999);
+        if (created > to) return false;
+      }
+      return true;
+    });
+  }, [examTypes, searchName, filterStatus, filterDateFrom, filterDateTo]);
 
   const createMutation = useMutation({
     mutationFn: (data) => api.post("/admin/exam-types", data),
@@ -125,6 +168,83 @@ export default function ManageExamTypes() {
         </Button>
       </div>
 
+      {/* Filtre Paneli */}
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-3 items-end">
+            {/* İsim arama */}
+            <div className="flex-1 min-w-[180px]">
+              <Label className="text-xs text-slate-500 mb-1 block">İsim</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                  placeholder="Sınav türü ara..."
+                  className="pl-8 h-9"
+                />
+              </div>
+            </div>
+
+            {/* Aktiflik */}
+            <div className="min-w-[140px]">
+              <Label className="text-xs text-slate-500 mb-1 block">Durum</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tümü</SelectItem>
+                  <SelectItem value="active">Aktif</SelectItem>
+                  <SelectItem value="passive">Pasif</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tarih aralığı */}
+            <div className="min-w-[140px]">
+              <Label className="text-xs text-slate-500 mb-1 block">
+                <CalendarDays className="inline w-3.5 h-3.5 mr-1" />
+                Başlangıç tarihi
+              </Label>
+              <Input
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+                className="h-9"
+              />
+            </div>
+            <div className="min-w-[140px]">
+              <Label className="text-xs text-slate-500 mb-1 block">
+                <CalendarDays className="inline w-3.5 h-3.5 mr-1" />
+                Bitiş tarihi
+              </Label>
+              <Input
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+                className="h-9"
+              />
+            </div>
+
+            {/* Temizle */}
+            {hasFilter && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 text-slate-500">
+                <X className="w-4 h-4 mr-1" />
+                Temizle
+              </Button>
+            )}
+          </div>
+
+          {/* Sonuç özeti */}
+          {hasFilter && (
+            <p className="text-xs text-slate-400 mt-2">
+              {filteredExamTypes.length} / {examTypes.length} sonuç gösteriliyor
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
@@ -133,14 +253,21 @@ export default function ManageExamTypes() {
                 <div key={i} className="h-16 bg-slate-100 rounded-lg animate-pulse" />
               ))}
             </div>
-          ) : examTypes.length === 0 ? (
+          ) : filteredExamTypes.length === 0 ? (
             <div className="text-center py-12">
               <Award className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">Henüz sınav türü yok</p>
+              <p className="text-slate-500">
+                {hasFilter ? "Filtreyle eşleşen sınav türü bulunamadı" : "Henüz sınav türü yok"}
+              </p>
+              {hasFilter && (
+                <Button variant="link" size="sm" onClick={clearFilters} className="mt-1 text-indigo-600">
+                  Filtreleri temizle
+                </Button>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {examTypes.map((exam) => (
+              {filteredExamTypes.map((exam) => (
                 <div key={exam.id} className="flex items-center justify-between p-6">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
@@ -151,6 +278,16 @@ export default function ManageExamTypes() {
                       <p className="text-sm text-slate-500 line-clamp-1">
                         {exam.description || "Açıklama yok"}
                       </p>
+                      {exam.createdAt && (
+                        <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                          <CalendarDays className="w-3 h-3" />
+                          {new Date(exam.createdAt).toLocaleDateString("tr-TR", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
