@@ -1,68 +1,59 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { ITopicRepository } from '../../domain/interfaces/ITopicRepository';
-import { IExamTypeRepository } from '../../domain/interfaces/IExamTypeRepository';
-import { PrismaAuditLogRepository } from '../../infrastructure/repositories/PrismaAuditLogRepository';
-import { EXAM_TYPE_REPO } from '../constants';
-import { TOPIC_REPO } from '../constants';
+import { Injectable } from '@nestjs/common';
+import { prisma } from '../../infrastructure/database/prisma';
 import { slugify } from '../utils/slugify';
 
-/** UUID formatı doğrulama — gelen examTypeId'nin geçerli olduğunu kontrol eder */
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 /**
- * Belirtilen sınav türüne yeni konu ekler (örn. YKS > Matematik).
- * Slug aynı sınav türü içinde benzersiz olmalıdır.
+ * Yeni konu oluşturur. examTypeIds dizisi ile birden fazla sınav türüne bağlanabilir.
+ * parentId ile üst konuya bağlanarak ağaç yapısı oluşturulur.
  */
 @Injectable()
 export class CreateTopicUseCase {
-  constructor(
-    @Inject(TOPIC_REPO) private readonly topicRepo: ITopicRepository,
-    @Inject(EXAM_TYPE_REPO) private readonly examTypeRepo: IExamTypeRepository,
-    private readonly auditRepo: PrismaAuditLogRepository,
-  ) {}
-
   async execute(
-    input: { examTypeId: string; name: string; slug?: string; active?: boolean },
+    input: { name: string; examTypeIds?: string[]; parentId?: string; active?: boolean },
     actorId?: string,
   ) {
-    if (!UUID_REGEX.test(input.examTypeId)) {
-      const err: any = new Error('Invalid examTypeId');
-      err.status = 400;
-      err.code = 'INVALID_UUID';
-      throw err;
+    if (!input.name?.trim()) {
+      const e: any = new Error('Konu adı zorunludur'); e.status = 400; throw e;
     }
-    const examType = await this.examTypeRepo.findById(input.examTypeId);
-    if (!examType) {
-      const err: any = new Error('ExamType not found');
-      err.status = 404;
-      err.code = 'EXAMTYPE_NOT_FOUND';
-      throw err;
+    const slug = slugify(input.name);
+
+    if (input.parentId) {
+      const parent = await prisma.topic.findUnique({ where: { id: input.parentId } });
+      if (!parent) { const e: any = new Error('Üst konu bulunamadı'); e.status = 404; throw e; }
     }
-    const slug = input.slug?.trim() ? slugify(input.slug) : slugify(input.name);
-    const existing = await this.topicRepo.findByExamTypeAndSlug(input.examTypeId, slug);
-    if (existing) {
-      const err: any = new Error('TOPIC_SLUG_EXISTS');
-      err.status = 409;
-      err.code = 'TOPIC_SLUG_EXISTS';
-      throw err;
-    }
-    const created = await this.topicRepo.create({
-      examTypeId: input.examTypeId,
-      name: input.name,
-      slug,
-      active: input.active ?? true,
+
+    const created = await (prisma.topic as any).create({
+      data: {
+        name: input.name.trim(),
+        slug,
+        active: input.active ?? true,
+        parentId: input.parentId ?? null,
+        examTypes: input.examTypeIds?.length
+          ? { create: input.examTypeIds.map((eid) => ({ examTypeId: eid })) }
+          : undefined,
+      },
+      include: {
+        examTypes: { include: { examType: { select: { id: true, name: true } } } },
+        parent: { select: { id: true, name: true } },
+        children: true,
+      },
     });
+
     try {
-      await this.auditRepo.create({
-        action: 'TOPIC_CREATED',
-        entityType: 'TOPIC',
-        entityId: created.id,
-        actorId: actorId ?? null,
-        metadata: {},
+      await (prisma as any).auditLog.create({
+        data: { action: 'TOPIC_CREATED', entityType: 'TOPIC', entityId: created.id, actorId: actorId ?? null, metadata: {} },
       });
-    } catch {
-      // swallow audit errors
-    }
-    return created;
+    } catch { /* swallow */ }
+
+    return this.mapTopic(created);
+  }
+
+  private mapTopic(t: any) {
+    return {
+      id: t.id, name: t.name, slug: t.slug, active: t.active,
+      parentId: t.parentId ?? null, parentName: t.parent?.name ?? null,
+      examTypes: t.examTypes.map((te: any) => ({ id: te.examType.id, name: te.examType.name })),
+      children: [],
+    };
   }
 }

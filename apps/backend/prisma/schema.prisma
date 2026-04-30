@@ -173,7 +173,7 @@ model ExamType {
   updatedAt   DateTime @updatedAt
   slug        String   @unique
   active      Boolean  @default(true)
-  topics      Topic[]
+  topics      TopicExamType[]
 
   tests ExamTest[]
 
@@ -183,17 +183,29 @@ model ExamType {
 // --- Sınav / Test Modülü ---
 
 model Topic {
-  id         String     @id @default(uuid())
-  examTypeId String
-  examType   ExamType   @relation(fields: [examTypeId], references: [id])
-  name       String
-  slug       String
-  active     Boolean    @default(true)
-  createdAt  DateTime   @default(now())
-  tests      ExamTest[]
+  id        String   @id @default(uuid())
+  name      String
+  slug      String
+  active    Boolean  @default(true)
+  parentId  String?
+  createdAt DateTime @default(now())
 
-  @@unique([examTypeId, slug])
+  parent    Topic?          @relation("TopicTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Topic[]         @relation("TopicTree")
+  examTypes TopicExamType[]
+  tests     ExamTest[]
+
   @@map("topics")
+}
+
+model TopicExamType {
+  topicId    String
+  examTypeId String
+  topic      Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  examType   ExamType @relation(fields: [examTypeId], references: [id], onDelete: Cascade)
+
+  @@id([topicId, examTypeId])
+  @@map("topic_exam_types")
 }
 
 model ExamTest {

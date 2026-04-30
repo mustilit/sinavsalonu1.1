@@ -1,34 +1,25 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { ITopicRepository } from '../../domain/interfaces/ITopicRepository';
-import { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository';
-import { TOPIC_REPO } from '../constants';
-import { AppError } from '../errors/AppError';
+import { Injectable } from '@nestjs/common';
+import { prisma } from '../../infrastructure/database/prisma';
 
 /**
- * Soru konusunu kalıcı olarak siler.
- * Konuya bağlı sorular varsa silme repo katmanında engellenebilir.
+ * Konuyu siler. Alt konular silinmez — parentId null olur (yetim kalır).
  */
 @Injectable()
 export class DeleteTopicUseCase {
-  constructor(
-    @Inject(TOPIC_REPO) private readonly repo: ITopicRepository,
-    private readonly auditRepo: IAuditLogRepository,
-  ) {}
-
   async execute(id: string, actorId?: string) {
-    const existing = await this.repo.findById(id);
-    if (!existing) throw new AppError('NOT_FOUND', 'Topic not found', 404);
+    const existing = await prisma.topic.findUnique({ where: { id } });
+    if (!existing) { const e: any = new Error('Konu bulunamadı'); e.status = 404; throw e; }
 
-    const deleted = await this.repo.delete(id);
-    if (!deleted) throw new AppError('CONFLICT', 'Cannot delete topic', 409);
+    // Alt konuları yetim bırak (parentId = null)
+    await (prisma.topic as any).updateMany({ where: { parentId: id }, data: { parentId: null } });
+    await prisma.topic.delete({ where: { id } });
 
-    if (this.auditRepo) {
-      try {
-        await this.auditRepo.create({ action: 'TOPIC_DELETED', entityType: 'Topic', entityId: id, actorId: actorId ?? null, metadata: {} });
-      } catch {
-        /* swallow */
-      }
-    }
+    try {
+      await (prisma as any).auditLog.create({
+        data: { action: 'TOPIC_DELETED', entityType: 'TOPIC', entityId: id, actorId: actorId ?? null, metadata: {} },
+      });
+    } catch { /* swallow */ }
+
     return { deleted: true };
   }
 }

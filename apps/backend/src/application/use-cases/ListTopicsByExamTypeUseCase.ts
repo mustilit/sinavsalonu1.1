@@ -1,31 +1,30 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { ITopicRepository } from '../../domain/interfaces/ITopicRepository';
-import { TOPIC_REPO } from '../constants';
-
-/** UUID doğrulama regex'i — examTypeId formatı bu kuralla kontrol edilir. */
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { Injectable } from '@nestjs/common';
+import { prisma } from '../../infrastructure/database/prisma';
 
 /**
- * Belirli bir sınav türüne ait konuları listeler.
- * examTypeId UUID formatında olmalıdır; geçersizse 400 hatası fırlatılır.
+ * Sınav türüne göre konuları düz liste olarak döndürür.
+ * examTypeId verilmezse tüm konular döner.
  */
 @Injectable()
 export class ListTopicsByExamTypeUseCase {
-  constructor(@Inject(TOPIC_REPO) private readonly repo: ITopicRepository) {}
+  async execute(examTypeId?: string, activeOnly = true) {
+    const where: any = activeOnly ? { active: true } : {};
+    if (examTypeId) where.examTypes = { some: { examTypeId } };
 
-  /**
-   * Sınav türüne göre konuları getirir.
-   * @param examTypeId - Sınav türü ID'si (UUID formatında olmalı).
-   * @param activeOnly - Sadece aktif konular dönsün mü? Varsayılan: true.
-   */
-  async execute(examTypeId: string, activeOnly = true) {
-    // examTypeId boş veya UUID formatına uymuyorsa erken hata döndür
-    if (!examTypeId || !UUID_REGEX.test(examTypeId)) {
-      const err: any = new Error('Invalid examTypeId');
-      err.status = 400;
-      err.code = 'INVALID_UUID';
-      throw err;
-    }
-    return this.repo.listByExamType(examTypeId, activeOnly);
+    const rows = await (prisma.topic as any).findMany({
+      where,
+      include: {
+        examTypes: { include: { examType: { select: { id: true, name: true } } } },
+        parent: { select: { id: true, name: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return rows.map((r: any) => ({
+      id: r.id, name: r.name, slug: r.slug, active: r.active,
+      parentId: (r as any).parentId ?? null,
+      parentName: (r as any).parent?.name ?? null,
+      examTypes: (r as any).examTypes.map((te: any) => ({ id: te.examType.id, name: te.examType.name })),
+    }));
   }
 }

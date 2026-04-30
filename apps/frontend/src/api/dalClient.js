@@ -481,24 +481,17 @@ export const entities = {
     },
   },
 
-  // Topic
+  // Topic (legacy flat adapter — kept for backward compat)
   Topic: {
-    list: async (sort) => {
-      const { data: examTypes } = await api.get('/site/exam-types');
-      const types = Array.isArray(examTypes) ? examTypes : examTypes?.items ?? [];
-      const all = [];
-      for (const et of types) {
-        const { data } = await api.get('/admin/topics', { params: { examTypeId: et.id } });
-        const items = Array.isArray(data) ? data : [];
-        all.push(...items.map((t) => ({ ...t, exam_type_id: et.id })));
-      }
-      return all;
+    list: async () => {
+      const { data } = await api.get('/admin/topics');
+      return Array.isArray(data) ? data : [];
     },
     create: async (body) => {
       const { data } = await api.post('/admin/topics', {
-        examTypeId: body.exam_type_id ?? body.examTypeId,
         name: body.name,
-        slug: body.slug ?? body.name?.toLowerCase().replace(/\s+/g, '-'),
+        examTypeIds: body.examTypeIds ?? (body.exam_type_id ? [body.exam_type_id] : []),
+        parentId: body.parentId ?? null,
         active: body.active !== false,
       });
       return data;
@@ -610,6 +603,35 @@ function testPackageAdapter(t) {
     createdAt: t.createdAt,
   };
 }
+
+/** topics — admin ağaç CRUD API (ManageTopics sayfası için) */
+export const topics = {
+  /** Tam ağaç — inactive dahil, admin paneli için */
+  tree: async () => {
+    const { data } = await api.get('/admin/topics/tree');
+    return Array.isArray(data) ? data : [];
+  },
+  /** Düz liste — opsiyonel examTypeId filtresi */
+  flat: async (examTypeId) => {
+    const params = examTypeId ? { examTypeId } : {};
+    const { data } = await api.get('/admin/topics', { params });
+    return Array.isArray(data) ? data : [];
+  },
+  /** Yeni konu — parentId ile alt konu oluşturulabilir */
+  create: async ({ name, examTypeIds = [], parentId = null, active = true }) => {
+    const { data } = await api.post('/admin/topics', { name, examTypeIds, parentId, active });
+    return data;
+  },
+  /** Konu güncelle */
+  update: async (id, body) => {
+    const { data } = await api.patch(`/admin/topics/${id}`, body);
+    return data;
+  },
+  /** Konu sil */
+  remove: async (id) => {
+    await api.delete(`/admin/topics/${id}`);
+  },
+};
 
 export default api;
 export { api };

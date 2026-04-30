@@ -1,13 +1,13 @@
 import { useState } from "react";
+import { topics as topicsApi } from "@/api/dalClient";
 import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit2, Trash2, BookOpen } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Edit2, Trash2, ChevronRight, ChevronDown, BookOpen } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -26,241 +26,420 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
-/**
- * ManageTopics (Soru Konuları Yönetimi) sayfası — admin'e özel;
- * sınav türlerine bağlı soru konularını listeleme, ekleme, düzenleme
- * ve silme işlemlerini sağlar. Admin olmayan kullanıcılara erişim engellenir.
- */
+// ── Çoklu sınav türü seçici ──────────────────────────────────────────────────
+function ExamTypeMultiSelect({ examTypes = [], selected = [], onChange }) {
+  const toggle = (id) =>
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-1">
+      {examTypes.map((et) => {
+        const active = selected.includes(et.id);
+        return (
+          <button
+            key={et.id}
+            type="button"
+            onClick={() => toggle(et.id)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+              active
+                ? "bg-indigo-600 text-white border-indigo-600"
+                : "bg-white text-slate-600 border-slate-300 hover:border-indigo-400"
+            }`}
+          >
+            {et.name}
+          </button>
+        );
+      })}
+      {examTypes.length === 0 && (
+        <p className="text-xs text-slate-400">Sınav türleri yükleniyor...</p>
+      )}
+    </div>
+  );
+}
+
+// ── Konu ekleme / düzenleme diyaloğu ────────────────────────────────────────
+function TopicDialog({ open, onOpenChange, topic, parentTopic, examTypes, onSave, isPending }) {
+  const [name, setName] = useState(topic?.name ?? "");
+  const [selectedExamTypes, setSelectedExamTypes] = useState(
+    topic?.examTypes?.map((et) => et.id) ??
+    parentTopic?.examTypes?.map((et) => et.id) ??
+    []
+  );
+
+  const handleSave = () => {
+    if (!name.trim()) { toast.error("Konu adı zorunludur"); return; }
+    onSave({ name: name.trim(), examTypeIds: selectedExamTypes });
+  };
+
+  const title = topic
+    ? "Konuyu Düzenle"
+    : parentTopic
+    ? `"${parentTopic.name}" için Alt Konu Ekle`
+    : "Yeni Konu Ekle";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-5 mt-2">
+          {parentTopic && !topic && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-600">
+              <BookOpen className="w-4 h-4 text-indigo-500" />
+              <span>Üst konu: <strong>{parentTopic.name}</strong></span>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Konu Adı *</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Örn: Matematik, Paragraf, Türev..."
+              autoFocus
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>
+              Sınav Türleri{" "}
+              <span className="text-slate-400 font-normal">(birden fazla seçilebilir)</span>
+            </Label>
+            <ExamTypeMultiSelect
+              examTypes={examTypes}
+              selected={selectedExamTypes}
+              onChange={setSelectedExamTypes}
+            />
+          </div>
+
+          <div className="flex gap-3 justify-end pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              İptal
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={isPending}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              {isPending ? "Kaydediliyor..." : "Kaydet"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Ağaç düğümü (özyinelemeli) ───────────────────────────────────────────────
+function TopicNode({ topic, depth = 0, examTypes, onEdit, onDelete, onAddChild }) {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = topic.children?.length > 0;
+
+  return (
+    <div>
+      <div
+        className={`flex items-center gap-2 py-2.5 px-3 rounded-lg hover:bg-slate-50 group ${
+          depth > 0 ? "ml-6 border-l-2 border-slate-100 pl-4" : ""
+        }`}
+      >
+        {/* Açma/kapama */}
+        <button
+          type="button"
+          className="w-5 h-5 flex items-center justify-center text-slate-400 shrink-0"
+          onClick={() => hasChildren && setExpanded((v) => !v)}
+        >
+          {hasChildren ? (
+            expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
+          ) : (
+            <span className="w-4" />
+          )}
+        </button>
+
+        {/* Konu adı */}
+        <span
+          className={`font-medium flex-1 ${
+            !topic.active ? "line-through text-slate-400" : "text-slate-800"
+          }`}
+        >
+          {topic.name}
+        </span>
+
+        {/* Sınav türü badge'leri */}
+        <div className="flex flex-wrap gap-1 max-w-xs">
+          {topic.examTypes?.map((et) => (
+            <Badge
+              key={et.id}
+              variant="outline"
+              className="text-xs py-0 px-2 border-indigo-200 text-indigo-700 bg-indigo-50"
+            >
+              {et.name}
+            </Badge>
+          ))}
+        </div>
+
+        {/* Eylemler — hover'da görünür */}
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-slate-500 hover:text-indigo-600"
+            title="Alt Konu Ekle"
+            onClick={() => onAddChild(topic)}
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-slate-500 hover:text-indigo-600"
+            onClick={() => onEdit(topic)}
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-slate-500 hover:text-rose-600"
+            onClick={() => onDelete(topic)}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Alt konular */}
+      {hasChildren && expanded && (
+        <div className="mt-0.5">
+          {topic.children.map((child) => (
+            <TopicNode
+              key={child.id}
+              topic={child}
+              depth={depth + 1}
+              examTypes={examTypes}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onAddChild={onAddChild}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Ana sayfa ─────────────────────────────────────────────────────────────────
 export default function ManageTopics() {
   const { user } = useAuth();
-  // Konu ekleme / düzenleme diyaloğunun açık/kapalı durumu
-  const [showDialog, setShowDialog] = useState(false);
-  // Düzenlenmekte olan konu; null ise yeni konu ekleme modundadır
-  const [editingTopic, setEditingTopic] = useState(null);
-  // Silinecek konunun ID'si; AlertDialog gösterimi için kullanılır
-  const [deleteId, setDeleteId] = useState(null);
-  // Diyalog formundaki konu adı ve sınav türü ID'si
-  const [formData, setFormData] = useState({ name: "", exam_type_id: "" });
-  // Sınav türüne göre filtreleme; "all" seçili olunca filtreleme uygulanmaz
-  const [filterExamType, setFilterExamType] = useState("all");
   const queryClient = useQueryClient();
 
-  // Konuları en yeni-en eski sırasıyla çek; sadece admin rolünde sorgu etkin
-  const { data: topics = [], isLoading } = useQuery({
-    queryKey: ["topics"],
-    queryFn: () => entities.Topic.list("-created_date"),
-    enabled: (user?.role || '').toString().toUpperCase() === "ADMIN",
+  // dialog: { mode: 'create'|'edit'|'addChild', topic?, parentTopic? }
+  const [dialog, setDialog] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [filterExamType, setFilterExamType] = useState("all");
+
+  const isAdmin = (user?.role || "").toString().toUpperCase() === "ADMIN";
+
+  const { data: tree = [], isLoading } = useQuery({
+    queryKey: ["topicsTree"],
+    queryFn: () => topicsApi.tree(),
+    enabled: isAdmin,
   });
 
-  // Konu formunda sınav türü seçimi için aktif türleri yükle
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
     queryFn: () => entities.ExamType.filter({ is_active: true }),
+    enabled: isAdmin,
   });
 
-  // Konu oluştururken exam_type_name'i de kaydeder (denormalize veri — liste görünümü için)
   const createMutation = useMutation({
-    mutationFn: (data) => {
-      const examType = examTypes.find(e => e.id === data.exam_type_id);
-      return entities.Topic.create({
-        ...data,
-        exam_type_name: examType?.name || ""
-      });
-    },
+    mutationFn: (data) => topicsApi.create(data),
     onSuccess: () => {
       toast.success("Konu oluşturuldu");
-      queryClient.invalidateQueries({ queryKey: ["topics"] });
-      closeDialog();
+      queryClient.invalidateQueries({ queryKey: ["topicsTree"] });
+      setDialog(null);
     },
+    onError: (e) => toast.error(e?.response?.data?.message || e?.message || "Hata"),
   });
 
-  // Konuyu güncellerken exam_type_name'i de günceller
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => {
-      const examType = examTypes.find(e => e.id === data.exam_type_id);
-      return entities.Topic.update(id, {
-        ...data,
-        exam_type_name: examType?.name || ""
-      });
-    },
+    mutationFn: ({ id, data }) => topicsApi.update(id, data),
     onSuccess: () => {
       toast.success("Konu güncellendi");
-      queryClient.invalidateQueries({ queryKey: ["topics"] });
-      closeDialog();
+      queryClient.invalidateQueries({ queryKey: ["topicsTree"] });
+      setDialog(null);
     },
+    onError: (e) => toast.error(e?.response?.data?.message || e?.message || "Hata"),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => entities.Topic.delete(id),
+    mutationFn: (id) => topicsApi.remove(id),
     onSuccess: () => {
       toast.success("Konu silindi");
-      queryClient.invalidateQueries({ queryKey: ["topics"] });
-      setDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: ["topicsTree"] });
+      setDeleteTarget(null);
     },
+    onError: (e) => toast.error(e?.response?.data?.message || e?.message || "Silinemedi"),
   });
 
-  // Diyaloğu açar: topic verilmişse düzenleme, verilmemişse yeni konu moduna girer
-  const openDialog = (topic = null) => {
-    if (topic) {
-      setEditingTopic(topic);
-      setFormData({ name: topic.name, exam_type_id: topic.exam_type_id });
-    } else {
-      setEditingTopic(null);
-      setFormData({ name: "", exam_type_id: "" });
-    }
-    setShowDialog(true);
-  };
-
-  const closeDialog = () => {
-    setShowDialog(false);
-    setEditingTopic(null);
-    setFormData({ name: "", exam_type_id: "" });
-  };
-
-  const handleSubmit = () => {
-    if (!formData.name || !formData.exam_type_id) {
-      toast.error("Lütfen tüm alanları doldurun");
-      return;
-    }
-    if (editingTopic) {
-      updateMutation.mutate({ id: editingTopic.id, data: formData });
-    } else {
-      createMutation.mutate(formData);
-    }
-  };
-
-  // "all" seçili olunca tüm konular, aksi halde seçili sınav türüne ait konular gösterilir
-  const filteredTopics = filterExamType === "all"
-    ? topics
-    : topics.filter(t => t.exam_type_id === filterExamType);
-
-  if ((user?.role || '').toString().toUpperCase() !== "ADMIN") {
+  if (!isAdmin) {
     return (
       <div className="text-center py-20">
         <h2 className="text-xl font-semibold text-slate-900">Erişim Engellendi</h2>
+        <p className="text-slate-500 mt-2">Bu sayfaya erişim yetkiniz yok</p>
       </div>
     );
   }
+
+  const handleSave = (formData) => {
+    if (dialog.mode === "edit") {
+      updateMutation.mutate({ id: dialog.topic.id, data: formData });
+    } else {
+      const payload = { ...formData };
+      if (dialog.parentTopic) payload.parentId = dialog.parentTopic.id;
+      createMutation.mutate(payload);
+    }
+  };
+
+  // Sınav türüne göre ağaç filtreleme (üst konuyu da dahil et)
+  const filterNode = (node) => {
+    if (filterExamType === "all") return true;
+    if (node.examTypes?.some((et) => et.id === filterExamType)) return true;
+    if (node.children?.some((c) => filterNode(c))) return true;
+    return false;
+  };
+  const filteredTree = tree.filter(filterNode);
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Soru Konuları</h1>
-          <p className="text-slate-500 mt-2">Sınav türlerine bağlı konuları yönet</p>
+          <p className="text-slate-500 mt-2">
+            Sınav türlerine bağlı konuları hiyerarşik olarak yönet
+          </p>
         </div>
-        <Button onClick={() => openDialog()} className="bg-indigo-600 hover:bg-indigo-700">
+        <Button
+          onClick={() => setDialog({ mode: "create" })}
+          className="bg-indigo-600 hover:bg-indigo-700"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Yeni Konu
         </Button>
       </div>
 
-      <div className="mb-6">
-        <Select value={filterExamType} onValueChange={setFilterExamType}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Sınav Türü Filtrele" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tüm Sınav Türleri</SelectItem>
-            {examTypes.map((exam) => (
-              <SelectItem key={exam.id} value={exam.id}>{exam.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Sınav türü filtresi */}
+      <div className="mb-6 flex flex-wrap gap-2 items-center">
+        <span className="text-sm text-slate-500 mr-1">Filtre:</span>
+        <button
+          type="button"
+          onClick={() => setFilterExamType("all")}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+            filterExamType === "all"
+              ? "bg-indigo-600 text-white border-indigo-600"
+              : "bg-white text-slate-600 border-slate-300 hover:border-indigo-400"
+          }`}
+        >
+          Tümü
+        </button>
+        {examTypes.map((et) => (
+          <button
+            key={et.id}
+            type="button"
+            onClick={() => setFilterExamType(et.id)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+              filterExamType === et.id
+                ? "bg-indigo-600 text-white border-indigo-600"
+                : "bg-white text-slate-600 border-slate-300 hover:border-indigo-400"
+            }`}
+          >
+            {et.name}
+          </button>
+        ))}
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-6 space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-16 bg-slate-100 rounded-lg animate-pulse" />
-              ))}
-            </div>
-          ) : filteredTopics.length === 0 ? (
-            <div className="text-center py-12">
-              <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">Konu bulunamadı</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {filteredTopics.map((topic) => (
-                <div key={topic.id} className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium text-slate-900">{topic.name}</p>
-                    <p className="text-sm text-slate-500">{topic.exam_type_name}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => openDialog(topic)}>
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-rose-600"
-                      onClick={() => setDeleteId(topic.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingTopic ? "Konuyu Düzenle" : "Yeni Konu"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label>Sınav Türü *</Label>
-              <Select value={formData.exam_type_id} onValueChange={(v) => setFormData({ ...formData, exam_type_id: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  {examTypes.map((exam) => (
-                    <SelectItem key={exam.id} value={exam.id}>{exam.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Konu Adı *</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Örn: Türkçe - Paragraf"
-              />
-            </div>
-            <div className="flex gap-3 justify-end pt-4">
-              <Button variant="outline" onClick={closeDialog}>İptal</Button>
-              <Button 
-                onClick={handleSubmit}
-                disabled={createMutation.isPending || updateMutation.isPending}
-                className="bg-indigo-600 hover:bg-indigo-700"
-              >
-                Kaydet
-              </Button>
-            </div>
+      {/* Konu ağacı */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="p-6 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+            ))}
           </div>
-        </DialogContent>
-      </Dialog>
+        ) : filteredTree.length === 0 ? (
+          <div className="text-center py-14">
+            <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">
+              {filterExamType === "all"
+                ? "Henüz konu eklenmedi"
+                : "Bu sınav türüne ait konu bulunamadı"}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => setDialog({ mode: "create" })}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              İlk konuyu ekle
+            </Button>
+          </div>
+        ) : (
+          <div className="p-4 space-y-1">
+            {filteredTree.map((topic) => (
+              <TopicNode
+                key={topic.id}
+                topic={topic}
+                examTypes={examTypes}
+                onEdit={(t) => setDialog({ mode: "edit", topic: t })}
+                onDelete={(t) => setDeleteTarget(t)}
+                onAddChild={(t) => setDialog({ mode: "addChild", parentTopic: t })}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+      {/* Oluşturma / düzenleme diyaloğu */}
+      {dialog && (
+        <TopicDialog
+          open={!!dialog}
+          onOpenChange={(open) => !open && setDialog(null)}
+          topic={dialog.topic}
+          parentTopic={dialog.parentTopic}
+          examTypes={examTypes}
+          onSave={handleSave}
+          isPending={isPending}
+          key={dialog.topic?.id ?? dialog.mode}
+        />
+      )}
+
+      {/* Silme onayı */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Konuyu silmek istediğinize emin misiniz?</AlertDialogTitle>
-            <AlertDialogDescription>Bu işlem geri alınamaz.</AlertDialogDescription>
+            <AlertDialogTitle>
+              "{deleteTarget?.name}" konusunu silmek istiyor musunuz?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.children?.length > 0
+                ? `Bu konunun ${deleteTarget.children.length} alt konusu var. Silindiğinde alt konular üst konusuz kalır.`
+                : "Bu işlem geri alınamaz."}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction className="bg-rose-600 hover:bg-rose-700" onClick={() => deleteMutation.mutate(deleteId)}>
-              Sil
+            <AlertDialogAction
+              className="bg-rose-600 hover:bg-rose-700"
+              onClick={() => deleteMutation.mutate(deleteTarget.id)}
+            >
+              {deleteMutation.isPending ? "Siliniyor..." : "Sil"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -56,6 +56,7 @@ import { ListTopicsByExamTypeUseCase } from '../application/use-cases/ListTopics
 import { CreateTopicUseCase } from '../application/use-cases/CreateTopicUseCase';
 import { UpdateTopicUseCase } from '../application/use-cases/UpdateTopicUseCase';
 import { DeleteTopicUseCase } from '../application/use-cases/DeleteTopicUseCase';
+import { GetTopicTreeUseCase } from '../application/use-cases/GetTopicTreeUseCase';
 import { ApproveEducatorUseCase } from '../application/use-cases/ApproveEducatorUseCase';
 import { SuspendEducatorUseCase } from '../application/use-cases/SuspendEducatorUseCase';
 import { UnsuspendEducatorUseCase } from '../application/use-cases/UnsuspendEducatorUseCase';
@@ -220,26 +221,11 @@ const throttleDisabled = process.env.THROTTLE_DISABLED === '1';
       useFactory: (repo: PrismaExamTypeRepository, audit: PrismaAuditLogRepository) => new DeleteExamTypeUseCase(repo, audit),
       inject: [EXAM_TYPE_REPO, PrismaAuditLogRepository],
     },
-    {
-      provide: ListTopicsByExamTypeUseCase,
-      useFactory: (repo: PrismaTopicRepository) => new ListTopicsByExamTypeUseCase(repo),
-      inject: [TOPIC_REPO],
-    },
-    {
-      provide: CreateTopicUseCase,
-      useFactory: (topicRepo: PrismaTopicRepository, examTypeRepo: PrismaExamTypeRepository, audit: PrismaAuditLogRepository) => new CreateTopicUseCase(topicRepo, examTypeRepo, audit),
-      inject: [TOPIC_REPO, EXAM_TYPE_REPO, PrismaAuditLogRepository],
-    },
-    {
-      provide: UpdateTopicUseCase,
-      useFactory: (repo: PrismaTopicRepository, audit: PrismaAuditLogRepository) => new UpdateTopicUseCase(repo, audit),
-      inject: [TOPIC_REPO, PrismaAuditLogRepository],
-    },
-    {
-      provide: DeleteTopicUseCase,
-      useFactory: (repo: PrismaTopicRepository, audit: PrismaAuditLogRepository) => new DeleteTopicUseCase(repo, audit),
-      inject: [TOPIC_REPO, PrismaAuditLogRepository],
-    },
+    { provide: ListTopicsByExamTypeUseCase, useFactory: () => new ListTopicsByExamTypeUseCase() },
+    { provide: CreateTopicUseCase, useFactory: () => new CreateTopicUseCase() },
+    { provide: UpdateTopicUseCase, useFactory: () => new UpdateTopicUseCase() },
+    { provide: DeleteTopicUseCase, useFactory: () => new DeleteTopicUseCase() },
+    { provide: GetTopicTreeUseCase, useFactory: () => new GetTopicTreeUseCase() },
     {
       provide: ApproveEducatorUseCase,
       useFactory: (userRepo: PrismaUserRepository, auditRepo: PrismaAuditLogRepository) => new ApproveEducatorUseCase(userRepo, auditRepo),

@@ -1,37 +1,50 @@
 import { Controller, Get, Post, Patch, Delete, Body, Req, Query, Param, Inject } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse, ApiForbiddenResponse, ApiConflictResponse, ApiBadRequestResponse, ApiNotFoundResponse } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { UpdateTopicDto } from './dto/update-topic.dto';
-import { ListTopicsQueryDto } from './dto/list-topics.query.dto';
 import { CreateTopicUseCase } from '../../application/use-cases/CreateTopicUseCase';
-import { ListTopicsByExamTypeUseCase } from '../../application/use-cases/ListTopicsByExamTypeUseCase';
 import { UpdateTopicUseCase } from '../../application/use-cases/UpdateTopicUseCase';
 import { DeleteTopicUseCase } from '../../application/use-cases/DeleteTopicUseCase';
+import { GetTopicTreeUseCase } from '../../application/use-cases/GetTopicTreeUseCase';
+import { ListTopicsByExamTypeUseCase } from '../../application/use-cases/ListTopicsByExamTypeUseCase';
 
 /**
- * Admin soru konusu CRUD yönetimi — sınav türüne göre konuları listeler,
- * oluşturur, günceller ve siler. Sadece ADMIN rolüne açıktır.
+ * Admin konu CRUD + ağaç yönetimi.
+ * GET /admin/topics/tree → tam ağaç (inactive dahil)
+ * GET /admin/topics     → düz liste (opsiyonel examTypeId filtresi)
+ * POST /admin/topics    → yeni konu (parentId + examTypeIds destekler)
+ * PATCH /admin/topics/:id
+ * DELETE /admin/topics/:id
  */
 @Controller('admin/topics')
 @ApiTags('admin/topics')
 export class AdminTopicsController {
   constructor(
-    @Inject(ListTopicsByExamTypeUseCase) private readonly listTopics: ListTopicsByExamTypeUseCase,
     @Inject(CreateTopicUseCase) private readonly createTopic: CreateTopicUseCase,
     @Inject(UpdateTopicUseCase) private readonly updateTopic: UpdateTopicUseCase,
     @Inject(DeleteTopicUseCase) private readonly deleteTopic: DeleteTopicUseCase,
+    @Inject(GetTopicTreeUseCase) private readonly topicTree: GetTopicTreeUseCase,
+    @Inject(ListTopicsByExamTypeUseCase) private readonly listTopics: ListTopicsByExamTypeUseCase,
   ) {}
+
+  @Get('tree')
+  @Roles('ADMIN')
+  @ApiBearerAuth('bearer')
+  @ApiOkResponse({ description: 'Full topic tree (inactive included)' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  tree() {
+    return this.topicTree.execute(false);
+  }
 
   @Get()
   @Roles('ADMIN')
   @ApiBearerAuth('bearer')
-  @ApiOkResponse({ description: 'List of topics for exam type' })
+  @ApiOkResponse({ description: 'Flat topic list, optional examTypeId filter' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
-  @ApiBadRequestResponse({ description: 'Invalid examTypeId' })
-  async list(@Query() q: ListTopicsQueryDto) {
-    const activeOnly = q.activeOnly === 'false' ? false : true;
-    return this.listTopics.execute(q.examTypeId, activeOnly);
+  list(@Query('examTypeId') examTypeId?: string, @Query('activeOnly') activeOnly?: string) {
+    const active = activeOnly === 'false' ? false : true;
+    return this.listTopics.execute(examTypeId, active);
   }
 
   @Post()
@@ -39,14 +52,10 @@ export class AdminTopicsController {
   @ApiBearerAuth('bearer')
   @ApiCreatedResponse({ description: 'Created' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
-  @ApiConflictResponse({ description: 'Topic slug exists for this exam type' })
-  @ApiBadRequestResponse({ description: 'Invalid examTypeId' })
-  @ApiNotFoundResponse({ description: 'Exam type not found' })
-  async create(@Body() body: CreateTopicDto, @Req() req: any) {
-    const actorId = (req as any).user?.id;
+  create(@Body() body: CreateTopicDto, @Req() req: any) {
     return this.createTopic.execute(
-      { examTypeId: body.examTypeId, name: body.name, slug: body.slug, active: body.active },
-      actorId,
+      { name: body.name, examTypeIds: body.examTypeIds, parentId: body.parentId, active: body.active },
+      req.user?.id,
     );
   }
 
@@ -56,10 +65,12 @@ export class AdminTopicsController {
   @ApiOkResponse({ description: 'Updated' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
   @ApiNotFoundResponse({ description: 'Not found' })
-  @ApiConflictResponse({ description: 'Slug exists' })
-  async update(@Param('id') id: string, @Body() body: UpdateTopicDto, @Req() req: any) {
-    const actorId = (req as any).user?.id;
-    return this.updateTopic.execute(id, { name: body.name, slug: body.slug, active: body.active }, actorId);
+  update(@Param('id') id: string, @Body() body: UpdateTopicDto, @Req() req: any) {
+    return this.updateTopic.execute(
+      id,
+      { name: body.name, examTypeIds: body.examTypeIds, parentId: body.parentId, active: body.active },
+      req.user?.id,
+    );
   }
 
   @Delete(':id')
@@ -68,8 +79,7 @@ export class AdminTopicsController {
   @ApiOkResponse({ description: 'Deleted' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
   @ApiNotFoundResponse({ description: 'Not found' })
-  async delete(@Param('id') id: string, @Req() req: any) {
-    const actorId = (req as any).user?.id;
-    return this.deleteTopic.execute(id, actorId);
+  delete(@Param('id') id: string, @Req() req: any) {
+    return this.deleteTopic.execute(id, req.user?.id);
   }
 }

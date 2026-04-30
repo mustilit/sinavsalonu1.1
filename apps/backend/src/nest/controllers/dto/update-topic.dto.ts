@@ -1,5 +1,4 @@
-/** Soru konusu güncelleme isteği DTO'su */
-import { IsOptional, IsString, IsBoolean, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, MaxLength, IsArray, IsUUID } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateTopicDto {
@@ -9,11 +8,15 @@ export class UpdateTopicDto {
   @MaxLength(200)
   name?: string;
 
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  examTypeIds?: string[];
+
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  slug?: string;
+  parentId?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()

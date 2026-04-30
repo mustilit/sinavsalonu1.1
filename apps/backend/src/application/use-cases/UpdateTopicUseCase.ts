@@ -1,43 +1,57 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { ITopicRepository } from '../../domain/interfaces/ITopicRepository';
-import { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository';
-import { TOPIC_REPO } from '../constants';
+import { Injectable } from '@nestjs/common';
+import { prisma } from '../../infrastructure/database/prisma';
 import { slugify } from '../utils/slugify';
 
 /**
- * Soru konusunu günceller. Slug çakışması aynı sınav türü içinde kontrol edilir
- * (farklı sınav türlerinde aynı slug olabilir — örn. "matematik" hem YKS hem KPSS'de).
+ * Mevcut konuyu günceller. examTypeIds gönderilirse tüm bağlantılar sıfırlanıp yeniden oluşturulur.
  */
 @Injectable()
 export class UpdateTopicUseCase {
-  constructor(
-    @Inject(TOPIC_REPO) private readonly repo: ITopicRepository,
-    private readonly auditRepo: IAuditLogRepository,
-  ) {}
+  async execute(
+    id: string,
+    input: { name?: string; examTypeIds?: string[]; parentId?: string | null; active?: boolean; slug?: string },
+    actorId?: string,
+  ) {
+    const existing = await prisma.topic.findUnique({ where: { id } });
+    if (!existing) { const e: any = new Error('Konu bulunamadı'); e.status = 404; throw e; }
 
-  async execute(id: string, input: { name?: string; slug?: string; active?: boolean }, actorId?: string) {
-    const existing = await this.repo.findById(id);
-    if (!existing) return null;
+    const data: any = {};
+    if (input.name !== undefined) { data.name = input.name.trim(); data.slug = slugify(input.name); }
+    if (input.slug !== undefined) data.slug = input.slug;
+    if (input.active !== undefined) data.active = input.active;
+    if ('parentId' in input) data.parentId = input.parentId ?? null;
 
-    const slug = input.slug?.trim() ? slugify(input.slug) : input.name ? slugify(input.name) : undefined;
-    if (slug) {
-      const bySlug = await this.repo.findByExamTypeAndSlug(existing.examTypeId, slug);
-      if (bySlug && bySlug.id !== id) {
-        const err: any = new Error('TOPIC_SLUG_EXISTS');
-        err.status = 409;
-        err.code = 'TOPIC_SLUG_EXISTS';
-        throw err;
+    if (input.examTypeIds !== undefined) {
+      await (prisma as any).topicExamType.deleteMany({ where: { topicId: id } });
+      if (input.examTypeIds.length > 0) {
+        await (prisma as any).topicExamType.createMany({
+          data: input.examTypeIds.map((eid) => ({ topicId: id, examTypeId: eid })),
+          skipDuplicates: true,
+        });
       }
     }
 
-    const updated = await this.repo.update(id, { name: input.name, slug, active: input.active });
-    if (updated && this.auditRepo) {
-      try {
-        await this.auditRepo.create({ action: 'TOPIC_UPDATED', entityType: 'Topic', entityId: id, actorId: actorId ?? null, metadata: {} });
-      } catch {
-        /* swallow */
-      }
-    }
-    return updated;
+    const updated = await (prisma.topic as any).update({
+      where: { id },
+      data,
+      include: {
+        examTypes: { include: { examType: { select: { id: true, name: true } } } },
+        parent: { select: { id: true, name: true } },
+        children: { select: { id: true, name: true } },
+      },
+    });
+
+    try {
+      await (prisma as any).auditLog.create({
+        data: { action: 'TOPIC_UPDATED', entityType: 'TOPIC', entityId: id, actorId: actorId ?? null, metadata: {} },
+      });
+    } catch { /* swallow */ }
+
+    return {
+      id: updated.id, name: updated.name, slug: updated.slug, active: updated.active,
+      parentId: (updated as any).parentId ?? null, parentName: (updated as any).parent?.name ?? null,
+      examTypes: (updated as any).examTypes.map((te: any) => ({ id: te.examType.id, name: te.examType.name })),
+      children: (updated as any).children.map((c: any) => ({ id: c.id, name: c.name })),
+    };
   }
 }
