@@ -49,7 +49,7 @@ export class PrismaExamTypeRepository implements IExamTypeRepository {
   }
 
   async delete(id: string): Promise<boolean> {
-    const topics = await prisma.topic.count({ where: { examTypeId: id } });
+    const topics = await prisma.topic.count({ where: { examTypes: { some: { examTypeId: id } } } });
     if (topics > 0) return false;
     const r = await prisma.examType.deleteMany({ where: { id } });
     return r.count > 0;

@@ -144,11 +144,17 @@ export class SeedService implements OnApplicationBootstrap {
       create: { name: 'Demo TYT', slug: 'demo-tyt', description: 'Deneme sınav türü', active: true },
       update: {},
     });
-    const topic = await this.prisma.topic.upsert({
-      where: { examTypeId_slug: { examTypeId: examType.id, slug: 'matematik' } },
-      create: { examTypeId: examType.id, name: 'Matematik', slug: 'matematik', active: true },
-      update: {},
-    });
+    let topic = await this.prisma.topic.findFirst({ where: { slug: 'matematik' } });
+    if (!topic) {
+      topic = await this.prisma.topic.create({
+        data: {
+          name: 'Matematik',
+          slug: 'matematik',
+          active: true,
+          examTypes: { create: [{ examTypeId: examType.id }] },
+        },
+      });
+    }
 
     // Demo test (yayında)
     const created = await this.prisma.examTest.create({

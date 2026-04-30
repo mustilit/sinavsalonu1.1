@@ -12,16 +12,16 @@ ALTER TABLE "ad_purchases"
 
 -- 3. testId artık nullable (EDUCATOR türünde test yoktur)
 ALTER TABLE "ad_purchases"
-  ALTER COLUMN "test_id" DROP NOT NULL;
+  ALTER COLUMN "testId" DROP NOT NULL;
 
 -- 4. ad_impressions tablosu: her ana sayfa yüklemesindeki gösterimi kaydeder
 CREATE TABLE "ad_impressions" (
-  "id"            UUID        NOT NULL DEFAULT gen_random_uuid(),
-  "purchase_id"   UUID        NOT NULL,
-  "educator_id"   UUID        NOT NULL,
-  "test_id"       UUID,
-  "viewer_user_id" UUID,
-  "created_at"    TIMESTAMP   NOT NULL DEFAULT NOW(),
+  "id"             TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  "purchase_id"    TEXT        NOT NULL,
+  "educator_id"    TEXT        NOT NULL,
+  "test_id"        TEXT,
+  "viewer_user_id" TEXT,
+  "created_at"     TIMESTAMP   NOT NULL DEFAULT NOW(),
 
   CONSTRAINT "ad_impressions_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "ad_impressions_purchase_id_fkey"
