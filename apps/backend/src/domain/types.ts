@@ -94,6 +94,8 @@ export type AdminSettings = {
   testAttemptsEnabled: boolean;
   /** Eğitici reklam satın alma kill-switch'i */
   adPurchasesEnabled: boolean;
+  /** Minimum paket fiyatı (kuruş). Eğitici bu değerin altında fiyat giremez. */
+  minPackagePriceCents: number;
 };
 
 export type SiteSettings = {

@@ -16,6 +16,7 @@ export interface TestPackageRecord {
   title: string;
   description: string | null;
   priceCents: number;
+  difficulty: string;
   isActive: boolean;
   publishedAt: Date | null;
   createdAt: Date;
@@ -29,6 +30,7 @@ export interface CreateTestPackageInput {
   title: string;
   description?: string | null;
   priceCents: number;
+  difficulty?: string;
 }
 
 export interface UpdateTestPackageInput {

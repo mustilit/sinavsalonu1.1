@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsOptional, MinLength, Min } from 'class-validator';
+import { IsString, IsInt, IsOptional, MinLength, Min, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePackageDto {
@@ -16,4 +16,10 @@ export class CreatePackageDto {
   @IsInt()
   @Min(0)
   priceCents!: number;
+
+  @ApiPropertyOptional({ example: 'medium', enum: ['easy', 'medium', 'hard'] })
+  @IsOptional()
+  @IsString()
+  @IsIn(['easy', 'medium', 'hard'])
+  difficulty?: string;
 }

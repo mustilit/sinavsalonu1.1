@@ -42,6 +42,7 @@ export class AdminSettingsController {
       testPublishingEnabled: dto.testPublishingEnabled,
       testAttemptsEnabled: dto.testAttemptsEnabled,
       adPurchasesEnabled: dto.adPurchasesEnabled,
+      minPackagePriceCents: dto.minPackagePriceCents,
     });
   }
 }

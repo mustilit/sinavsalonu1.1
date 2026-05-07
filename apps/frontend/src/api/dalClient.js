@@ -275,6 +275,7 @@ export const entities = {
             description: pkg.description ?? '',
             priceCents: pkg.priceCents,
             price: pkg.priceCents != null ? pkg.priceCents / 100 : 0,
+            difficulty: pkg.difficulty ?? 'medium',
             is_published: !!pkg.publishedAt,
             publishedAt: pkg.publishedAt ?? null,
             createdAt: pkg.createdAt,

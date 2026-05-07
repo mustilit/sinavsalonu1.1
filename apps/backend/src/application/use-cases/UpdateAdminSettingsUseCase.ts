@@ -15,6 +15,8 @@ export class UpdateAdminSettingsUseCase {
       testAttemptsEnabled?: boolean;
       /** Eğitici reklam satın alma kill-switch'i */
       adPurchasesEnabled?: boolean;
+      /** Minimum paket fiyatı (kuruş) */
+      minPackagePriceCents?: number;
     },
   ): Promise<AdminSettings> {
     const row = await prisma.adminSettings.upsert({
@@ -28,6 +30,7 @@ export class UpdateAdminSettingsUseCase {
         testPublishingEnabled: input.testPublishingEnabled ?? true,
         testAttemptsEnabled: input.testAttemptsEnabled ?? true,
         adPurchasesEnabled: input.adPurchasesEnabled ?? true,
+        minPackagePriceCents: input.minPackagePriceCents ?? 100,
       },
       update: {
         ...(input.commissionPercent !== undefined && { commissionPercent: input.commissionPercent }),
@@ -37,6 +40,7 @@ export class UpdateAdminSettingsUseCase {
         ...(input.testPublishingEnabled !== undefined && { testPublishingEnabled: input.testPublishingEnabled }),
         ...(input.testAttemptsEnabled !== undefined && { testAttemptsEnabled: input.testAttemptsEnabled }),
         ...(input.adPurchasesEnabled !== undefined && { adPurchasesEnabled: input.adPurchasesEnabled }),
+        ...(input.minPackagePriceCents !== undefined && { minPackagePriceCents: input.minPackagePriceCents }),
       },
     });
     return {
@@ -46,8 +50,8 @@ export class UpdateAdminSettingsUseCase {
       packageCreationEnabled: row.packageCreationEnabled ?? true,
       testPublishingEnabled: row.testPublishingEnabled ?? true,
       testAttemptsEnabled: row.testAttemptsEnabled ?? true,
-      // Reklam satın alma kill-switch — varsayılan açık
       adPurchasesEnabled: (row as any).adPurchasesEnabled ?? true,
+      minPackagePriceCents: (row as any).minPackagePriceCents ?? 100,
     };
   }
 }

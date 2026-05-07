@@ -13,6 +13,7 @@ import {
   Loader2,
   ShieldAlert,
   Info,
+  BadgeDollarSign,
 } from "lucide-react";
 
 const CONTROLS = [
@@ -185,6 +186,7 @@ function KillSwitch({ control, value, onChange, saving }) {
 export default function AdminSystemControls() {
   const queryClient = useQueryClient();
   const [savingKey, setSavingKey] = useState(null);
+  const [minPriceInput, setMinPriceInput] = useState("");
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["admin-settings"],
@@ -224,6 +226,18 @@ export default function AdminSystemControls() {
   const handleToggle = (key, newValue) => {
     setSavingKey(key);
     updateMutation.mutate({ [key]: newValue });
+  };
+
+  const handleMinPriceSave = () => {
+    const tl = parseFloat(minPriceInput);
+    if (isNaN(tl) || tl <= 0) {
+      toast.error("Geçerli bir fiyat giriniz");
+      return;
+    }
+    const cents = Math.round(tl * 100);
+    setSavingKey("minPackagePriceCents");
+    updateMutation.mutate({ minPackagePriceCents: cents });
+    setMinPriceInput("");
   };
 
   const allEnabled = CONTROLS.every((c) => settings?.[c.key] !== false);
@@ -297,6 +311,54 @@ export default function AdminSystemControls() {
           ))}
         </div>
       )}
+
+      {/* Minimum Paket Fiyatı */}
+      <div className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
+            <BadgeDollarSign className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-slate-900">Minimum Paket Fiyatı</p>
+            <p className="text-sm text-slate-500">
+              Eğiticilerin paket oluştururken girebileceği en düşük fiyat.
+              Mevcut değer:{" "}
+              <strong className="text-slate-700">
+                {settings?.minPackagePriceCents != null
+                  ? `${(settings.minPackagePriceCents / 100).toFixed(2)} ₺`
+                  : "1,00 ₺"}
+              </strong>
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-xs">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₺</span>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder={
+                settings?.minPackagePriceCents != null
+                  ? (settings.minPackagePriceCents / 100).toFixed(2)
+                  : "1.00"
+              }
+              value={minPriceInput}
+              onChange={(e) => setMinPriceInput(e.target.value)}
+              className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <button
+            onClick={handleMinPriceSave}
+            disabled={!minPriceInput || savingKey === "minPackagePriceCents"}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+          >
+            {savingKey === "minPackagePriceCents"
+              ? <><Loader2 className="w-4 h-4 animate-spin" />Kaydediliyor...</>
+              : "Kaydet"}
+          </button>
+        </div>
+      </div>
 
       {/* Info box */}
       <div className="flex items-start gap-3 p-5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600">

@@ -31,6 +31,7 @@ export class PrismaTestPackageRepository implements ITestPackageRepository {
       title: pkg.title,
       description: pkg.description ?? null,
       priceCents: pkg.priceCents,
+      difficulty: pkg.difficulty ?? 'medium',
       isActive: pkg.isActive,
       publishedAt: pkg.publishedAt ?? null,
       createdAt: pkg.createdAt,
@@ -47,6 +48,7 @@ export class PrismaTestPackageRepository implements ITestPackageRepository {
         title: input.title,
         description: input.description ?? null,
         priceCents: input.priceCents,
+        difficulty: input.difficulty ?? 'medium',
       },
     });
     return this.mapRecord(pkg);

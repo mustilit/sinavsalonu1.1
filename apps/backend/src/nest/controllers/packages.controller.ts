@@ -55,6 +55,7 @@ export class PackagesController {
       title: dto.title,
       description: dto.description ?? null,
       priceCents: dto.priceCents,
+      difficulty: dto.difficulty,
     });
   }
 

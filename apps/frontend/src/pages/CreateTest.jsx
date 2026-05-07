@@ -726,7 +726,8 @@ function TestCard({ test, testIndex, examTypes, topicList, onTestUpdate, onTestD
 export default function CreateTest() {
   const { user }     = useAuth();
   const navigate     = useAppNavigate();
-  const { packageCreationEnabled } = useServiceStatus();
+  const { packageCreationEnabled, minPackagePriceCents = 100 } = useServiceStatus();
+  const minPriceTL = minPackagePriceCents / 100;
   const showCreateTour = useShouldShowTour(TOUR_KEYS.EDUCATOR_CREATE);
   const completeTour   = useCompleteTour();
 
@@ -739,6 +740,7 @@ export default function CreateTest() {
     description: "",
     priceCents: 0,
     examTypeId: "",
+    difficulty: "medium",
   });
 
   const [tests, setTests] = useState([emptyTest()]);
@@ -835,6 +837,7 @@ export default function CreateTest() {
         description: pkgData.description || undefined,
         priceCents: Math.round((pkgData.priceCents || 0) * 100),
         examTypeId: pkgData.examTypeId || undefined,
+        difficulty: pkgData.difficulty || "medium",
       });
 
       // 3. Testleri pakete ekle
@@ -907,8 +910,8 @@ export default function CreateTest() {
       toast.error("Paket başlığı zorunludur");
       return;
     }
-    if (!pkgData.priceCents || pkgData.priceCents <= 0) {
-      toast.error("Fiyat 0'dan büyük olmalıdır");
+    if (!pkgData.priceCents || pkgData.priceCents < minPriceTL) {
+      toast.error(`Paket fiyatı en az ${minPriceTL} ₺ olmalıdır`);
       return;
     }
     setStep(2);
@@ -1038,7 +1041,24 @@ export default function CreateTest() {
               <Input id="pkg-price" type="number" min="1" step="1" placeholder="Örn: 49"
                 value={pkgData.priceCents || ""}
                 onChange={(e) => setPkgData({ ...pkgData, priceCents: Number(e.target.value) })} />
-              <p className="text-xs text-slate-500">Fiyat 0'dan büyük olmalıdır</p>
+              <p className="text-xs text-slate-500">Minimum fiyat: {minPriceTL} ₺</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pkg-difficulty">Zorluk Seviyesi *</Label>
+              <Select
+                value={pkgData.difficulty}
+                onValueChange={(v) => setPkgData({ ...pkgData, difficulty: v })}
+              >
+                <SelectTrigger id="pkg-difficulty">
+                  <SelectValue placeholder="Zorluk seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easy">🟢 Kolay</SelectItem>
+                  <SelectItem value="medium">🟡 Orta</SelectItem>
+                  <SelectItem value="hard">🔴 Zor</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex justify-end pt-2">

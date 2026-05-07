@@ -382,6 +382,7 @@ model TestPackage {
   title       String
   description String?
   priceCents  Int
+  difficulty  String    @default("medium")
   isActive    Boolean   @default(true)
   publishedAt DateTime?
   createdAt   DateTime  @default(now())
@@ -573,6 +574,7 @@ model AdminSettings {
   testPublishingEnabled  Boolean  @default(true)  // Canlı Test Durdur (yayınlama)
   testAttemptsEnabled    Boolean  @default(true)  // Test Durdur (çözüm başlatma)
   adPurchasesEnabled     Boolean  @default(true)  // Reklam Satın Alma Durdur
+  minPackagePriceCents   Int      @default(100)   // Minimum paket fiyatı (kuruş)
   updatedAt              DateTime @updatedAt
 
   @@map("admin_settings")

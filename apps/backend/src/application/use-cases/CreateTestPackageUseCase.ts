@@ -10,6 +10,7 @@ export class CreateTestPackageUseCase {
     title: string;
     description?: string | null;
     priceCents: number;
+    difficulty?: string;
   }) {
     // Kill-switch kontrolü
     const settings = await prisma.adminSettings.findFirst({ where: { id: 1 } });
@@ -21,13 +22,20 @@ export class CreateTestPackageUseCase {
       throw new AppError('INVALID_TITLE', 'Paket başlığı boş olamaz', 400);
     }
 
-    if (input.priceCents < 0) {
-      throw new AppError('INVALID_PRICE', 'Fiyat negatif olamaz', 400);
+    const minPriceCents = (settings as any)?.minPackagePriceCents ?? 100;
+    if (input.priceCents < minPriceCents) {
+      const minTL = (minPriceCents / 100).toFixed(2).replace('.', ',');
+      throw new AppError('PRICE_TOO_LOW', `Paket fiyatı en az ${minTL} ₺ olmalıdır`, 400);
     }
 
     // Educator'ın tenant'ını bul
     const educator = await prisma.user.findUnique({ where: { id: educatorId }, select: { tenantId: true } });
     const tenantId = educator?.tenantId ?? getDefaultTenantId();
+
+    const validDifficulties = ['easy', 'medium', 'hard'];
+    const difficulty = input.difficulty && validDifficulties.includes(input.difficulty)
+      ? input.difficulty
+      : 'medium';
 
     return this.repo.create({
       tenantId,
@@ -35,6 +43,7 @@ export class CreateTestPackageUseCase {
       title: input.title.trim(),
       description: input.description ?? null,
       priceCents: input.priceCents,
+      difficulty,
     });
   }
 }

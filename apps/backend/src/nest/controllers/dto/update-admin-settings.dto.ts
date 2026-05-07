@@ -1,5 +1,5 @@
 /** Admin uygulama ayarları güncelleme DTO'su — özellik bayrakları */
-import { IsOptional, IsInt, Min, Max, IsBoolean } from 'class-validator';
+import { IsOptional, IsInt, Min, Max, IsBoolean, IsPositive } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateAdminSettingsDto {
@@ -41,4 +41,10 @@ export class UpdateAdminSettingsDto {
   @IsOptional()
   @IsBoolean()
   adPurchasesEnabled?: boolean;
+
+  @ApiPropertyOptional({ example: 100, description: 'Minimum paket fiyatı (kuruş, ör. 100 = 1 ₺)' })
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  minPackagePriceCents?: number;
 }

@@ -12,8 +12,9 @@ const DEFAULTS = {
   packageCreationEnabled: true,
   testPublishingEnabled: true,
   testAttemptsEnabled: true,
-  // Reklam satın alma kill-switch — varsayılan açık
   adPurchasesEnabled: true,
+  // Minimum paket fiyatı (kuruş) — varsayılan 1 ₺
+  minPackagePriceCents: 100,
 };
 
 export function useServiceStatus() {

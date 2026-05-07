@@ -66,7 +66,9 @@ export class SiteController {
       testPublishingEnabled:  row?.testPublishingEnabled               ?? true,
       testAttemptsEnabled:    row?.testAttemptsEnabled                 ?? true,
       // Eğitici reklam satın alma kill-switch'i
-      adPurchasesEnabled:     (row as any)?.adPurchasesEnabled         ?? true,
+      adPurchasesEnabled:       (row as any)?.adPurchasesEnabled       ?? true,
+      // Minimum paket fiyatı — eğiticiler bu değeri okur
+      minPackagePriceCents:     (row as any)?.minPackagePriceCents      ?? 100,
     };
   }
 
