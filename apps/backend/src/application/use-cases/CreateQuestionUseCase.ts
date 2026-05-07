@@ -9,17 +9,18 @@ import { randomUUID } from 'crypto';
 export class CreateQuestionUseCase {
   constructor(private readonly examRepository: IExamRepository) {}
 
-  async execute(testId: string, input: { content: string; order?: number; options: { content: string; isCorrect: boolean }[]; solutionText?: string | null; solutionMediaUrl?: string | null }) {
+  async execute(testId: string, input: { content: string; mediaUrl?: string | null; order?: number; options: { content: string; mediaUrl?: string | null; isCorrect: boolean }[]; solutionText?: string | null; solutionMediaUrl?: string | null }) {
     // ID'ler sunucuda üretilir — istemci tarafı ID enjeksiyonu engellenir
     const qId = randomUUID();
     const question = {
       id: qId,
       testId,
       content: input.content,
+      mediaUrl: input.mediaUrl ?? null,
       order: input.order ?? 0,
       solutionText: input.solutionText ?? null,
       solutionMediaUrl: input.solutionMediaUrl ?? null,
-      options: input.options.map(o => ({ id: randomUUID(), content: o.content, isCorrect: o.isCorrect })),
+      options: input.options.map(o => ({ id: randomUUID(), content: o.content, mediaUrl: o.mediaUrl ?? null, isCorrect: o.isCorrect })),
     };
     return this.examRepository.addQuestion(testId, question as any);
   }

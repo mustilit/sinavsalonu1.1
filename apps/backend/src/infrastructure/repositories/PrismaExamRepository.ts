@@ -250,6 +250,7 @@ export class PrismaExamRepository implements IExamRepository {
           testId,
           content: question.content,
           order: question.order,
+          ...((question as any).mediaUrl !== undefined && { mediaUrl: (question as any).mediaUrl }),
           ...((question as any).solutionText !== undefined && { solutionText: (question as any).solutionText }),
           ...((question as any).solutionMediaUrl !== undefined && { solutionMediaUrl: (question as any).solutionMediaUrl }),
           options: {
@@ -257,6 +258,7 @@ export class PrismaExamRepository implements IExamRepository {
               id: o.id,
               content: o.content,
               isCorrect: o.isCorrect,
+              ...((o as any).mediaUrl !== undefined && { mediaUrl: (o as any).mediaUrl }),
             })),
           },
         },
@@ -382,6 +384,7 @@ export class PrismaExamRepository implements IExamRepository {
       questionCount: row.questions?.length ?? r.questionCount ?? 0,
       hasSolutions: r.hasSolutions ?? false,
       priceCents: r.priceCents ?? null,
+      packageId: r.packageId ?? null,
       educator: r.educator ?? null,
       _count: r._count ?? null,
       questions: row.questions.map((q) => ({
@@ -389,11 +392,13 @@ export class PrismaExamRepository implements IExamRepository {
         testId: row.id,
         content: q.content,
         order: q.order,
+        mediaUrl: (q as any).mediaUrl ?? null,
         options: q.options.map((o) => ({
           id: o.id,
           questionId: q.id,
           content: o.content,
           isCorrect: o.isCorrect,
+          mediaUrl: (o as any).mediaUrl ?? null,
         })),
         solutionText: (q as any).solutionText ?? null,
         solutionMediaUrl: (q as any).solutionMediaUrl ?? null,

@@ -108,7 +108,11 @@ export async function apiRequest(path, opts = {}) {
   const baseUrl = getApiBaseUrl();
   const url = joinUrl(baseUrl, path);
 
-  const headers = { 'Content-Type': 'application/json', ...customHeaders };
+  // FormData ise Content-Type browser tarafından boundary ile otomatik eklenir
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const headers = isFormData
+    ? { ...customHeaders }
+    : { 'Content-Type': 'application/json', ...customHeaders };
   if (!skipAuth) {
     const token = getStoredToken();
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -123,7 +127,7 @@ export async function apiRequest(path, opts = {}) {
     res = await fetch(url, {
       method,
       headers,
-      body: body != null ? JSON.stringify(body) : undefined,
+      body: body != null ? (isFormData ? body : JSON.stringify(body)) : undefined,
       signal,
       credentials: 'same-origin',
     });

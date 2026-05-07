@@ -4,15 +4,15 @@ import { createPageUrl } from "@/utils";
 import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Plus, 
-  Edit2, 
-  Eye, 
+import {
+  Plus,
+  Edit2,
+  Eye,
   EyeOff,
   BookOpen,
-  MoreVertical,
   Search,
   Filter,
   Download,
@@ -20,12 +20,6 @@ import {
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -64,10 +58,16 @@ export default function MyTestPackages() {
 
 
   const togglePublishMutation = useMutation({
-    mutationFn: ({ id, is_published }) => 
-      entities.TestPackage.update(id, { is_published }),
+    mutationFn: ({ id, is_published }) =>
+      is_published
+        ? api.put(`/packages/${id}/publish`)
+        : api.put(`/packages/${id}/unpublish`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["myTestPackages"] });
+      toast.success("Paket durumu güncellendi");
+    },
+    onError: (err) => {
+      toast.error(err?.message || "İşlem başarısız");
     },
   });
 
@@ -248,67 +248,55 @@ export default function MyTestPackages() {
         <>
           <div className="space-y-4">
             {paginatedTests.map((test) => {
-            const difficulty = difficultyLabels[test.difficulty] || difficultyLabels.medium;
             const safePrice = test.price ?? (test.priceCents != null ? test.priceCents / 100 : 0);
             return (
               <div 
                 key={test.id}
                 className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-md transition-shadow"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <h3 className="font-semibold text-lg text-slate-900">{test.title}</h3>
                       <Badge className={test.is_published ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}>
                         {test.is_published ? "Yayında" : "Taslak"}
                       </Badge>
-                      <Badge className={difficulty.color}>{difficulty.label}</Badge>
                     </div>
                     <p className="text-slate-500 text-sm line-clamp-1 mb-3">
                       {test.description || "Açıklama yok"}
                     </p>
                     <div className="flex items-center gap-6 text-sm text-slate-500">
                       <span>{test.question_count || 0} soru</span>
-                      <span>{test.duration ?? 60} dakika</span>
                       <span className="font-semibold text-slate-900">₺{safePrice}</span>
                       <span>{test.total_sales || 0} satış</span>
                     </div>
                   </div>
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="w-5 h-5" />
+                  {/* Satır üstü aksiyonlar */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Link to={createPageUrl("EditTest") + `?id=${test.id}`}>
+                      <Button size="sm" variant="outline" className="gap-1.5">
+                        <Edit2 className="w-3.5 h-3.5" />
+                        Düzenle
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link to={createPageUrl("EditTest") + `?id=${test.id}`}>
-                          <Edit2 className="w-4 h-4 mr-2" />
-                          Düzenle
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => togglePublishMutation.mutate({ 
-                          id: test.id, 
-                          is_published: !test.is_published 
-                        })}
-                      >
-                        {test.is_published ? (
-                          <>
-                            <EyeOff className="w-4 h-4 mr-2" />
-                            Yayından Kaldır
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="w-4 h-4 mr-2" />
-                            Yayınla
-                          </>
-                        )}
-                      </DropdownMenuItem>
-
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={togglePublishMutation.isPending}
+                      className={test.is_published
+                        ? "gap-1.5 border-amber-200 text-amber-700 hover:bg-amber-50"
+                        : "gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50"}
+                      onClick={() => togglePublishMutation.mutate({
+                        id: test.id,
+                        is_published: !test.is_published,
+                      })}
+                    >
+                      {test.is_published
+                        ? <><EyeOff className="w-3.5 h-3.5" />Yayından Kaldır</>
+                        : <><Eye className="w-3.5 h-3.5" />Yayınla</>}
+                    </Button>
+                  </div>
                 </div>
               </div>
             );

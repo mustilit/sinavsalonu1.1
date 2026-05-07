@@ -211,20 +211,44 @@ export const entities = {
       }
       const { data } = await api.get('/me/purchases');
       let list = Array.isArray(data) ? data : [];
-      if (opts.test_package_id) list = list.filter((p) => (p.testId ?? p.test?.id) === opts.test_package_id);
+      // test_package_id hem testId (eski sistem) hem packageId (yeni sistem) ile eşleşebilir
+      if (opts.test_package_id) {
+        list = list.filter((p) =>
+          (p.testId ?? p.test?.id) === opts.test_package_id ||
+          p.packageId === opts.test_package_id
+        );
+      }
       return list.map((p) => ({
         id: p.id,
         user_email: opts.user_email,
-        test_package_id: p.testId ?? p.test?.id,
+        // Yeni sistemde packageId, eski sistemde testId kullanılır
+        test_package_id: p.packageId ?? p.testId ?? p.test?.id ?? null,
         test_id: p.testId,
+        package_id: p.packageId,
         test: p.test,
+        package: p.package,
         attempt: p.attempt,
-        test_package_snapshot: p.test ? testPackageAdapter(p.test) : null,
+        payment_status: p.paymentStatus,
+        test_package_snapshot: p.package
+          ? { id: p.package.id, title: p.package.title, price: p.package.priceCents / 100 }
+          : (p.test ? testPackageAdapter(p.test) : null),
       }));
     },
     create: async (body) => {
       const testId = body.test_package_id ?? body.test_id;
       const { data } = await api.post(`/purchases/${testId}`, { discountCode: body.discount_code });
+      return data;
+    },
+    initiatePayment: async (packageId, provider, callbackUrl) => {
+      const { data } = await api.post(`/purchases/package/${packageId}/initiate`, { provider, callbackUrl });
+      return data;
+    },
+    getPaymentStatus: async (packageId) => {
+      const { data } = await api.get(`/purchases/package/${packageId}/status`);
+      return data;
+    },
+    verifyPayment: async (token, provider) => {
+      const { data } = await api.post('/purchases/package/verify', { token, provider });
       return data;
     },
   },
@@ -233,19 +257,32 @@ export const entities = {
     filter: async (opts = {}, sort = '-publishedAt', limit = 50) => {
       if (opts.id) {
         try {
-          const { data } = await api.get(`/tests/${opts.id}`);
-          return data ? [testPackageAdapter(data)] : [];
+          // Önce marketplace/packages endpoint'ini dene (yeni sistem — TestPackage)
+          const { data } = await api.get(`/marketplace/packages/${opts.id}`);
+          return data ? [publicPackageDetailAdapter(data)] : [];
         } catch {
           return [];
         }
       }
-      // Educator's own tests (including drafts) - use /educators/me/tests
+      // Educator'ın kendi paketleri — GET /packages
       if (opts.educator_owns === true || opts.my_tests === true) {
         try {
-          const res = await api.get('/educators/me/tests');
-          const data = res?.data ?? res;
-          const list = Array.isArray(data) ? data : (data?.items ?? data?.data ?? []);
-          return (list || []).map((t) => testPackageAdapter(t));
+          const { data } = await api.get('/packages');
+          const list = Array.isArray(data) ? data : [];
+          return list.map((pkg) => ({
+            id: pkg.id,
+            title: pkg.title,
+            description: pkg.description ?? '',
+            priceCents: pkg.priceCents,
+            price: pkg.priceCents != null ? pkg.priceCents / 100 : 0,
+            is_published: !!pkg.publishedAt,
+            publishedAt: pkg.publishedAt ?? null,
+            createdAt: pkg.createdAt,
+            updatedAt: pkg.updatedAt,
+            tests: pkg.tests ?? [],
+            question_count: (pkg.tests ?? []).reduce((s, t) => s + (t.questionCount ?? 0), 0),
+            total_sales: 0,
+          }));
         } catch (err) {
           console.warn('[dalClient] TestPackage.filter educator_owns failed:', err?.message || err);
           return [];
@@ -581,6 +618,34 @@ export const entities = {
   },
 };
 
+/**
+ * Adapter: GET /marketplace/packages/:id yanıtını TestDetail sayfasının beklediği shape'e dönüştürür.
+ */
+function publicPackageDetailAdapter(pkg) {
+  return {
+    id: pkg.id,
+    title: pkg.title,
+    description: pkg.description ?? '',
+    educator_email: pkg.educatorId ?? '',
+    educator_name: pkg.educatorUsername ?? '',
+    exam_type_id: pkg.examTypeId ?? null,
+    exam_type_name: pkg.examTypeName ?? null,
+    question_count: (pkg.tests ?? []).reduce((s, t) => s + (t.questionCount ?? 0), 0),
+    price: pkg.priceCents != null ? pkg.priceCents / 100 : 0,
+    is_published: !!pkg.isActive,
+    is_active: !!pkg.isActive,
+    total_sales: pkg.saleCount ?? 0,
+    average_rating: pkg.ratingAvg ?? null,
+    rating_count: pkg.ratingCount ?? 0,
+    is_timed: (pkg.tests ?? [])[0]?.isTimed ?? false,
+    duration: (pkg.tests ?? [])[0]?.durationMinutes ?? null,
+    created_date: pkg.createdAt,
+    createdAt: pkg.createdAt,
+    packageId: pkg.id,
+    _tests: pkg.tests ?? [],
+  };
+}
+
 // Adapter: Dal ExamTest -> Sınav Salonu TestPackage shape
 function testPackageAdapter(t) {
   return {
@@ -601,6 +666,7 @@ function testPackageAdapter(t) {
     duration: t.duration,
     created_date: t.createdAt,
     createdAt: t.createdAt,
+    packageId: t.packageId ?? null,
   };
 }
 

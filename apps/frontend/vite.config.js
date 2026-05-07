@@ -42,6 +42,8 @@ export default defineConfig({
       '/refunds': { target: backendTarget, changeOrigin: true },
       '/ad-packages': { target: backendTarget, changeOrigin: true },
       '/notifications': { target: backendTarget, changeOrigin: true },
+      '/upload': { target: backendTarget, changeOrigin: true },
+      '/packages': { target: backendTarget, changeOrigin: true },
       '/docs': { target: backendTarget, changeOrigin: true },
       '/health': { target: backendTarget, changeOrigin: true },
     },

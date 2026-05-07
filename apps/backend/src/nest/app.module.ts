@@ -125,6 +125,17 @@ import { AdminWorkersController } from './controllers/admin.workers.controller';
 import { CreateWorkerUseCase } from '../application/use-cases/CreateWorkerUseCase';
 import { GetWorkerPermissionsUseCase } from '../application/use-cases/GetWorkerPermissionsUseCase';
 import { UpdateWorkerPermissionsUseCase } from '../application/use-cases/UpdateWorkerPermissionsUseCase';
+import { PackagesController } from './controllers/packages.controller';
+import { PrismaTestPackageRepository } from '../infrastructure/repositories/PrismaTestPackageRepository';
+import { CreateTestPackageUseCase } from '../application/use-cases/CreateTestPackageUseCase';
+import { GetTestPackageUseCase } from '../application/use-cases/GetTestPackageUseCase';
+import { ListEducatorPackagesUseCase } from '../application/use-cases/ListEducatorPackagesUseCase';
+import { UpdateTestPackageUseCase } from '../application/use-cases/UpdateTestPackageUseCase';
+import { AddTestToPackageUseCase } from '../application/use-cases/AddTestToPackageUseCase';
+import { RemoveTestFromPackageUseCase } from '../application/use-cases/RemoveTestFromPackageUseCase';
+import { PublishTestPackageUseCase } from '../application/use-cases/PublishTestPackageUseCase';
+import { UnpublishTestPackageUseCase } from '../application/use-cases/UnpublishTestPackageUseCase';
+import { UploadController } from './controllers/upload.controller';
 
 const THROTTLE_TTL_SECONDS = Number(process.env.THROTTLE_TTL_SECONDS ?? '60') || 60;
 
@@ -189,7 +200,7 @@ const throttleDisabled = process.env.THROTTLE_DISABLED === '1';
     (require('./modules/refunds/refunds.module').RefundsModule),
     ContractsModule,
   ],
-  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AdminCandidatesController, AdminEducatorReportController, AdminCommissionController, AdminAdReportController, MePerformanceController, MeHeartbeatController, AdminWorkersController],
+  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AdminCandidatesController, AdminEducatorReportController, AdminCommissionController, AdminAdReportController, MePerformanceController, MeHeartbeatController, AdminWorkersController, PackagesController, UploadController],
   providers: [
     SeedService,
     ...(throttleDisabled ? [] : [{ provide: APP_GUARD, useClass: CustomThrottlerGuard }]),
@@ -409,6 +420,48 @@ const throttleDisabled = process.env.THROTTLE_DISABLED === '1';
     { provide: CreateWorkerUseCase, useFactory: () => new CreateWorkerUseCase() },
     { provide: GetWorkerPermissionsUseCase, useFactory: () => new GetWorkerPermissionsUseCase() },
     { provide: UpdateWorkerPermissionsUseCase, useFactory: () => new UpdateWorkerPermissionsUseCase() },
+    // TestPackage CRUD
+    PrismaTestPackageRepository,
+    {
+      provide: CreateTestPackageUseCase,
+      useFactory: (repo: PrismaTestPackageRepository) => new CreateTestPackageUseCase(repo),
+      inject: [PrismaTestPackageRepository],
+    },
+    {
+      provide: GetTestPackageUseCase,
+      useFactory: (repo: PrismaTestPackageRepository) => new GetTestPackageUseCase(repo),
+      inject: [PrismaTestPackageRepository],
+    },
+    {
+      provide: ListEducatorPackagesUseCase,
+      useFactory: (repo: PrismaTestPackageRepository) => new ListEducatorPackagesUseCase(repo),
+      inject: [PrismaTestPackageRepository],
+    },
+    {
+      provide: UpdateTestPackageUseCase,
+      useFactory: (repo: PrismaTestPackageRepository) => new UpdateTestPackageUseCase(repo),
+      inject: [PrismaTestPackageRepository],
+    },
+    {
+      provide: AddTestToPackageUseCase,
+      useFactory: (repo: PrismaTestPackageRepository) => new AddTestToPackageUseCase(repo),
+      inject: [PrismaTestPackageRepository],
+    },
+    {
+      provide: RemoveTestFromPackageUseCase,
+      useFactory: (repo: PrismaTestPackageRepository) => new RemoveTestFromPackageUseCase(repo),
+      inject: [PrismaTestPackageRepository],
+    },
+    {
+      provide: PublishTestPackageUseCase,
+      useFactory: (repo: PrismaTestPackageRepository) => new PublishTestPackageUseCase(repo),
+      inject: [PrismaTestPackageRepository],
+    },
+    {
+      provide: UnpublishTestPackageUseCase,
+      useFactory: (repo: PrismaTestPackageRepository) => new UnpublishTestPackageUseCase(repo),
+      inject: [PrismaTestPackageRepository],
+    },
   ],
 })
 export class AppModule {}

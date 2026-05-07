@@ -1,6 +1,9 @@
 import 'reflect-metadata';
 import { webcrypto } from 'node:crypto';
 import { NestFactory } from '@nestjs/core';
+import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import * as express from 'express';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
@@ -77,6 +80,15 @@ async function bootstrap() {
   const reflector = app.get(Reflector);
   const jwtService = new JwtService();
   app.useGlobalGuards(new JwtAuthGuard(jwtService, reflector), new RolesGuard(reflector));
+  // Uploads klasörünü statik olarak sun
+  // CORP: cross-origin — frontend farklı port'tan img src ile erişebilsin
+  const uploadsDir = join(process.cwd(), 'uploads');
+  if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+  app.use('/uploads', (_req: any, res: any, next: any) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  }, express.static(uploadsDir));
+
   // Disable Express x-powered-by header for security
   app.getHttpAdapter().getInstance().disable('x-powered-by');
   // Trust proxy if configured (for reverse proxy / load balancer setups)

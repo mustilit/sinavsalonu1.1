@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Put, Param, Get, Req, Patch } from '@nestjs/common';
+import { Controller, Post, Body, Put, Param, Get, Req, Patch, Inject } from '@nestjs/common';
 import { Roles } from '../decorators/roles.decorator';
 import { Public } from '../decorators/public.decorator';
 import { CreateTestUseCase } from '../../application/use-cases/CreateTestUseCase';
@@ -23,20 +23,20 @@ import { UpdateOptionDto } from './dto/update-option.dto';
 @Controller()
 export class TestsController {
   constructor(
-    private readonly createTestUC: CreateTestUseCase,
-    private readonly createQuestionUC: CreateQuestionUseCase,
-    private readonly listUC: ListMarketplaceTestsUseCase,
-    private readonly getUC: GetTestUseCase,
-    private readonly publishUC: PublishTestUseCase,
-    private readonly unpublishUC: UnpublishTestUseCase,
-    private readonly updateTestUC: UpdateTestUseCase,
-    private readonly updateQuestionUC: UpdateQuestionUseCase,
-    private readonly updateOptionUC: UpdateOptionUseCase,
+    @Inject(CreateTestUseCase) private readonly createTestUC: CreateTestUseCase,
+    @Inject(CreateQuestionUseCase) private readonly createQuestionUC: CreateQuestionUseCase,
+    @Inject(ListMarketplaceTestsUseCase) private readonly listUC: ListMarketplaceTestsUseCase,
+    @Inject(GetTestUseCase) private readonly getUC: GetTestUseCase,
+    @Inject(PublishTestUseCase) private readonly publishUC: PublishTestUseCase,
+    @Inject(UnpublishTestUseCase) private readonly unpublishUC: UnpublishTestUseCase,
+    @Inject(UpdateTestUseCase) private readonly updateTestUC: UpdateTestUseCase,
+    @Inject(UpdateQuestionUseCase) private readonly updateQuestionUC: UpdateQuestionUseCase,
+    @Inject(UpdateOptionUseCase) private readonly updateOptionUC: UpdateOptionUseCase,
   ) {}
 
   /** Yeni test paketi oluşturur — educatorId JWT token'dan alınır, DTO'dan gelmez */
   @Post('tests')
-  @Roles('EDUCATOR')
+  @Roles('EDUCATOR', 'ADMIN')
   createTest(@Body() body: CreateTestDto, @Req() req: any) {
     const educatorId = (req as any).user?.id ?? undefined;
     return this.createTestUC.execute({
@@ -52,26 +52,26 @@ export class TestsController {
   }
 
   @Put('tests/:id/publish')
-  @Roles('EDUCATOR')
+  @Roles('EDUCATOR', 'ADMIN')
   async publish(@Param('id') id: string, @Req() req: any) {
     const actorId = (req as any).user?.id;
     return await this.publishUC.execute(id, actorId);
   }
 
   @Put('tests/:id/unpublish')
-  @Roles('EDUCATOR')
+  @Roles('EDUCATOR', 'ADMIN')
   async unpublish(@Param('id') id: string) {
     return await this.unpublishUC.execute(id);
   }
 
   @Post('tests/:id/questions')
-  @Roles('EDUCATOR')
+  @Roles('EDUCATOR', 'ADMIN')
   addQuestion(@Param('id') id: string, @Body() body: any) {
     return this.createQuestionUC.execute(id, body);
   }
 
   @Patch('tests/:id')
-  @Roles('EDUCATOR')
+  @Roles('EDUCATOR', 'ADMIN')
   async updateTest(@Param('id') id: string, @Body() body: UpdateTestDto, @Req() req: any) {
     const actorId = (req as any).user?.id;
     return await this.updateTestUC.execute(id, {
@@ -88,7 +88,7 @@ export class TestsController {
   }
 
   @Patch('tests/:id/questions/:questionId')
-  @Roles('EDUCATOR')
+  @Roles('EDUCATOR', 'ADMIN')
   async updateQuestion(
     @Param('id') _id: string,
     @Param('questionId') questionId: string,
@@ -106,7 +106,7 @@ export class TestsController {
   }
 
   @Patch('tests/:id/questions/:questionId/options/:optionId')
-  @Roles('EDUCATOR')
+  @Roles('EDUCATOR', 'ADMIN')
   async updateOption(
     @Param('id') _id: string,
     @Param('questionId') _questionId: string,

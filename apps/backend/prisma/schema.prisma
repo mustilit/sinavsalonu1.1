@@ -147,6 +147,7 @@ model User {
   adImpressions           AdImpression[]           @relation("AdImpressionEducator")
   viewedAdImpressions     AdImpression[]           @relation("AdImpressionViewer")
   workerPermission        WorkerPermission?
+  testPackages            TestPackage[]    @relation("educatorPackages")
 
   @@index([tenantId])
   @@map("users")
@@ -257,6 +258,7 @@ model ExamQuestion {
   id               String  @id @default(uuid())
   testId           String
   content          String
+  mediaUrl         String?
   order            Int     @default(0)
   solutionText     String?
   solutionMediaUrl String?
@@ -273,6 +275,7 @@ model ExamOption {
   id         String  @id @default(uuid())
   questionId String
   content    String
+  mediaUrl   String?
   isCorrect  Boolean @default(false)
 
   question   ExamQuestion    @relation(fields: [questionId], references: [id], onDelete: Cascade)
@@ -373,20 +376,24 @@ model Purchase {
 }
 
 model TestPackage {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   tenantId    String
+  educatorId  String?
   title       String
   description String?
   priceCents  Int
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean   @default(true)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  educator  User?      @relation("educatorPackages", fields: [educatorId], references: [id], onDelete: SetNull)
   tests     ExamTest[]
   purchases Purchase[]
 
   @@index([tenantId])
+  @@index([educatorId])
   @@map("test_packages")
 }
 

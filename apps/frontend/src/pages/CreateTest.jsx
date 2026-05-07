@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { createPageUrl } from "@/utils";
 import { entities, topics as topicsApi } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import api from "@/lib/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +15,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
-  ArrowLeft, WrenchIcon, History, Plus, GripVertical,
-  BookOpen, Eye, CheckCircle2, Trash2, Package, HelpCircle,
+  ArrowLeft, WrenchIcon, History, Plus, Package,
+  BookOpen, Eye, CheckCircle2, Trash2, AlertTriangle, Upload, X, Loader2, ImagePlus,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { buildPageUrl, useAppNavigate } from "@/lib/navigation";
@@ -29,16 +31,47 @@ import { EDUCATOR_CREATE_STEPS } from "@/components/onboarding/tourSteps";
 import { useAutoSave } from "@/lib/useAutoSave";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
-import { QuestionForm } from "@/components/questions/QuestionForm";
 import { TestPreviewModal } from "@/components/TestPreviewModal";
 
-// ─── Adım göstergesi ─────────────────────────────────────────────────────────
+// ─── Sabitler ───────────────────────────────────────────────────────────────
 const STEPS = [
-  { id: 1, label: "Paket",     icon: Package     },
-  { id: 2, label: "Sorular",   icon: HelpCircle  },
-  { id: 3, label: "Önizleme",  icon: Eye         },
+  { id: 1, label: "Paket",    icon: Package    },
+  { id: 2, label: "Testler",  icon: BookOpen   },
+  { id: 3, label: "Önizleme", icon: Eye        },
 ];
 
+const LETTERS = ["A", "B", "C", "D", "E"];
+
+// ─── Yardımcı fonksiyonlar ──────────────────────────────────────────────────
+const uid = () => Math.random().toString(36).slice(2);
+
+function emptyOption() {
+  return { _k: uid(), content: "", mediaUrl: "", isCorrect: false };
+}
+
+function emptyQuestion() {
+  return {
+    _k: uid(),
+    content: "",
+    mediaUrl: "",
+    options: [emptyOption(), emptyOption(), emptyOption(), emptyOption(), emptyOption()],
+    topicId: null,
+    duplicateWarning: null,
+  };
+}
+
+function emptyTest() {
+  return {
+    _k: uid(),
+    title: "",
+    examTypeId: "",
+    isTimed: false,
+    duration: 30,
+    questions: [emptyQuestion()],
+  };
+}
+
+// ─── Adım göstergesi ────────────────────────────────────────────────────────
 function StepIndicator({ current }) {
   return (
     <div className="flex items-center justify-center mb-8">
@@ -74,258 +107,845 @@ function StepIndicator({ current }) {
   );
 }
 
-// ─── Ana bileşen ─────────────────────────────────────────────────────────────
-/**
- * CreateTest — 3 adımlı sihirbaz
- *  1. Paket: başlık, açıklama, sınav türü, fiyat, süre, süreli mi
- *  2. Sorular: soru ekle / düzenle / sil (soru bazında konu seçimi)
- *  3. Önizleme: aday gözünden önizle → yayınla veya taslak kaydet
- */
+// ─── Upload yardımcısı (dialog içi kullanım) ────────────────────────────────
+async function doUpload(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const { data } = await api.post("/upload/image", fd);
+  return data.url || data.fileUrl || data.file_url || "";
+}
+
+// ─── Soru düzenleme dialog'u ─────────────────────────────────────────────────
+function QuestionEditDialog({ question, questionIndex, topicList, onSave, onSaveAndNew, onClose }) {
+  const makeLocalState = (q) => ({
+    ...q,
+    _imgFile: null,
+    _imgPreview: null,
+    options: q.options.map(o => ({ ...o, _imgFile: null, _imgPreview: null })),
+  });
+
+  const [local, setLocal] = useState(() => makeLocalState(question));
+  const [displayIndex, setDisplayIndex] = useState(questionIndex);
+  const [submitting, setSubmitting] = useState(false);
+  const [duplicateLoading, setDuplicateLoading] = useState(false);
+
+  const handleContentBlur = async () => {
+    const text = local.content.trim();
+    if (text.length >= 15 && !local.duplicateWarning) {
+      setDuplicateLoading(true);
+      try {
+        const { data } = await api.post("/educators/me/questions/check-duplicate", {
+          content: text,
+          excludeQuestionId: null,
+        });
+        if (data?.isDuplicate) {
+          setLocal(prev => ({ ...prev, duplicateWarning: data }));
+          toast.warning("Benzer bir soru bulundu. İsterseniz devam edebilirsiniz.");
+        }
+      } catch {
+        // Sessiz hata (educator'lar 403 alabilir)
+      } finally {
+        setDuplicateLoading(false);
+      }
+    }
+  };
+
+  // Görselleri yükler, blob URL'leri temizler, kaydedilecek nesneyi döndürür
+  const prepareAndUpload = async () => {
+    let mediaUrl = local.mediaUrl || "";
+    if (local._imgFile) mediaUrl = await doUpload(local._imgFile);
+
+    const options = await Promise.all(local.options.map(async (opt) => {
+      let optMediaUrl = opt.mediaUrl || "";
+      if (opt._imgFile) optMediaUrl = await doUpload(opt._imgFile);
+      const { _imgFile, _imgPreview, ...rest } = opt;
+      return { ...rest, mediaUrl: optMediaUrl };
+    }));
+
+    if (local._imgPreview) URL.revokeObjectURL(local._imgPreview);
+    local.options.forEach(o => { if (o._imgPreview) URL.revokeObjectURL(o._imgPreview); });
+
+    const { _imgFile, _imgPreview, ...rest } = local;
+    return { ...rest, mediaUrl, options };
+  };
+
+  const validate = () => {
+    if (!local.options.some(o => o.isCorrect)) {
+      toast.error("Lütfen doğru seçeneği işaretleyin (A–E)");
+      return false;
+    }
+    return true;
+  };
+
+  const handleSave = async () => {
+    if (!validate()) return;
+    setSubmitting(true);
+    try {
+      const saved = await prepareAndUpload();
+      onSave(saved);
+      onClose();
+    } catch (e) {
+      console.error("Tamamla error:", e);
+      toast.error(e?.message || "Kaydedilirken hata oluştu");
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaveAndNew = async () => {
+    if (!validate()) return;
+    setSubmitting(true);
+    try {
+      const saved = await prepareAndUpload();
+      onSaveAndNew(saved); // ebeveyni güncelle + yeni boş soru ekle
+      // Dialog'u sıfırla — yeni boş soru için
+      const newQ = emptyQuestion();
+      setDisplayIndex(prev => prev + 1);
+      setLocal(makeLocalState(newQ));
+    } catch (e) {
+      console.error("Yeni Soru error:", e);
+      toast.error(e?.message || "Kaydedilirken hata oluştu");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const qImgDisplay = local._imgPreview || local.mediaUrl || null;
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Soru {displayIndex + 1} Düzenle</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-5 py-2">
+          {/* Soru metni */}
+          <div className="space-y-2">
+            <Label>Soru Metni</Label>
+            <Textarea
+              placeholder="Soru metnini giriniz..."
+              value={local.content}
+              onChange={(e) => setLocal(prev => ({ ...prev, content: e.target.value, duplicateWarning: null }))}
+              onBlur={handleContentBlur}
+              disabled={duplicateLoading}
+              rows={3}
+            />
+            {duplicateLoading && (
+              <p className="text-xs text-slate-500 flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Kopya soru kontrol ediliyor...
+              </p>
+            )}
+            {local.duplicateWarning && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                <p className="font-medium text-amber-900">Uyarı: Benzer bir soru bulundu</p>
+                <p className="text-amber-700 mt-1 text-xs">
+                  Benzerlik: {Math.round(local.duplicateWarning.similarity * 100)}%
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Soru görseli */}
+          <div className="space-y-2">
+            <Label>Soru Görseli (İsteğe Bağlı)</Label>
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-600">
+                <ImagePlus className="w-4 h-4" /> Görsel Seç
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!f) return;
+                    if (local._imgPreview) URL.revokeObjectURL(local._imgPreview);
+                    setLocal(prev => ({ ...prev, _imgFile: f, _imgPreview: URL.createObjectURL(f), mediaUrl: "" }));
+                  }}
+                />
+              </label>
+              {qImgDisplay && (
+                <>
+                  <div className="w-16 h-12 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
+                    <img src={qImgDisplay} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (local._imgPreview) URL.revokeObjectURL(local._imgPreview);
+                      setLocal(prev => ({ ...prev, _imgFile: null, _imgPreview: null, mediaUrl: "" }));
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-rose-200 bg-white hover:bg-rose-50 text-rose-600"
+                  >
+                    <X className="w-4 h-4" />Temizle
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Konu seçimi */}
+          <div className="space-y-2">
+            <Label>Konu (İsteğe Bağlı)</Label>
+            <Select
+              value={local.topicId || "none"}
+              onValueChange={(v) => setLocal(prev => ({ ...prev, topicId: v === "none" ? null : v }))}
+            >
+              <SelectTrigger><SelectValue placeholder="Konu seçin" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— Seçilmedi —</SelectItem>
+                {topicList.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.parentName ? `${t.parentName} / ${t.name}` : t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Seçenekler */}
+          <div className="space-y-3">
+            <Label>Seçenekler</Label>
+            {local.options.map((opt, optIdx) => {
+              const optImgDisplay = opt._imgPreview || opt.mediaUrl || null;
+              return (
+                <div key={opt._k} className="p-3 rounded-lg bg-slate-50 space-y-2">
+                  <div className="flex items-start gap-3">
+                    <RadioGroup
+                      value={local.options.find(o => o.isCorrect)?._k || ""}
+                      onValueChange={(v) => setLocal(prev => ({
+                        ...prev,
+                        options: prev.options.map(o => ({ ...o, isCorrect: o._k === v })),
+                      }))}
+                    >
+                      <div className="flex items-center space-x-2 pt-1">
+                        <RadioGroupItem
+                          value={opt._k}
+                          id={`dlg-opt-${question._k}-${optIdx}`}
+                          disabled={!opt.content.trim() && !opt.mediaUrl && !opt._imgFile}
+                        />
+                        <label htmlFor={`dlg-opt-${question._k}-${optIdx}`} className="text-sm font-semibold cursor-pointer">
+                          {LETTERS[optIdx]}
+                        </label>
+                      </div>
+                    </RadioGroup>
+
+                    <div className="flex-1 space-y-2">
+                      <Input
+                        placeholder={`Seçenek ${LETTERS[optIdx]}`}
+                        value={opt.content}
+                        onChange={(e) => setLocal(prev => ({
+                          ...prev,
+                          options: prev.options.map((o, i) => i === optIdx ? { ...o, content: e.target.value } : o),
+                        }))}
+                      />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <label className="cursor-pointer inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-600">
+                          <ImagePlus className="w-3 h-3" />Görsel
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              e.target.value = "";
+                              if (!f) return;
+                              if (opt._imgPreview) URL.revokeObjectURL(opt._imgPreview);
+                              setLocal(prev => ({
+                                ...prev,
+                                options: prev.options.map((o, i) =>
+                                  i === optIdx
+                                    ? { ...o, _imgFile: f, _imgPreview: URL.createObjectURL(f), mediaUrl: "" }
+                                    : o
+                                ),
+                              }));
+                            }}
+                          />
+                        </label>
+                        {optImgDisplay && (
+                          <>
+                            <div className="w-8 h-8 rounded bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-200">
+                              <img src={optImgDisplay} alt="" className="w-full h-full object-cover" />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (opt._imgPreview) URL.revokeObjectURL(opt._imgPreview);
+                                setLocal(prev => ({
+                                  ...prev,
+                                  options: prev.options.map((o, i) =>
+                                    i === optIdx ? { ...o, _imgFile: null, _imgPreview: null, mediaUrl: "" } : o
+                                  ),
+                                }));
+                              }}
+                              className="inline-flex items-center px-1.5 py-1 rounded text-xs border border-slate-200 bg-white hover:bg-rose-50 text-rose-500"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 pt-4 border-t flex-wrap">
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            İptal
+          </Button>
+          {onSaveAndNew && (
+            <Button
+              variant="outline"
+              className="border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+              onClick={handleSaveAndNew}
+              disabled={submitting}
+            >
+              {submitting
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Kaydediliyor...</>
+                : <><Plus className="w-4 h-4 mr-1" />Yeni Soru</>
+              }
+            </Button>
+          )}
+          <Button
+            className="bg-indigo-600 hover:bg-indigo-700"
+            onClick={handleSave}
+            disabled={submitting}
+          >
+            {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Kaydediliyor...</> : "Tamamla"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Soru maddesi accordion ──────────────────────────────────────────────────
+function QuestionItem({ questionIndex, question, topicList, onUpdate, onDelete, onAddNew }) {
+  const [editOpen, setEditOpen] = useState(false);
+
+  const isComplete = (question.content.trim() || question.mediaUrl) &&
+    question.options.filter(o => o.content.trim() || o.mediaUrl).length >= 2 &&
+    question.options.some(o => o.isCorrect);
+
+  return (
+    <>
+      <AccordionItem value={question._k}>
+        <AccordionTrigger className="hover:no-underline">
+          <div className="flex items-center gap-3 text-left flex-1">
+            <span className="text-sm font-semibold text-slate-600">Soru {questionIndex + 1}</span>
+            {isComplete
+              ? <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              : <div className="w-4 h-4 rounded-full border-2 border-slate-300 flex-shrink-0" />
+            }
+            {question.duplicateWarning && (
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            )}
+            {question.content && (
+              <span className="text-xs text-slate-400 truncate max-w-xs">{question.content}</span>
+            )}
+          </div>
+        </AccordionTrigger>
+        <AccordionContent className="pt-2 pb-1">
+          {/* Ozet bilgi */}
+          {question.mediaUrl && (
+            <p className="text-xs text-slate-500 mb-2">📷 Görsel eklenmiş</p>
+          )}
+          <p className="text-xs text-slate-500 mb-3">
+            {question.options.filter(o => o.content.trim()).length}/5 secenek dolu
+            {question.options.find(o => o.isCorrect)
+              ? " • Dogru cevap: " + LETTERS[question.options.findIndex(o => o.isCorrect)]
+              : " • Dogru cevap secilmedi"
+            }
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+              <WrenchIcon className="w-3 h-3 mr-1" />Düzenle
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+              onClick={() => onDelete(questionIndex)}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />Sil
+            </Button>
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+
+      {editOpen && (
+        <QuestionEditDialog
+          question={question}
+          questionIndex={questionIndex}
+          topicList={topicList}
+          onSave={(updated) => onUpdate(updated)}
+          onSaveAndNew={(updated) => {
+            onUpdate(updated);
+            if (onAddNew) onAddNew();
+          }}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Test kartı (Adım 2'de) ─────────────────────────────────────────────────
+function TestCard({ test, testIndex, examTypes, topicList, onTestUpdate, onTestDelete }) {
+  const [showDOCXDialog, setShowDOCXDialog] = useState(false);
+  const [docxLoading, setDocxLoading] = useState(false);
+
+  const handleDOCXImport = async (file) => {
+    setDocxLoading(true);
+    try {
+      const mammoth = await import("mammoth");
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+      const html = result.value;
+
+      // Basit HTML parse: <p>, <li> elemanlarını böl
+      const div = document.createElement("div");
+      div.innerHTML = html;
+      const lines = Array.from(div.querySelectorAll("p, li"))
+        .map((el) => el.textContent.trim())
+        .filter((t) => t.length > 0);
+
+      const questions = [];
+      let currentQuestion = null;
+
+      for (const line of lines) {
+        // Soru tanımı: numarası veya "Soru:" ile başlar
+        if (/^(soru:|\d+\s*\.)/i.test(line)) {
+          if (currentQuestion && currentQuestion.options.length >= 2) {
+            questions.push(currentQuestion);
+          }
+          currentQuestion = emptyQuestion();
+          currentQuestion.content = line.replace(/^(soru:|\d+\s*\.\s*)/i, "").trim();
+        } else if (currentQuestion && /^([A-E])\s*\)\s*(.+)/.test(line)) {
+          // Seçenek: A) B) C) D) E)
+          const match = line.match(/^([A-E])\s*\)\s*(.+)/);
+          const letter = match[1];
+          const text = match[2].trim();
+          const idx = LETTERS.indexOf(letter);
+          if (idx >= 0 && idx < currentQuestion.options.length) {
+            currentQuestion.options[idx].content = text;
+          }
+        } else if (currentQuestion && /^\*|cevap:/i.test(line)) {
+          // Doğru cevap işareti
+          const match = line.match(/^[\*]*\s*([A-E])/i);
+          if (match) {
+            const letter = match[1].toUpperCase();
+            const idx = LETTERS.indexOf(letter);
+            if (idx >= 0) {
+              currentQuestion.options = currentQuestion.options.map((o, i) => ({
+                ...o,
+                isCorrect: i === idx,
+              }));
+            }
+          }
+        }
+      }
+
+      if (currentQuestion && currentQuestion.options.length >= 2) {
+        questions.push(currentQuestion);
+      }
+
+      if (questions.length === 0) {
+        toast.error("DOCX'ten soru parse edilemedi. Lütfen manuel ekleyiniz.");
+      } else {
+        onTestUpdate({
+          ...test,
+          questions: [...test.questions, ...questions],
+        });
+        toast.success(`${questions.length} soru eklendi`);
+      }
+    } catch (err) {
+      if (err.message?.includes("mammoth")) {
+        toast.error("DOCX import paketi yüklü değil");
+      } else {
+        toast.error("DOCX import başarısız: " + (err?.message || "Bilinmeyen hata"));
+      }
+    } finally {
+      setDocxLoading(false);
+      setShowDOCXDialog(false);
+    }
+  };
+
+  const filledQuestions = test.questions.filter((q) => {
+    const filled = q.options.filter((o) => o.content.trim() || o.mediaUrl);
+    return (q.content.trim() || q.mediaUrl) && filled.length >= 2 && q.options.some((o) => o.isCorrect);
+  });
+
+  return (
+    <Card className="mb-4">
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <div className="space-y-2">
+              <Label htmlFor={`test-title-${test._k}`}>Test Başlığı *</Label>
+              <Input
+                id={`test-title-${test._k}`}
+                placeholder="Örn: YKS Matematik"
+                value={test.title}
+                onChange={(e) => onTestUpdate({ ...test, title: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2 mt-3">
+              <Label htmlFor={`test-type-${test._k}`}>Sınav Türü (İsteğe Bağlı)</Label>
+              <Select value={test.examTypeId || "none"} onValueChange={(v) => onTestUpdate({ ...test, examTypeId: v === "none" ? "" : v })}>
+                <SelectTrigger id={`test-type-${test._k}`}><SelectValue placeholder="Seçin" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Seçilmedi —</SelectItem>
+                  {(examTypes || []).map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <Switch id={`timed-${test._k}`} checked={test.isTimed} onCheckedChange={(v) => onTestUpdate({ ...test, isTimed: v })} />
+              <Label htmlFor={`timed-${test._k}`} className="cursor-pointer">Süreli</Label>
+            </div>
+            {test.isTimed && (
+              <div className="space-y-2">
+                <Label htmlFor={`duration-${test._k}`}>Süre (dakika)</Label>
+                <Input
+                  id={`duration-${test._k}`}
+                  type="number"
+                  min="1"
+                  value={test.duration}
+                  onChange={(e) => onTestUpdate({ ...test, duration: Number(e.target.value) })}
+                />
+              </div>
+            )}
+          </div>
+          {test.title && (
+            <Button size="sm" variant="ghost" className="text-rose-600 hover:bg-rose-50"
+              onClick={() => onTestDelete(testIndex)}>
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Sorular accordionu */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-slate-700">
+              {test.questions.length} soru ({filledQuestions.length} tamamlanmış)
+            </p>
+            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700"
+              onClick={() => onTestUpdate({
+                ...test,
+                questions: [...test.questions, emptyQuestion()],
+              })}>
+              <Plus className="w-4 h-4 mr-1" />Soru Ekle
+            </Button>
+          </div>
+          <Accordion type="single" collapsible className="space-y-2">
+            {test.questions.map((q, qIdx) => (
+              <QuestionItem
+                key={q._k}
+                test={test}
+                questionIndex={qIdx}
+                question={q}
+                topicList={topicList}
+                onUpdate={(updated) => {
+                  onTestUpdate({
+                    ...test,
+                    questions: test.questions.map((x, i) => i === qIdx ? updated : x),
+                  });
+                }}
+                onDelete={(idx) => {
+                  onTestUpdate({
+                    ...test,
+                    questions: test.questions.filter((_, i) => i !== idx),
+                  });
+                }}
+                onAddNew={() => {
+                  onTestUpdate({
+                    ...test,
+                    questions: [...test.questions, emptyQuestion()],
+                  });
+                }}
+              />
+            ))}
+          </Accordion>
+        </div>
+
+        {/* DOCX import */}
+        <div className="border-t pt-4">
+          <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowDOCXDialog(true)} disabled={docxLoading}>
+            <Upload className="w-4 h-4" />
+            {docxLoading ? "Yükleniyor..." : "DOCX İçeri Aktar"}
+          </Button>
+        </div>
+
+        {/* DOCX dialog */}
+        <Dialog open={showDOCXDialog} onOpenChange={setShowDOCXDialog}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>DOCX'ten Sorular İçeri Aktar</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">
+                Word dosyasını seçin. Sorular otomatik olarak ayrıştırılacak.
+              </p>
+              <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
+                <label className="cursor-pointer flex flex-col items-center gap-2">
+                  <Upload className="w-6 h-6 text-slate-400" />
+                  <span className="text-sm font-medium text-slate-600">DOCX Dosya Seç</span>
+                  <input
+                    type="file"
+                    accept=".docx"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleDOCXImport(file);
+                      e.target.value = "";
+                    }}
+                    disabled={docxLoading}
+                  />
+                </label>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Ana bileşen ────────────────────────────────────────────────────────────
 export default function CreateTest() {
   const { user }     = useAuth();
   const navigate     = useAppNavigate();
-  const qc           = useQueryClient();
   const { packageCreationEnabled } = useServiceStatus();
   const showCreateTour = useShouldShowTour(TOUR_KEYS.EDUCATOR_CREATE);
   const completeTour   = useCompleteTour();
 
-  // ─── Sihirbaz durumu ─────────────────────────────────────────────────────
-  const [step, setStep]     = useState(1);
-  const [testId, setTestId] = useState(null);     // adım 1→2 geçişinde set edilir
+  // ─── Sihirbaz durumu ────────────────────────────────────────────────
+  const [step, setStep] = useState(1);
+  const [previewTestIndex, setPreviewTestIndex] = useState(null);
 
-  const [formData, setFormData] = useState({
-    title: "", description: "", exam_type_id: "",
-    price: 0, duration_minutes: 60, is_timed: false,
+  const [pkgData, setPkgData] = useState({
+    title: "",
+    description: "",
+    priceCents: 0,
+    examTypeId: "",
   });
 
-  // Adım 2 soru formu
-  const [showNewForm,      setShowNewForm]      = useState(false);
-  const [editingQuestion,  setEditingQuestion]  = useState(null);
+  const [tests, setTests] = useState([emptyTest()]);
 
-  // Önizleme modalı
-  const [previewOpen, setPreviewOpen] = useState(false);
-
-  // ─── Taslak kurtarma ────────────────────────────────────────────────────
+  // ─── Taslak kurtarma ────────────────────────────────────────────
   const [showDraftDialog, setShowDraftDialog] = useState(false);
-  const [draftInfo,       setDraftInfo]       = useState(null);
-  const draftKey      = user?.id ? `createTest_${user.id}` : null;
-  const getFormData   = useCallback(() => formData, [formData]);
+  const [draftInfo, setDraftInfo] = useState(null);
+  const draftKey = user?.id ? `createTestWizard_${user.id}` : null;
+  const getFormData = useCallback(() => ({ pkgData, tests }), [pkgData, tests]);
   const { hasDraft, loadDraft, clearDraft } = useAutoSave(
     draftKey ?? "__noop__",
     getFormData,
-    { enabled: !!draftKey && step === 1 },
+    { enabled: !!draftKey && step <= 2 },
   );
 
   useEffect(() => {
     if (!draftKey) return;
     if (hasDraft()) {
       const draft = loadDraft();
-      if (draft?.data?.title) { setDraftInfo(draft); setShowDraftDialog(true); }
+      if (draft?.data?.pkgData?.title) {
+        setDraftInfo(draft);
+        setShowDraftDialog(true);
+      }
     }
   }, [draftKey]);
 
-  // ─── Sorgular ───────────────────────────────────────────────────────────
+  // ─── Sorgular ─────────────────────────────────────────────────────
   const { data: examTypes = [] } = useQuery({
     queryKey: ["examTypes"],
-    queryFn:  () => entities.ExamType.filter({ is_active: true }),
-    enabled:  !!user,
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
+    enabled: !!user,
   });
 
-  // Konu listesi: soru formunda kullanılacak (düz/flat liste)
-  // Admin topics endpoint'i kullanır; eğiticiler için boş döner (403) — graceful fallback
   const { data: topicList = [] } = useQuery({
-    queryKey: ["topicsFlat", formData.exam_type_id],
-    queryFn:  async () => {
+    queryKey: ["topicsFlat", pkgData.examTypeId],
+    queryFn: async () => {
       try {
-        return await topicsApi.flat(formData.exam_type_id || undefined);
+        return await topicsApi.flat(pkgData.examTypeId || undefined);
       } catch {
         return [];
       }
     },
-    enabled:  step >= 2,
-    retry:    false,
+    enabled: step >= 2,
+    retry: false,
     staleTime: 60_000,
   });
 
-  // Oluşturulan testin soruları
-  const { data: testDetail } = useQuery({
-    queryKey: ["test", testId],
-    queryFn:  async () => { const { data } = await api.get(`/tests/${testId}`); return data; },
-    enabled:  !!testId,
-  });
-
-  const questions = testDetail?.questions || [];
-
-  // ─── Mutasyonlar ────────────────────────────────────────────────────────
-  // Adım 1 → 2: testi oluştur (ya da var olanı güncelle)
-  const createTestMutation = useMutation({
-    mutationFn: async () => {
-      if (testId) {
-        // Kullanıcı geri gelip tekrar ileri tıkladı — testi güncelle
-        // UpdateTestDto: title, priceCents, duration, isTimed, hasSolutions
-        await api.patch(`/tests/${testId}`, {
-          title:      formData.title,
-          priceCents: Math.round((formData.price || 0) * 100),
-          isTimed:    formData.is_timed,
-          duration:   formData.duration_minutes || 60,
-        });
-        return { id: testId };
-      }
-      // CreateTestDto: title, isTimed, duration, price (kuruş cinsinden), examTypeId, topicId
-      const { data } = await api.post("/tests", {
-        title:      formData.title,
-        examTypeId: formData.exam_type_id || undefined,
-        price:      Math.round((formData.price || 0) * 100),
-        isTimed:    formData.is_timed,
-        duration:   formData.duration_minutes || 60,
-      });
-      return data;
-    },
-    onSuccess: (newTest) => {
-      clearDraft();
-      setTestId(newTest.id);
-      setStep(2);
-    },
-    onError: (err) => {
-      toast.error(err?.response?.data?.message || "Test oluşturulurken hata oluştu");
-    },
-  });
-
-  // Soru ekle
-  const createQuestionMutation = useMutation({
-    mutationFn: async (data) => {
-      const options = (data.options || []).filter(o => (o.content || "").trim() || o.mediaUrl);
-      await api.post(`/tests/${testId}/questions`, {
-        content:          data.question_text,
-        mediaUrl:         data.question_mediaUrl || undefined,
-        order:            questions.length,
-        topicId:          data.topicId || undefined,
-        solutionText:     data.solutionText || undefined,
-        solutionMediaUrl: data.solutionMediaUrl || undefined,
-        options,
-      });
-    },
-    onSuccess: () => {
-      toast.success("Soru eklendi");
-      qc.invalidateQueries({ queryKey: ["test", testId] });
-      setShowNewForm(false);
-      setEditingQuestion(null);
-    },
-    onError: (err) => toast.error(err?.response?.data?.message || "Soru eklenemedi"),
-  });
-
-  // Soru güncelle
-  const updateQuestionMutation = useMutation({
-    mutationFn: async ({ questionId, data }) => {
-      await api.patch(`/tests/${testId}/questions/${questionId}`, {
-        content:          data.question_text,
-        mediaUrl:         data.question_mediaUrl ?? undefined,
-        order:            data.order,
-        topicId:          data.topicId ?? undefined,
-        solutionText:     data.solutionText || undefined,
-        solutionMediaUrl: data.solutionMediaUrl || undefined,
-      });
-      for (let i = 0; i < (data.options || []).length; i++) {
-        const opt  = data.options[i];
-        const orig = editingQuestion?.options?.[i];
-        if (orig?.id) {
-          await api.patch(
-            `/tests/${testId}/questions/${questionId}/options/${orig.id}`,
-            { content: opt.content, isCorrect: opt.isCorrect, mediaUrl: opt.mediaUrl ?? undefined },
-          );
-        }
-      }
-    },
-    onSuccess: () => {
-      toast.success("Soru güncellendi");
-      qc.invalidateQueries({ queryKey: ["test", testId] });
-      setEditingQuestion(null);
-      setShowNewForm(false);
-    },
-    onError: (err) => toast.error(err?.response?.data?.message || "Güncelleme başarısız"),
-  });
-
-  // Soru sil
-  const deleteQuestionMutation = useMutation({
-    mutationFn: (qId) => api.delete(`/tests/${testId}/questions/${qId}`),
-    onSuccess:  () => { toast.success("Soru silindi"); qc.invalidateQueries({ queryKey: ["test", testId] }); },
-    onError:    () => toast.error("Soru silinemedi"),
-  });
-
-  // Yayınla
+  // ─── Mutasyonlar ────────────────────────────────────────────────
+  // publish=true → yayınla, publish=false → taslak kaydet
   const publishMutation = useMutation({
-    mutationFn: () => api.put(`/tests/${testId}/publish`),
-    onSuccess:  () => {
-      toast.success("Test yayınlandı!");
-      qc.invalidateQueries({ queryKey: ["test", testId] });
+    mutationFn: async (publish = true) => {
+      // 1. Her test için ExamTest oluştur
+      const createdTestIds = [];
+      for (const testData of tests) {
+        if (!testData.title.trim()) continue; // Başlıksız testi atla
+
+        const { data: created } = await api.post("/tests", {
+          title: testData.title,
+          examTypeId: testData.examTypeId || undefined,
+          price: 0, // Fiyat paket düzeyinde
+          isTimed: testData.isTimed,
+          duration: testData.isTimed ? testData.duration : undefined,
+        });
+
+        // Soruları ekle
+        for (let qi = 0; qi < testData.questions.length; qi++) {
+          const q = testData.questions[qi];
+          const filledOpts = q.options.filter(o => o.content.trim() || o.mediaUrl);
+          if (!filledOpts.length || !q.options.some(o => o.isCorrect)) continue; // Tamamlanmamış soruyu atla
+
+          await api.post(`/tests/${created.id}/questions`, {
+            content: q.content,
+            mediaUrl: q.mediaUrl || undefined,
+            topicId: q.topicId || undefined,
+            order: qi,
+            options: filledOpts.map(o => ({
+              content: o.content,
+              mediaUrl: o.mediaUrl || undefined,
+              isCorrect: o.isCorrect,
+            })),
+          });
+        }
+
+        createdTestIds.push(created.id);
+      }
+
+      if (createdTestIds.length === 0) {
+        throw new Error("En az bir geçerli test oluşturmalısınız");
+      }
+
+      // 2. TestPackage oluştur
+      const { data: pkg } = await api.post("/packages", {
+        title: pkgData.title,
+        description: pkgData.description || undefined,
+        priceCents: Math.round((pkgData.priceCents || 0) * 100),
+        examTypeId: pkgData.examTypeId || undefined,
+      });
+
+      // 3. Testleri pakete ekle
+      for (const testId of createdTestIds) {
+        await api.post(`/packages/${pkg.id}/tests`, { testId });
+      }
+
+      // 4. Yayınla (opsiyonel)
+      if (publish) {
+        await api.put(`/packages/${pkg.id}/publish`);
+      }
+
+      return { pkg, publish };
+    },
+    onSuccess: (result) => {
+      clearDraft();
+      if (result.publish) {
+        toast.success("Paket oluşturuldu ve yayınlandı!");
+      } else {
+        toast.success("Paket taslak olarak kaydedildi.");
+      }
       navigate(buildPageUrl("MyTestPackages"), { replace: true });
     },
-    onError: (err) => toast.error(err?.response?.data?.message || "Yayınlama başarısız"),
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || err?.message || "Kaydetme başarısız");
+    },
   });
 
-  // ─── Guard'lar ──────────────────────────────────────────────────────────
-  if (!user) return (
-    <div className="max-w-2xl mx-auto text-center py-20">
-      <p className="text-slate-600 mb-4">Test oluşturmak için giriş yapın</p>
-      <Link to={createPageUrl("Login")}>
-        <Button className="bg-indigo-600 hover:bg-indigo-700">Giriş Yap</Button>
-      </Link>
-    </div>
-  );
-
-  if (!packageCreationEnabled) return (
-    <div className="max-w-2xl mx-auto text-center py-20">
-      <div className="w-20 h-20 mx-auto bg-amber-100 rounded-full flex items-center justify-center mb-4">
-        <WrenchIcon className="w-10 h-10 text-amber-600" />
+  // ─── Guard'lar ───────────────────────────────────────────────────
+  if (!user) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <p className="text-slate-600 mb-4">Test oluşturmak için giriş yapın</p>
+        <Link to={createPageUrl("Login")}>
+          <Button className="bg-indigo-600 hover:bg-indigo-700">Giriş Yap</Button>
+        </Link>
       </div>
-      <h2 className="text-2xl font-bold text-slate-900 mb-2">Bakım Modu</h2>
-      <p className="text-slate-600">Test oluşturma geçici olarak durdurulmuştur.</p>
-    </div>
-  );
+    );
+  }
 
-  if (user.role === "EDUCATOR" && user?.status === "PENDING_EDUCATOR_APPROVAL") return (
-    <div className="max-w-2xl mx-auto text-center py-20">
-      <h2 className="text-2xl font-bold text-slate-900 mb-2">Hesap Onayı Bekleniyor</h2>
-      <p className="text-slate-600 mb-6">
-        Test oluşturabilmek için hesabınızın yönetici tarafından onaylanması gerekiyor.
-      </p>
-      <Link to={createPageUrl("EducatorSettings")}>
-        <Button className="bg-indigo-600 hover:bg-indigo-700">Profil Ayarlarına Git</Button>
-      </Link>
-    </div>
-  );
+  if (!packageCreationEnabled) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <div className="w-20 h-20 mx-auto bg-amber-100 rounded-full flex items-center justify-center mb-4">
+          <WrenchIcon className="w-10 h-10 text-amber-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Bakım Modu</h2>
+        <p className="text-slate-600">Test oluşturma geçici olarak durdurulmuştur.</p>
+      </div>
+    );
+  }
 
-  // ─── Geçiş işleyicileri ─────────────────────────────────────────────────
-  const goToQuestions = () => {
-    if (!formData.title.trim()) { toast.error("Test başlığı zorunludur"); return; }
-    if (formData.is_timed && (!formData.duration_minutes || formData.duration_minutes < 1)) {
-      toast.error("Süreli test için süre giriniz"); return;
+  if (user.role === "EDUCATOR" && user?.status === "PENDING_EDUCATOR_APPROVAL") {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Hesap Onayı Bekleniyor</h2>
+        <p className="text-slate-600 mb-6">
+          Test oluşturabilmek için hesabınızın yönetici tarafından onaylanması gerekiyor.
+        </p>
+        <Link to={createPageUrl("EducatorSettings")}>
+          <Button className="bg-indigo-600 hover:bg-indigo-700">Profil Ayarlarına Git</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  // ─── Geçiş işleyicileri ────────────────────────────────────────
+  const goToTests = () => {
+    if (!pkgData.title.trim()) {
+      toast.error("Paket başlığı zorunludur");
+      return;
     }
-    createTestMutation.mutate();
+    if (!pkgData.priceCents || pkgData.priceCents <= 0) {
+      toast.error("Fiyat 0'dan büyük olmalıdır");
+      return;
+    }
+    setStep(2);
   };
 
   const goToPreview = () => {
-    if (questions.length === 0) { toast.error("En az 1 soru eklemelisiniz"); return; }
+    const validTests = tests.filter((t) => {
+      if (!t.title.trim()) return false;
+      const validQuestions = t.questions.filter((q) => {
+        const filledOpts = q.options.filter(o => o.content.trim() || o.mediaUrl);
+        return (q.content.trim() || q.mediaUrl) && filledOpts.length >= 2 && q.options.some(o => o.isCorrect);
+      });
+      return validQuestions.length > 0;
+    });
+
+    if (validTests.length === 0) {
+      toast.error("En az bir tamamlanmış test ve soru eklemelisiniz");
+      return;
+    }
+
     setStep(3);
   };
 
-  const handleSaveQuestion = (data) => {
-    if (editingQuestion?.id) {
-      updateQuestionMutation.mutate({ questionId: editingQuestion.id, data });
-    } else {
-      createQuestionMutation.mutate(data);
-    }
-  };
-
   const draftSavedAt = draftInfo?.savedAt
-    ? (() => { try { return format(new Date(draftInfo.savedAt), "d MMM yyyy HH:mm", { locale: tr }); } catch { return draftInfo.savedAt; } })()
+    ? (() => {
+        try {
+          return format(new Date(draftInfo.savedAt), "d MMM yyyy HH:mm", { locale: tr });
+        } catch {
+          return draftInfo.savedAt;
+        }
+      })()
     : null;
 
-  // ─── Render ─────────────────────────────────────────────────────────────
+  // ─── Render ─────────────────────────────────────────────────────
   return (
-    <div className="max-w-2xl mx-auto">
-
-      {/* Taslak kurtarma diyaloğu */}
+    <div className="max-w-4xl mx-auto">
+      {/* Taslak kurtarma */}
       <Dialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -336,18 +956,22 @@ export default function CreateTest() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              <strong>"{draftInfo?.data?.title}"</strong> başlıklı kaydedilmemiş bir taslak bulundu.
+              <strong>"{draftInfo?.data?.pkgData?.title}"</strong> başlıklı kaydedilmemiş bir taslak bulundu.
               {draftSavedAt && <span className="text-slate-400"> ({draftSavedAt})</span>}
             </p>
             <div className="flex gap-3">
               <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={() => {
-                if (draftInfo?.data) setFormData(draftInfo.data);
+                if (draftInfo?.data) {
+                  setPkgData(draftInfo.data.pkgData);
+                  setTests(draftInfo.data.tests);
+                }
                 toast.success("Taslak yüklendi");
                 setShowDraftDialog(false);
               }}>Devam Et</Button>
-              <Button variant="outline" className="flex-1" onClick={() => { clearDraft(); setShowDraftDialog(false); }}>
-                Sil, Yeniden Başla
-              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => {
+                clearDraft();
+                setShowDraftDialog(false);
+              }}>Sil, Yeniden Başla</Button>
             </div>
           </div>
         </DialogContent>
@@ -362,19 +986,19 @@ export default function CreateTest() {
         />
       )}
 
-      {/* Geri + başlık */}
+      {/* Başlık */}
       <Link to={createPageUrl("EducatorDashboard")}
         className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6">
         <ArrowLeft className="w-4 h-4" />
         Dashboard'a Dön
       </Link>
 
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Yeni Test Oluştur</h1>
-      <p className="text-slate-500 mb-8">Adımları takip ederek testinizi oluşturun ve yayınlayın.</p>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">Yeni Test Paketi Oluştur</h1>
+      <p className="text-slate-500 mb-8">3 adımda testlerinizi hazırlayın ve yayınlayın.</p>
 
       <StepIndicator current={step} />
 
-      {/* ── ADIM 1: Paket bilgileri ─────────────────────────────────────────── */}
+      {/* ── ADIM 1: Paket ─────────────────────────────────────────── */}
       {step === 1 && (
         <Card>
           <CardHeader>
@@ -385,24 +1009,23 @@ export default function CreateTest() {
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="title">Test Başlığı *</Label>
-              <Input id="title" placeholder="Örn: KPSS Genel Yetenek Deneme Sınavı"
-                value={formData.title}
-                onChange={e => setFormData({ ...formData, title: e.target.value })} />
+              <Label htmlFor="pkg-title">Paket Başlığı *</Label>
+              <Input id="pkg-title" placeholder="Örn: KPSS Genel Yetenek Paket"
+                value={pkgData.title}
+                onChange={(e) => setPkgData({ ...pkgData, title: e.target.value })} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Açıklama</Label>
-              <Textarea id="description" placeholder="Test hakkında kısa bir açıklama..." rows={3}
-                value={formData.description}
-                onChange={e => setFormData({ ...formData, description: e.target.value })} />
+              <Label htmlFor="pkg-desc">Açıklama</Label>
+              <Textarea id="pkg-desc" placeholder="Paket hakkında..." rows={3}
+                value={pkgData.description}
+                onChange={(e) => setPkgData({ ...pkgData, description: e.target.value })} />
             </div>
 
             <div className="space-y-2">
-              <Label>Sınav Türü</Label>
-              <Select value={formData.exam_type_id || "none"}
-                onValueChange={v => setFormData({ ...formData, exam_type_id: v === "none" ? "" : v })}>
-                <SelectTrigger><SelectValue placeholder="Seçin (opsiyonel)" /></SelectTrigger>
+              <Label htmlFor="pkg-type">Sınav Türü (İsteğe Bağlı)</Label>
+              <Select value={pkgData.examTypeId || "none"} onValueChange={(v) => setPkgData({ ...pkgData, examTypeId: v === "none" ? "" : v })}>
+                <SelectTrigger id="pkg-type"><SelectValue placeholder="Seçin" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">— Seçilmedi —</SelectItem>
                   {examTypes.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
@@ -410,181 +1033,155 @@ export default function CreateTest() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="price">Fiyat (₺)</Label>
-                <Input id="price" type="number" min="0" step="0.01"
-                  value={formData.price}
-                  onChange={e => setFormData({ ...formData, price: Number(e.target.value) })} />
-              </div>
-              {formData.is_timed && (
-                <div className="space-y-2">
-                  <Label htmlFor="duration">Süre (dakika) *</Label>
-                  <Input id="duration" type="number" min="1"
-                    value={formData.duration_minutes}
-                    onChange={e => setFormData({ ...formData, duration_minutes: Number(e.target.value) })} />
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Switch id="is_timed" checked={formData.is_timed}
-                onCheckedChange={v => setFormData({ ...formData, is_timed: v })} />
-              <Label htmlFor="is_timed" className="cursor-pointer">Süreli Test</Label>
+            <div className="space-y-2">
+              <Label htmlFor="pkg-price">Fiyat (₺) *</Label>
+              <Input id="pkg-price" type="number" min="1" step="1" placeholder="Örn: 49"
+                value={pkgData.priceCents || ""}
+                onChange={(e) => setPkgData({ ...pkgData, priceCents: Number(e.target.value) })} />
+              <p className="text-xs text-slate-500">Fiyat 0'dan büyük olmalıdır</p>
             </div>
 
             <div className="flex justify-end pt-2">
-              <Button onClick={goToQuestions} disabled={createTestMutation.isPending}
-                className="bg-indigo-600 hover:bg-indigo-700">
-                {createTestMutation.isPending ? "Oluşturuluyor..." : "İleri →"}
+              <Button onClick={goToTests} className="bg-indigo-600 hover:bg-indigo-700">
+                İleri →
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* ── ADIM 2: Sorular ─────────────────────────────────────────────────── */}
+      {/* ── ADIM 2: Testler ──────────────────────────────────────── */}
       {step === 2 && (
         <div className="space-y-5">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <HelpCircle className="w-5 h-5 text-indigo-600" />
-                  Sorular
-                  <Badge variant="outline" className="ml-1 font-normal">{questions.length} soru</Badge>
-                </CardTitle>
-                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700"
-                  onClick={() => { setShowNewForm(true); setEditingQuestion(null); }}
-                  disabled={showNewForm || !!editingQuestion}>
-                  <Plus className="w-4 h-4 mr-1" />Soru Ekle
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Soru formu */}
-              {(showNewForm || editingQuestion) && (
-                <div className="mb-5">
-                  <QuestionForm
-                    question={editingQuestion?.id ? editingQuestion : null}
-                    options={editingQuestion?.options || []}
-                    topicList={topicList}
-                    onSave={handleSaveQuestion}
-                    onCancel={() => { setShowNewForm(false); setEditingQuestion(null); }}
-                    isLoading={createQuestionMutation.isPending || updateQuestionMutation.isPending}
-                    saveLabel={editingQuestion?.id ? "Güncelle" : "Soru Ekle"}
-                  />
-                </div>
-              )}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Testler & Sorular</h2>
+              <p className="text-sm text-slate-500 mt-1">Her teste sorular ekleyip düzenleyin</p>
+            </div>
+            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700"
+              onClick={() => setTests([...tests, emptyTest()])}>
+              <Plus className="w-4 h-4 mr-1" />Test Ekle
+            </Button>
+          </div>
 
-              {/* Soru listesi */}
-              <div className="space-y-2">
-                {questions.map((q, idx) => {
-                  const correctOpt    = q.options?.find(o => o.isCorrect);
-                  const correctLetter = correctOpt ? ["A","B","C","D","E"][q.options.indexOf(correctOpt)] : "-";
-                  return (
-                    <div key={q.id} className="flex items-start gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-                      <div className="flex items-center gap-1.5 text-slate-400 shrink-0 mt-0.5">
-                        <GripVertical className="w-4 h-4" />
-                        <span className="text-sm font-semibold w-5 text-center">{idx + 1}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-800 line-clamp-2">{q.content}</p>
-                        <div className="flex gap-2 mt-1.5 flex-wrap">
-                          <Badge variant="outline" className="text-xs py-0 px-2">Doğru: {correctLetter}</Badge>
-                          {q.topic?.name && (
-                            <Badge variant="outline" className="text-xs py-0 px-2 border-indigo-200 text-indigo-700 bg-indigo-50">
-                              {q.topic.name}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-1 shrink-0">
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-slate-500 hover:text-indigo-600"
-                          onClick={() => { setEditingQuestion(q); setShowNewForm(false); }}>
-                          Düzenle
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-slate-400 hover:text-rose-600"
-                          onClick={() => deleteQuestionMutation.mutate(q.id)}
-                          disabled={deleteQuestionMutation.isPending}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
+          {tests.map((test, tIdx) => (
+            <TestCard
+              key={test._k}
+              test={test}
+              testIndex={tIdx}
+              examTypes={examTypes}
+              topicList={topicList}
+              onTestUpdate={(updated) => {
+                setTests(tests.map((t, i) => i === tIdx ? updated : t));
+              }}
+              onTestDelete={(idx) => {
+                setTests(tests.filter((_, i) => i !== idx));
+              }}
+              onAddQuestion={() => {
+                setTests(tests.map((t, i) =>
+                  i === tIdx ? { ...t, questions: [...t.questions, emptyQuestion()] } : t
+                ));
+              }}
+            />
+          ))}
 
-                {questions.length === 0 && !showNewForm && !editingQuestion && (
-                  <div className="text-center py-10 text-slate-500">
-                    <BookOpen className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                    <p className="font-medium">Henüz soru eklenmedi</p>
-                    <p className="text-sm mt-1 text-slate-400">"Soru Ekle" butonuna tıklayarak başlayın</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          {tests.length === 0 && (
+            <Card>
+              <CardContent className="py-12 text-center text-slate-500">
+                <BookOpen className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                <p className="font-medium">Henüz test eklenmedi</p>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex justify-between">
             <Button variant="outline" onClick={() => setStep(1)}>← Geri</Button>
-            <div className="flex gap-2">
-              {questions.length > 0 && (
-                <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-50 gap-1.5"
-                  onClick={() => setPreviewOpen(true)}>
-                  <Eye className="w-4 h-4" />Önizle
-                </Button>
-              )}
-              <Button onClick={goToPreview} className="bg-indigo-600 hover:bg-indigo-700">
-                Önizleme →
-              </Button>
-            </div>
+            <Button onClick={goToPreview} className="bg-indigo-600 hover:bg-indigo-700">
+              Önizleme →
+            </Button>
           </div>
         </div>
       )}
 
-      {/* ── ADIM 3: Önizleme & Yayınla ─────────────────────────────────────── */}
+      {/* ── ADIM 3: Önizleme & Yayınla ────────────────────────── */}
       {step === 3 && (
         <div className="space-y-5">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Eye className="w-5 h-5 text-indigo-600" />
-                Önizleme & Yayınla
+                Paket Özeti
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Özet */}
               <div className="bg-slate-50 rounded-xl p-4 space-y-3">
-                <h3 className="font-semibold text-slate-900">{formData.title}</h3>
-                {formData.description && <p className="text-sm text-slate-600">{formData.description}</p>}
+                <div>
+                  <p className="text-xs text-slate-500">Paket Başlığı</p>
+                  <p className="text-lg font-semibold text-slate-900">{pkgData.title}</p>
+                </div>
+                {pkgData.description && (
+                  <div>
+                    <p className="text-xs text-slate-500">Açıklama</p>
+                    <p className="text-sm text-slate-700">{pkgData.description}</p>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">{questions.length} soru</Badge>
-                  {formData.is_timed && <Badge variant="outline">{formData.duration_minutes} dk</Badge>}
-                  <Badge variant="outline">{formData.price === 0 ? "Ücretsiz" : `₺${formData.price}`}</Badge>
-                  {examTypes.find(e => e.id === formData.exam_type_id)?.name && (
+                  <Badge variant="outline">{tests.length} test</Badge>
+                  <Badge variant="outline">
+                    {tests.reduce((acc, t) => acc + t.questions.filter(q => {
+                      const filled = q.options.filter(o => o.content.trim() || o.mediaUrl);
+                      return (q.content.trim() || q.mediaUrl) && filled.length >= 2 && q.options.some(o => o.isCorrect);
+                    }).length, 0)} soru
+                  </Badge>
+                  <Badge variant="outline">{pkgData.priceCents === 0 ? "Ücretsiz" : `₺${pkgData.priceCents}`}</Badge>
+                  {examTypes.find(e => e.id === pkgData.examTypeId)?.name && (
                     <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50">
-                      {examTypes.find(e => e.id === formData.exam_type_id)?.name}
+                      {examTypes.find(e => e.id === pkgData.examTypeId)?.name}
                     </Badge>
                   )}
                 </div>
               </div>
 
-              <Button variant="outline" className="w-full border-amber-300 text-amber-700 hover:bg-amber-50 gap-2"
-                onClick={() => setPreviewOpen(true)}>
-                <Eye className="w-4 h-4" />Aday Gözünden Önizle
-              </Button>
+              {/* Test listesi */}
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-slate-700">Testler</p>
+                {tests.map((t, tIdx) => {
+                  const validQuestions = t.questions.filter(q => {
+                    const filled = q.options.filter(o => o.content.trim() || o.mediaUrl);
+                    return (q.content.trim() || q.mediaUrl) && filled.length >= 2 && q.options.some(o => o.isCorrect);
+                  });
+                  return (
+                    <div key={t._k} className="p-3 rounded-lg bg-slate-50 border border-slate-100">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-slate-900">{t.title || "Başlıksız Test"}</p>
+                          <p className="text-sm text-slate-600">{validQuestions.length} soru</p>
+                        </div>
+                        <Button size="sm" variant="ghost" className="text-indigo-600"
+                          onClick={() => {
+                            setPreviewTestIndex(tIdx);
+                          }}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
               <div className="border-t pt-4 space-y-3">
                 <p className="text-sm text-slate-500">
-                  Test yayınlandığında öğrenciler tarafından görülebilir ve satın alınabilir hale gelir.
+                  Paket yayınlandığında öğrenciler tarafından görülebilir ve satın alınabilir hale gelir.
                 </p>
                 <div className="flex gap-3">
                   <Button variant="outline" className="flex-1"
-                    onClick={() => { toast.success("Test taslak olarak kaydedildi"); navigate(buildPageUrl("MyTestPackages"), { replace: true }); }}>
-                    Taslak Kaydet
+                    disabled={publishMutation.isPending}
+                    onClick={() => publishMutation.mutate(false)}>
+                    {publishMutation.isPending ? "Kaydediliyor..." : "Taslak Kaydet"}
                   </Button>
                   <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 gap-2"
-                    disabled={publishMutation.isPending} onClick={() => publishMutation.mutate()}>
+                    disabled={publishMutation.isPending}
+                    onClick={() => publishMutation.mutate(true)}>
                     <CheckCircle2 className="w-4 h-4" />
                     {publishMutation.isPending ? "Yayınlanıyor..." : "Yayınla"}
                   </Button>
@@ -593,20 +1190,22 @@ export default function CreateTest() {
             </CardContent>
           </Card>
 
-          <Button variant="outline" onClick={() => setStep(2)}>← Geri (Sorular)</Button>
+          <Button variant="outline" onClick={() => setStep(2)}>← Geri (Testler)</Button>
         </div>
       )}
 
       {/* Önizleme modalı */}
-      <TestPreviewModal
-        isOpen={previewOpen}
-        questions={questions}
-        title={formData.title}
-        onClose={() => setPreviewOpen(false)}
-        onConfirm={step === 3 && !testDetail?.publishedAt
-          ? () => { setPreviewOpen(false); publishMutation.mutate(); }
-          : null}
-      />
+      {previewTestIndex !== null && tests[previewTestIndex] && (
+        <TestPreviewModal
+          isOpen={previewTestIndex !== null}
+          questions={tests[previewTestIndex].questions.filter((q) => {
+            const filled = q.options.filter(o => o.content.trim() || o.mediaUrl);
+            return (q.content.trim() || q.mediaUrl) && filled.length >= 2 && q.options.some(o => o.isCorrect);
+          })}
+          title={tests[previewTestIndex].title}
+          onClose={() => setPreviewTestIndex(null)}
+        />
+      )}
     </div>
   );
 }

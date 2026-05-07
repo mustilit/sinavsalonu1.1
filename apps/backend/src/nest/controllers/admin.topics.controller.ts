@@ -38,7 +38,7 @@ export class AdminTopicsController {
   }
 
   @Get()
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'EDUCATOR')
   @ApiBearerAuth('bearer')
   @ApiOkResponse({ description: 'Flat topic list, optional examTypeId filter' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
