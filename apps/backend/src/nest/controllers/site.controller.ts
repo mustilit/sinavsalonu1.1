@@ -60,15 +60,17 @@ export class SiteController {
   @ApiOkResponse({ description: 'Current kill-switch status for all services' })
   async getServiceStatus() {
     const row = await this.prisma.adminSettings.findFirst({ where: { id: 1 } });
+    // minPackagePriceCents Prisma client'ta olmayabilir; raw okuma güvenli yol
+    const raw = await (this.prisma as any).$queryRaw<{ minPackagePriceCents: number }[]>`
+      SELECT "minPackagePriceCents" FROM admin_settings WHERE id = 1
+    `;
     return {
       purchasesEnabled:       row?.purchasesEnabled                    ?? true,
       packageCreationEnabled: row?.packageCreationEnabled              ?? true,
       testPublishingEnabled:  row?.testPublishingEnabled               ?? true,
       testAttemptsEnabled:    row?.testAttemptsEnabled                 ?? true,
-      // Eğitici reklam satın alma kill-switch'i
-      adPurchasesEnabled:       (row as any)?.adPurchasesEnabled       ?? true,
-      // Minimum paket fiyatı — eğiticiler bu değeri okur
-      minPackagePriceCents:     (row as any)?.minPackagePriceCents      ?? 100,
+      adPurchasesEnabled:     (row as any)?.adPurchasesEnabled         ?? true,
+      minPackagePriceCents:   raw[0]?.minPackagePriceCents             ?? 100,
     };
   }
 

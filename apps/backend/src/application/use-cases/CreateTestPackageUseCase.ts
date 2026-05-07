@@ -22,7 +22,11 @@ export class CreateTestPackageUseCase {
       throw new AppError('INVALID_TITLE', 'Paket başlığı boş olamaz', 400);
     }
 
-    const minPriceCents = (settings as any)?.minPackagePriceCents ?? 100;
+    // minPackagePriceCents Prisma client'ta olmayabilir; raw okuma güvenli yol
+    const rawMin = await (prisma as any).$queryRaw<{ minPackagePriceCents: number }[]>`
+      SELECT "minPackagePriceCents" FROM admin_settings WHERE id = 1
+    `;
+    const minPriceCents = rawMin[0]?.minPackagePriceCents ?? 100;
     if (input.priceCents < minPriceCents) {
       const minTL = (minPriceCents / 100).toFixed(2).replace('.', ',');
       throw new AppError('PRICE_TOO_LOW', `Paket fiyatı en az ${minTL} ₺ olmalıdır`, 400);
