@@ -40,7 +40,7 @@ export class StartTestAttemptUseCase {
       if (packageId) {
         const packagePurchase = await prismaRetry(() =>
           (this.prisma.purchase as any).findFirst({
-            where: { packageId, candidateId: userId, paymentStatus: 'COMPLETED' },
+            where: { packageId, candidateId: userId },
           }),
         );
         hasAccess = !!packagePurchase;
@@ -57,11 +57,14 @@ export class StartTestAttemptUseCase {
       }),
     );
 
+    const isTimed = (test as any).isTimed ?? false;
+    // Zamansız testler için 24 saat varsayılan; zamanlı testlerde duration zorunlu
     const durationSec =
       (test as any).durationSec ??
-      ((test as any).duration ? Number((test as any).duration) * 60 : null);
+      ((test as any).duration ? Number((test as any).duration) * 60 : null) ??
+      (!isTimed ? 86400 : null);
 
-    if (!durationSec || durationSec <= 0) {
+    if (isTimed && (!durationSec || durationSec <= 0)) {
       throw new BadRequestException({
         code: 'INVALID_DURATION',
         message: 'Test duration is not configured',

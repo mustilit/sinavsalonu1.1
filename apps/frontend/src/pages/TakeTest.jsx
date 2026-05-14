@@ -140,18 +140,9 @@ export default function TakeTest() {
     enabled: !!testId,
   });
 
-  // Paket satın alma kontrolü: test bir paketin parçasıysa packageId üzerinden kontrol et
-  const packageId = testDetail?.packageId ?? null;
-  const { data: packageAccess, isLoading: loadingPackageAccess } = useQuery({
-    queryKey: ["packageAccess", packageId, user?.id],
-    queryFn: () => entities.Purchase.getPaymentStatus(packageId),
-    enabled: !!user && !!packageId,
-    staleTime: 30_000,
-  });
-
-  // Erişim belirlendi mi?
-  const accessDetermined = !!testDetail && !loadingPurchases && (!packageId || !loadingPackageAccess);
-  const hasAccess = purchases.length > 0 || packageAccess?.purchased === true;
+  // Erişim belirlendi mi? — /me/purchases zaten hem testId hem packageId ile eşleşiyor
+  const accessDetermined = !!testDetail && !loadingPurchases;
+  const hasAccess = purchases.length > 0;
 
   const questions = attemptState && testDetail
     ? toUIStyle(testDetail.questions || [], attemptState.questions)
