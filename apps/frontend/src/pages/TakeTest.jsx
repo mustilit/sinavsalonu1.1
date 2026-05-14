@@ -870,7 +870,7 @@ export default function TakeTest() {
           questionId={currentQuestion?.id}
           onHasDrawings={setHasDrawings}
         />
-        <div className="flex items-start justify-between mb-6">
+        <div className="relative z-20 flex items-start justify-between mb-6">
           <h2 className="text-lg font-semibold text-slate-900">Soru {currentIndex + 1}</h2>
           <div className="flex gap-2">
             {!isReviewMode && answers[currentQuestion?.id] && (
