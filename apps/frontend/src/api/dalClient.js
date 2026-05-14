@@ -429,7 +429,8 @@ export const entities = {
         const list = Array.isArray(data) ? data : (data?.items ?? data?.data ?? []);
         const results = [];
         for (const p of list) {
-          if (opts.test_package_id && p.testId !== opts.test_package_id) continue;
+          const pkgId = p.packageId ?? p.testId ?? p.test_id;
+          if (opts.test_package_id && p.testId !== opts.test_package_id && p.packageId !== opts.test_package_id) continue;
           const attempt = p?.attempt ?? p?.attempts?.[0];
           if (attempt && (attempt.status === 'SUBMITTED' || attempt.status === 'TIMEOUT')) {
             const started = attempt.startedAt ? new Date(attempt.startedAt).getTime() : 0;
@@ -439,7 +440,7 @@ export const entities = {
             results.push({
               id: attempt.id,
               user_email: opts.user_email,
-              test_package_id: p.testId ?? p.test_id,
+              test_package_id: pkgId,
               test_id: p.testId ?? p.test_id,
               test_package_title: test?.title ?? p?.testTitle ?? '',
               score: attempt.score ?? 0,
@@ -468,12 +469,13 @@ export const entities = {
       const list = Array.isArray(data) ? data : [];
       const progress = [];
       for (const p of list) {
-        if (opts.test_package_id && p.testId !== opts.test_package_id) continue;
+        const pkgId = p.packageId ?? p.testId;
+        if (opts.test_package_id && p.testId !== opts.test_package_id && p.packageId !== opts.test_package_id) continue;
         if (opts.is_completed === false && p.attempt && p.attempt.status === 'IN_PROGRESS') {
           progress.push({
             id: p.attempt.id,
             user_email: opts.user_email,
-            test_package_id: p.testId,
+            test_package_id: pkgId,
             test_id: p.testId,
             is_completed: false,
           });
@@ -686,9 +688,10 @@ export const entities = {
 };
 
 /**
- * Adapter: GET /marketplace/packages/:id → TestDetail sayfasının beklediği shape.
+ * Tek kaynak adapter: tüm marketplace paket endpointleri (liste ve detay) için ortak shape.
+ * Liste endpointi bazı alanları döndürmeyebilir; bunlar varsayılan değerlerle tamamlanır.
  */
-function publicPackageDetailAdapter(pkg) {
+function packageAdapter(pkg) {
   return {
     id: pkg.id,
     title: pkg.title,
@@ -697,7 +700,6 @@ function publicPackageDetailAdapter(pkg) {
     educator_name: pkg.educatorUsername ?? '',
     exam_type_id: pkg.examTypeId ?? null,
     exam_type_name: pkg.examTypeName ?? null,
-    // detail endpoint'te questionCount ve testCount direkt alan olarak geliyor
     question_count: pkg.questionCount ?? (pkg.tests ?? []).reduce((s, t) => s + (t.questionCount ?? 0), 0),
     test_count: pkg.testCount ?? (pkg.tests ?? []).length,
     price: pkg.priceCents != null ? pkg.priceCents / 100 : 0,
@@ -719,34 +721,9 @@ function publicPackageDetailAdapter(pkg) {
   };
 }
 
-/**
- * Adapter: GET /marketplace/packages (liste) → Explore/Home sayfalarının beklediği shape.
- */
-function marketplacePackageAdapter(pkg) {
-  return {
-    id: pkg.id,
-    title: pkg.title,
-    description: pkg.description ?? '',
-    educator_email: pkg.educatorId ?? '',
-    educator_name: pkg.educatorUsername ?? '',
-    exam_type_id: pkg.examTypeId ?? null,
-    exam_type_name: pkg.examTypeName ?? null,
-    question_count: pkg.questionCount ?? 0,
-    price: pkg.priceCents != null ? pkg.priceCents / 100 : 0,
-    priceCents: pkg.priceCents ?? 0,
-    difficulty: pkg.difficulty ?? 'medium',
-    is_published: !!pkg.publishedAt,
-    is_active: !!pkg.publishedAt,
-    total_sales: 0,
-    average_rating: null,
-    rating_count: 0,
-    is_timed: false,
-    duration: null,
-    created_date: pkg.publishedAt,
-    createdAt: pkg.publishedAt,
-    packageId: pkg.id,
-  };
-}
+// Geriye dönük uyumluluk için takma adlar
+const publicPackageDetailAdapter = packageAdapter;
+const marketplacePackageAdapter = packageAdapter;
 
 // Adapter: Dal ExamTest -> Sınav Salonu TestPackage shape
 function testPackageAdapter(t) {

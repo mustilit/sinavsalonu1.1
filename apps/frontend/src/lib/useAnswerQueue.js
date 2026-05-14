@@ -138,8 +138,7 @@ export function useAnswerQueue(attemptId) {
     syncCount();
     // Önceki oturumdan kalan bekleyen cevapları temizle
     if (navigator.onLine) flush();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attemptId]); // attemptId değişince tekrar çalış
+  }, [attemptId]); // eslint-disable-line -- intentionally omitting flush/syncCount from deps
 
   // ─── Test bitince kuyruğu tamamen temizle ───────────────────────────────
 

@@ -35,11 +35,6 @@ export default function Explore() {
     queryFn: () => entities.TestPackage.filter({ is_published: true, is_active: true }, "-created_date"),
   });
 
-  const { data: allQuestions = [] } = useQuery({
-    queryKey: ["allQuestions"],
-    queryFn: () => entities.Question.list(),
-  });
-
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases", user?.id],
     queryFn: () => entities.Purchase.filter({}),
@@ -55,20 +50,8 @@ export default function Explore() {
   const purchasedIds = new Set(purchases.map(p => p.test_package_id));
   const completedIds = new Set(results.map(r => r.test_package_id));
 
-  // Calculate real question counts
-  const questionCounts = allQuestions.reduce((acc, q) => {
-    acc[q.test_package_id] = (acc[q.test_package_id] || 0) + 1;
-    return acc;
-  }, {});
-
-  // Enrich tests with real question counts
-  const testsWithRealCounts = allTests.map(test => ({
-    ...test,
-    question_count: questionCounts[test.id] || 0
-  }));
-
   // Filter tests
-  const filteredTests = testsWithRealCounts.filter((test) => {
+  const filteredTests = allTests.filter((test) => {
     const matchesSearch = !searchQuery || 
       test.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       test.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||

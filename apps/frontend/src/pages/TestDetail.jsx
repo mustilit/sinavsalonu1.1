@@ -18,6 +18,7 @@ import {
   ShoppingCart,
   ArrowLeft,
   Play,
+  Eye,
   Bell,
   BellOff
 } from "lucide-react";
@@ -417,7 +418,7 @@ export default function TestDetail() {
                   const isInProgress = !!testProgress;
                   
                   let buttonStyle = { backgroundColor: '#10b981' };
-                  if (isCompleted) buttonStyle = { backgroundColor: '#6b7280' };
+                  if (isCompleted) buttonStyle = { backgroundColor: '#f97316' };
                   else if (isInProgress) buttonStyle = { backgroundColor: '#f59e0b' };
                   
                   return (
@@ -435,7 +436,19 @@ export default function TestDetail() {
                            {testQuestionsCount} soru • {testItem.duration_minutes || 60} dk
                           </p>
                         </div>
-                        <Play className="w-4 h-4" />
+                        {isCompleted ? (
+                          <div className="flex items-center gap-1">
+                            <Eye className="w-4 h-4" />
+                            <span className="text-xs">Gözden Geçir</span>
+                          </div>
+                        ) : isInProgress ? (
+                          <div className="flex items-center gap-1">
+                            <Play className="w-4 h-4" />
+                            <span className="text-xs">Devam Et</span>
+                          </div>
+                        ) : (
+                          <Play className="w-4 h-4" />
+                        )}
                       </Button>
                     </Link>
                   );

@@ -388,6 +388,8 @@ export default function TakeTest() {
       queryClient.invalidateQueries({ queryKey: ["attemptState", resolvedAttemptId] });
       queryClient.invalidateQueries({ queryKey: ["myResults", user?.email] });
       queryClient.invalidateQueries({ queryKey: ["purchases", user?.id, testId] });
+      queryClient.invalidateQueries({ queryKey: ["allTestResults", user?.id, testId] });
+      queryClient.invalidateQueries({ queryKey: ["allTestProgress", user?.id, testId] });
       toast.success("Test tamamlandı!");
     },
     onError: () => {

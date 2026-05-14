@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Clock, BookOpen, Star, User } from "lucide-react";
+import { Clock, BookOpen, Star, User, Eye, Play } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -79,10 +79,15 @@ export default function TestPackageCard({ test, onBuy, isPurchased, isCompleted,
               <span>{test.average_rating.toFixed(1)}</span>
             </div>
           }
-          {/* Tamamlanan test için kullanılan süre */}
-          {attempt && isCompleted && attempt.startedAt && (attempt.submittedAt || attempt.completedAt) && (() => {
-            const endTime = attempt.submittedAt || attempt.completedAt;
-            const sec = Math.max(0, Math.floor((new Date(endTime) - new Date(attempt.startedAt)) / 1000));
+          {/* Tamamlanan test için kullanılan süre — önce localStorage'daki timer değeri, yoksa DB farkı */}
+          {attempt && isCompleted && (() => {
+            const stored = parseInt(localStorage.getItem(`elapsed_${attempt.id}`) || '0', 10);
+            const sec = stored > 0
+              ? stored
+              : (attempt.startedAt && (attempt.submittedAt || attempt.completedAt)
+                  ? Math.max(0, Math.floor((new Date(attempt.submittedAt || attempt.completedAt) - new Date(attempt.startedAt)) / 1000))
+                  : 0);
+            if (!sec) return null;
             const m = Math.floor(sec / 60);
             const s = sec % 60;
             const label = m >= 60 ? `${Math.floor(m / 60)}s ${m % 60}dk` : `${m}dk ${s}s`;
@@ -109,9 +114,13 @@ export default function TestPackageCard({ test, onBuy, isPurchased, isCompleted,
             }
           </div>
           {isPurchased ?
-          <Link to={createPageUrl("TestDetail") + `?id=${test.id}`}>
-              <Button size="sm" style={{backgroundColor: '#10b981'}} className="hover:opacity-90">
-                Teste Başla
+          <Link to={createPageUrl("TestDetail") + `?id=${test.id}${isCompleted ? '&review=true' : ''}`}>
+              <Button size="sm" style={{backgroundColor: isCompleted ? '#f97316' : '#10b981'}} className="hover:opacity-90 flex items-center gap-1">
+                {isCompleted ? (
+                  <><Eye className="w-4 h-4" /> Gözden Geçir</>
+                ) : (
+                  <><Play className="w-4 h-4" /> Teste Başla</>
+                )}
               </Button>
             </Link> :
 
