@@ -110,6 +110,8 @@ export default function TakeTest() {
   const [isOvertime, setIsOvertime] = useState(false);
   // Süre aşımı sayacı (saniye cinsinden, timer'ın üstüne eklenir)
   const [overtimeElapsed, setOvertimeElapsed] = useState(0);
+  // Süresiz test için geçen süre (saniye) — localStorage ile persist edilir
+  const [elapsedSec, setElapsedSec] = useState(0);
   // Çizim modu
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [hasDrawings, setHasDrawings] = useState(false);
@@ -248,6 +250,11 @@ export default function TakeTest() {
       if (typeof attemptState.attempt?.remainingSeconds === "number") {
         setTimeLeft(attemptState.attempt.remainingSeconds);
       }
+      // Süresiz test: localStorage'dan geçen süreyi yükle
+      if (!testDetail?.isTimed && resolvedAttemptId) {
+        const saved = parseInt(localStorage.getItem(`elapsed_${resolvedAttemptId}`) || '0', 10);
+        setElapsedSec(isNaN(saved) ? 0 : saved);
+      }
       setTestStarted(true);
       const started = attemptState.attempt?.startedAt ? new Date(attemptState.attempt.startedAt).getTime() : Date.now();
       setStartTime(started);
@@ -371,6 +378,10 @@ export default function TakeTest() {
   const finishMutation = useMutation({
     mutationFn: () => entities.Attempt.finish(resolvedAttemptId),
     onSuccess: (data) => {
+      // Geçen süreyi localStorage'a kaydet (MyTests sayfasında göstermek için)
+      if (resolvedAttemptId) {
+        localStorage.setItem(`elapsed_${resolvedAttemptId}`, String(elapsedSec));
+      }
       setResult(data);
       // Test bitti — localStorage cevap kuyruğunu temizle
       clearQueue();
@@ -424,6 +435,14 @@ export default function TakeTest() {
     return () => clearInterval(overtimeTimer);
   }, [isOvertime, testFinished, isReviewMode]);
 
+  // Süresiz test elapsed sayacı — her saniye güncellenir
+  useEffect(() => {
+    if (!testStarted || testFinished || isReviewMode) return;
+    if (test?.is_timed) return;
+    const timer = setInterval(() => setElapsedSec((prev) => prev + 1), 1000);
+    return () => clearInterval(timer);
+  }, [testStarted, testFinished, isReviewMode, test?.is_timed]);
+
   // answerMutation yerine useAnswerQueue kullanılıyor — localStorage yedekli, retry'lı
 
   const { testAttemptsEnabled } = useServiceStatus();
@@ -450,6 +469,10 @@ export default function TakeTest() {
   };
 
   const saveAndExit = () => {
+    // Süresiz testte geçen süreyi localStorage'a kaydet
+    if (resolvedAttemptId && !test?.is_timed) {
+      localStorage.setItem(`elapsed_${resolvedAttemptId}`, String(elapsedSec));
+    }
     toast.success("İlerlemeniz kaydedildi");
     setTimeout(() => {
       navigate(createPageUrl("MyTests"), { replace: true });
@@ -829,14 +852,10 @@ export default function TakeTest() {
               </div>
               )
             ) : (
-              startTime && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
-                  <Clock className="w-4 h-4" />
-                  <span className="font-mono font-semibold">
-                    {formatTime(Math.floor((Date.now() - startTime) / 1000))}
-                  </span>
-                </div>
-              )
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
+                <Clock className="w-4 h-4" />
+                <span className="font-mono font-semibold">{formatTime(elapsedSec)}</span>
+              </div>
             )
           )}
         </div>

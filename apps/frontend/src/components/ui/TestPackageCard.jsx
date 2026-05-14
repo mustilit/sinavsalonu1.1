@@ -11,7 +11,7 @@ const difficultyLabels = {
   hard: { label: "Zor", color: "bg-rose-100 text-rose-700" }
 };
 
-export default function TestPackageCard({ test, onBuy, isPurchased, isCompleted, isInProgress = false, showEducator = true }) {
+export default function TestPackageCard({ test, onBuy, isPurchased, isCompleted, isInProgress = false, showEducator = true, attempt = null }) {
   const difficulty = difficultyLabels[test.difficulty] || difficultyLabels.medium;
 
   return (
@@ -79,6 +79,20 @@ export default function TestPackageCard({ test, onBuy, isPurchased, isCompleted,
               <span>{test.average_rating.toFixed(1)}</span>
             </div>
           }
+          {/* Tamamlanan test için kullanılan süre */}
+          {attempt && isCompleted && attempt.startedAt && (attempt.submittedAt || attempt.completedAt) && (() => {
+            const endTime = attempt.submittedAt || attempt.completedAt;
+            const sec = Math.max(0, Math.floor((new Date(endTime) - new Date(attempt.startedAt)) / 1000));
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            const label = m >= 60 ? `${Math.floor(m / 60)}s ${m % 60}dk` : `${m}dk ${s}s`;
+            return (
+              <div className="flex items-center gap-1 text-indigo-600">
+                <Clock className="w-4 h-4" />
+                <span>{label}</span>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-100">

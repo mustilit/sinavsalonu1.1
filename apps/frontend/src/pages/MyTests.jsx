@@ -53,6 +53,15 @@ export default function MyTests() {
   });
 
   const purchasedTestIds = new Set(purchases.map(p => p.test_package_id));
+
+  // testId → attempt map'i: tamamlanan testlerde kullanılan süreyi TestPackageCard'a geçirmek için
+  const attemptByTestId = {};
+  purchases.forEach((p) => {
+    if (p.test_package_id && p.attempt) {
+      attemptByTestId[p.test_package_id] = p.attempt;
+    }
+  });
+
   const completedTestIds = new Set(results.map(r => r.test_package_id));
   const inProgressTestIds = new Set(testProgress.map(p => p.test_package_id));
   
@@ -202,6 +211,7 @@ export default function MyTests() {
               isCompleted={completedTestIds.has(test.id)}
               isInProgress={inProgressTestIds.has(test.id)}
               showEducator={true}
+              attempt={attemptByTestId[test.id] ?? null}
             />
           ))}
         </div>
