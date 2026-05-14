@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { entities } from "@/api/dalClient";
@@ -20,6 +20,8 @@ import {
   Lightbulb,
   Grid3x3,
   Trash2,
+  Pencil,
+  Eraser,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -38,6 +40,7 @@ import { useOffline } from "@/lib/useOffline";
 import { useAnswerQueue } from "@/lib/useAnswerQueue";
 // Offline overlay bileşeni
 import OfflineBanner from "@/components/ui/OfflineBanner";
+import QuestionCanvas from "@/components/test/QuestionCanvas";
 
 // Map Dal question/options to Sınav Salonu format
 function toUIStyle(questions, stateQuestions) {
@@ -107,6 +110,16 @@ export default function TakeTest() {
   const [isOvertime, setIsOvertime] = useState(false);
   // Süre aşımı sayacı (saniye cinsinden, timer'ın üstüne eklenir)
   const [overtimeElapsed, setOvertimeElapsed] = useState(0);
+  // Çizim modu
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const [hasDrawings, setHasDrawings] = useState(false);
+  const canvasRef = useRef(null);
+
+  // Soru değişince çizim modunu kapat (canvas kendi çizgilerini zaten sıfırlar)
+  useEffect(() => {
+    setIsDrawingMode(false);
+    setHasDrawings(false);
+  }, [currentIndex]);
 
   const { data: purchases = [], isLoading: loadingPurchases } = useQuery({
     queryKey: ["purchases", user?.id, testId],
@@ -850,7 +863,13 @@ export default function TakeTest() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 p-8 mb-6">
+      <div className="relative bg-white rounded-2xl border border-slate-200 p-8 mb-6">
+        <QuestionCanvas
+          ref={canvasRef}
+          isActive={isDrawingMode}
+          questionId={currentQuestion?.id}
+          onHasDrawings={setHasDrawings}
+        />
         <div className="flex items-start justify-between mb-6">
           <h2 className="text-lg font-semibold text-slate-900">Soru {currentIndex + 1}</h2>
           <div className="flex gap-2">
@@ -871,6 +890,27 @@ export default function TakeTest() {
                 Çözüm
               </Button>
             )}
+            {/* Kalem — her modda görünür */}
+            {hasDrawings && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => canvasRef.current?.clear()}
+                className="text-slate-500"
+              >
+                <Eraser className="w-4 h-4 mr-1" />
+                Temizle
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsDrawingMode((v) => !v)}
+              className={cn(isDrawingMode ? "text-indigo-600 bg-indigo-50" : "text-slate-400")}
+            >
+              <Pencil className="w-4 h-4 mr-1" />
+              {isDrawingMode ? "Çizim Açık" : "Kalem"}
+            </Button>
             {!isReviewMode && (
               <>
                 <Button
