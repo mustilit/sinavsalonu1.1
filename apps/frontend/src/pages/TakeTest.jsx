@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { entities } from "@/api/dalClient";
@@ -144,9 +144,13 @@ export default function TakeTest() {
   const accessDetermined = !!testDetail && !loadingPurchases;
   const hasAccess = purchases.length > 0;
 
-  const questions = attemptState && testDetail
-    ? toUIStyle(testDetail.questions || [], attemptState.questions)
-    : [];
+  // useMemo: questions her render'da yeni referans almasın (useEffect döngüsünü kırar)
+  const questions = useMemo(
+    () => attemptState && testDetail
+      ? toUIStyle(testDetail.questions || [], attemptState.questions)
+      : [],
+    [attemptState, testDetail]
+  );
   const isLoading = !!resolvedAttemptId && !!user && !attemptState;
 
   const test = testDetail
