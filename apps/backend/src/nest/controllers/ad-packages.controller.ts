@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Inject } from '@nestjs/common';
 import { ApiTags, ApiOkResponse } from '@nestjs/swagger';
 import { Public } from '../decorators/public.decorator';
 import { ListAdPackagesUseCase } from '../../application/use-cases/ListAdPackagesUseCase';
@@ -7,7 +7,7 @@ import { ListAdPackagesUseCase } from '../../application/use-cases/ListAdPackage
 @Controller('ad-packages')
 @ApiTags('ad-packages')
 export class AdPackagesController {
-  constructor(private readonly listUC: ListAdPackagesUseCase) {}
+  constructor(@Inject(ListAdPackagesUseCase) private readonly listUC: ListAdPackagesUseCase) {}
 
   @Public()
   @Get()

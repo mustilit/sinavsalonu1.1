@@ -1,11 +1,20 @@
 import { IExamRepository } from '../../domain/interfaces/IExamRepository';
+import { prisma } from '../../infrastructure/database/prisma';
 
-/** Test paketini ID ile getirir; sorular ve seçenekler dahil. */
+/**
+ * TestPackage ID ile paketin ilk ExamTest'ini getirir (sorular ve seçenekler dahil).
+ * Gelen ID her zaman TestPackage ID'sidir.
+ */
 export class GetTestUseCase {
   constructor(private readonly examRepository: IExamRepository) {}
 
   async execute(id: string) {
-    return this.examRepository.findById(id);
+    const firstTest = await prisma.examTest.findFirst({
+      where: { packageId: id, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (!firstTest) return null;
+    return this.examRepository.findById(firstTest.id);
   }
 }
-

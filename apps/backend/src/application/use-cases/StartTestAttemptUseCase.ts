@@ -25,18 +25,29 @@ export class StartTestAttemptUseCase {
       throw new ForbiddenException({ code: 'TENANT_MISMATCH', message: 'Test does not belong to tenant' });
     }
 
-    // Basit B2C kontrolü: aktif purchase var mı?
-    const hasPurchase = await prismaRetry(() =>
+    // Satın alma kontrolü: doğrudan testId bazlı VEYA paket (packageId) bazlı
+    const directPurchase = await prismaRetry(() =>
       this.prisma.purchase.findFirst({
-        where: {
-          testId,
-          candidateId: userId,
-          status: 'ACTIVE',
-        } as any,
+        where: { testId, candidateId: userId, status: 'ACTIVE' } as any,
       }),
     );
 
-    if (!hasPurchase) {
+    let hasAccess = !!directPurchase;
+
+    if (!hasAccess) {
+      // Test bir paketin parçasıysa o pakete ait tamamlanmış satın alma var mı?
+      const packageId = (test as any).packageId ?? null;
+      if (packageId) {
+        const packagePurchase = await prismaRetry(() =>
+          (this.prisma.purchase as any).findFirst({
+            where: { packageId, candidateId: userId, paymentStatus: 'COMPLETED' },
+          }),
+        );
+        hasAccess = !!packagePurchase;
+      }
+    }
+
+    if (!hasAccess) {
       throw new ForbiddenException({ code: 'NO_PURCHASE', message: 'User has no purchase for this test' });
     }
 
@@ -57,9 +68,33 @@ export class StartTestAttemptUseCase {
       });
     }
 
+    // 0 sorulu teste attempt başlatılamaz
+    const questionCount = await this.prisma.examQuestion.count({ where: { testId } });
+    if (questionCount === 0) {
+      throw new BadRequestException({
+        code: 'NO_QUESTIONS',
+        message: 'Test has no questions',
+      });
+    }
+
     const now = new Date();
 
     if (!existing) {
+      // Soru snapshot'ını al — eğitici sonradan güncellese bile bu attempt orijinal versiyonu görecek
+      const snapshotQuestions = await this.prisma.examQuestion.findMany({
+        where: { testId },
+        orderBy: { order: 'asc' },
+        select: {
+          id: true,
+          content: true,
+          mediaUrl: true,
+          order: true,
+          options: {
+            select: { id: true, content: true, mediaUrl: true, isCorrect: true },
+          },
+        },
+      });
+
       const created = await this.prisma.testAttempt.create({
         data: {
           testId,
@@ -68,6 +103,7 @@ export class StartTestAttemptUseCase {
           startedAt: now,
           lastResumedAt: now,
           remainingSec: durationSec,
+          questionsSnapshot: snapshotQuestions as any,
         } as any,
       });
 

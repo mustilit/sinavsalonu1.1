@@ -1,5 +1,5 @@
 import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { incrWithTtl } from '../common/rate-limit';
+import { incrWithTtl, getCount } from '../common/rate-limit';
 import { CaptchaService } from '../services/captcha.service';
 
 const LOGIN_IP_LIMIT = Number(process.env.LOGIN_IP_LIMIT ?? '20') || 20;
@@ -21,17 +21,20 @@ export class LoginBruteforceGuard implements CanActivate {
     const ipKey = `login:ip:${ip}`;
     const emailKey = email ? `login:email:${email}` : null;
 
-    const [ipCount, emailCount] = await Promise.all([
-      incrWithTtl(ipKey, LOGIN_IP_TTL_SECONDS),
-      emailKey ? incrWithTtl(emailKey, LOGIN_EMAIL_TTL_SECONDS) : Promise.resolve(0),
+    // Önce MEVCUT sayaçları oku (artırmadan).
+    // Bu sayede limitteki son kullanıcı doğru şifreyle girdiğinde controller çalışabilir
+    // ve delKey ile sayaçlar sıfırlanabilir. Guard'dan önce increment yapılırsa
+    // controller hiç çalışmaz → delKey asla çağrılmaz → kullanıcı kilitli kalır.
+    const [ipNow, emailNow] = await Promise.all([
+      getCount(ipKey),
+      emailKey ? getCount(emailKey) : Promise.resolve(0),
     ]);
 
-    // Hard limit → 429
-    if (ipCount > LOGIN_IP_LIMIT || emailCount > LOGIN_EMAIL_LIMIT) {
-      const ttl = ipCount > LOGIN_IP_LIMIT ? LOGIN_IP_TTL_SECONDS : LOGIN_EMAIL_TTL_SECONDS;
-      const retryAfter = ttl;
+    // Hard limit → mevcut sayaç zaten eşikte veya üstündeyse reddet (increment yapma)
+    if (ipNow >= LOGIN_IP_LIMIT || emailNow >= LOGIN_EMAIL_LIMIT) {
+      const ttl = ipNow >= LOGIN_IP_LIMIT ? LOGIN_IP_TTL_SECONDS : LOGIN_EMAIL_TTL_SECONDS;
       const res = context.switchToHttp().getResponse<any>();
-      res.setHeader('Retry-After', String(retryAfter));
+      res.setHeader('Retry-After', String(ttl));
       throw new HttpException(
         {
           error: {
@@ -42,6 +45,12 @@ export class LoginBruteforceGuard implements CanActivate {
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
+
+    // Limit aşılmadı — bu denemeyi say
+    const [ipCount, emailCount] = await Promise.all([
+      incrWithTtl(ipKey, LOGIN_IP_TTL_SECONDS),
+      emailKey ? incrWithTtl(emailKey, LOGIN_EMAIL_TTL_SECONDS) : Promise.resolve(0),
+    ]);
 
     // Captcha eşiği
     const needsCaptcha =

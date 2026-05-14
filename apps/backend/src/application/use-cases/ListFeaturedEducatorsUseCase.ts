@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 export type FeaturedEducator = {
   id: string;
@@ -10,7 +11,7 @@ export type FeaturedEducator = {
 
 export class ListFeaturedEducatorsUseCase {
   async execute(prisma: PrismaClient, limit = 6, examTypeIds?: string[]): Promise<FeaturedEducator[]> {
-    const capped = Math.min(20, Math.max(1, limit));
+    const capped = Math.min(100, Math.max(1, limit));
 
     let educatorIds: string[] = [];
 
@@ -19,17 +20,21 @@ export class ListFeaturedEducatorsUseCase {
       const safeIds = examTypeIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
       if (safeIds.length > 0) {
         const preferredLimit = Math.ceil(capped * 0.7);
-        const preferredRows = await prisma.$queryRaw<{ educator_id: string; cnt: number }[]>`
-          SELECT t."educatorId" AS educator_id, COUNT(p.id)::int AS cnt
-          FROM purchases p
-          JOIN exam_tests t ON p."testId" = t.id
-          WHERE t."educatorId" IS NOT NULL
-            AND t."publishedAt" IS NOT NULL
-            AND t."examTypeId" = ANY(${safeIds}::uuid[])
-          GROUP BY t."educatorId"
-          ORDER BY cnt DESC
-          LIMIT ${preferredLimit}
-        `;
+        // examTypeId sütunu TEXT tipinde — cast gerekmez, doğrudan text karşılaştırması
+        const examTypeIdList = Prisma.join(safeIds.map((id) => Prisma.sql`${id}`));
+        const preferredRows = await prisma.$queryRaw<{ educator_id: string; cnt: number }[]>(
+          Prisma.sql`
+            SELECT t."educatorId" AS educator_id, COUNT(p.id)::int AS cnt
+            FROM purchases p
+            JOIN exam_tests t ON p."testId" = t.id
+            WHERE t."educatorId" IS NOT NULL
+              AND t."publishedAt" IS NOT NULL
+              AND t."examTypeId" IN (${examTypeIdList})
+            GROUP BY t."educatorId"
+            ORDER BY cnt DESC
+            LIMIT ${preferredLimit}
+          `
+        );
         educatorIds = preferredRows.map((r) => r.educator_id);
       }
     }
@@ -37,25 +42,59 @@ export class ListFeaturedEducatorsUseCase {
     // Phase 2: fill remaining slots with global bestsellers
     if (educatorIds.length < capped) {
       const remaining = capped - educatorIds.length;
-      const excludeIds = educatorIds;
-      const globalRows = await prisma.$queryRaw<{ educator_id: string; cnt: number }[]>`
-        SELECT t."educatorId" AS educator_id, COUNT(p.id)::int AS cnt
-        FROM purchases p
-        JOIN exam_tests t ON p."testId" = t.id
-        WHERE t."educatorId" IS NOT NULL
-          AND t."publishedAt" IS NOT NULL
-          AND (${excludeIds.length} = 0 OR t."educatorId" != ALL(${excludeIds}::uuid[]))
-        GROUP BY t."educatorId"
-        ORDER BY cnt DESC
-        LIMIT ${remaining}
-      `;
+      let globalRows: { educator_id: string; cnt: number }[];
+      if (educatorIds.length === 0) {
+        // Exclude listesi boşsa ayrı sorgu
+        globalRows = await prisma.$queryRaw<{ educator_id: string; cnt: number }[]>(
+          Prisma.sql`
+            SELECT t."educatorId" AS educator_id, COUNT(p.id)::int AS cnt
+            FROM purchases p
+            JOIN exam_tests t ON p."testId" = t.id
+            WHERE t."educatorId" IS NOT NULL
+              AND t."publishedAt" IS NOT NULL
+            GROUP BY t."educatorId"
+            ORDER BY cnt DESC
+            LIMIT ${remaining}
+          `
+        );
+      } else {
+        // educatorId TEXT sütunu — cast gerekmez
+        const excludeList = Prisma.join(educatorIds.map((id) => Prisma.sql`${id}`));
+        globalRows = await prisma.$queryRaw<{ educator_id: string; cnt: number }[]>(
+          Prisma.sql`
+            SELECT t."educatorId" AS educator_id, COUNT(p.id)::int AS cnt
+            FROM purchases p
+            JOIN exam_tests t ON p."testId" = t.id
+            WHERE t."educatorId" IS NOT NULL
+              AND t."publishedAt" IS NOT NULL
+              AND t."educatorId" NOT IN (${excludeList})
+            GROUP BY t."educatorId"
+            ORDER BY cnt DESC
+            LIMIT ${remaining}
+          `
+        );
+      }
       educatorIds = [...educatorIds, ...globalRows.map((r) => r.educator_id)];
     }
 
     // Fallback: no purchase data at all — return active educators by creation date
     if (educatorIds.length === 0) {
+      let fallbackWhere: any = { role: 'EDUCATOR', status: 'ACTIVE' };
+      if (examTypeIds && examTypeIds.length > 0) {
+        const safeIds = examTypeIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+        if (safeIds.length > 0) {
+          const testRows = await prisma.examTest.findMany({
+            where: { publishedAt: { not: null }, examTypeId: { in: safeIds } },
+            select: { educatorId: true },
+            distinct: ['educatorId'],
+          });
+          const eIds = testRows.map((t) => t.educatorId).filter(Boolean) as string[];
+          if (eIds.length === 0) return [];
+          fallbackWhere = { ...fallbackWhere, id: { in: eIds } };
+        }
+      }
       const fallback = await prisma.user.findMany({
-        where: { role: 'EDUCATOR', status: 'ACTIVE' },
+        where: fallbackWhere,
         take: capped,
         select: { id: true, username: true },
       });
@@ -88,15 +127,18 @@ export class ListFeaturedEducatorsUseCase {
     });
     const testCountMap = new Map(testCounts.map((t) => [t.educatorId!, t._count.id]));
 
-    // Build sale count map from all purchases (not just typed ones) so totals are accurate
-    const allSales = await prisma.$queryRaw<{ educator_id: string; cnt: number }[]>`
-      SELECT t."educatorId" AS educator_id, COUNT(p.id)::int AS cnt
-      FROM purchases p
-      JOIN exam_tests t ON p."testId" = t.id
-      WHERE t."educatorId" = ANY(${educatorIds}::uuid[])
-        AND t."publishedAt" IS NOT NULL
-      GROUP BY t."educatorId"
-    `;
+    // Build sale count map — educatorId TEXT sütunu, cast gerekmez
+    const educatorIdList = Prisma.join(educatorIds.map((id) => Prisma.sql`${id}`));
+    const allSales = await prisma.$queryRaw<{ educator_id: string; cnt: number }[]>(
+      Prisma.sql`
+        SELECT t."educatorId" AS educator_id, COUNT(p.id)::int AS cnt
+        FROM purchases p
+        JOIN exam_tests t ON p."testId" = t.id
+        WHERE t."educatorId" IN (${educatorIdList})
+          AND t."publishedAt" IS NOT NULL
+        GROUP BY t."educatorId"
+      `
+    );
     const saleMap = new Map(allSales.map((r) => [r.educator_id, r.cnt]));
 
     const ratingRows = await prisma.review.groupBy({

@@ -6,32 +6,41 @@ import api from '@/lib/api/apiClient';
 import TestPackageCard from '@/components/ui/TestPackageCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Star, BookOpen, Users } from 'lucide-react';
+import { ArrowLeft, Star, BookOpen, Users, GraduationCap, MessageSquare, User } from 'lucide-react';
 import { buildPageUrl, useAppNavigate } from '@/lib/navigation';
 
-/** URL parametresinin e-posta adresi mi yoksa ID mi olduğunu belirler */
 function isEmailLike(v) {
   return typeof v === 'string' && v.includes('@');
 }
 
-/**
- * EducatorProfile (Eğitici Profili) sayfası — bir eğiticinin genel bilgilerini,
- * istatistiklerini (puan, satış sayısı) ve yayındaki test paketlerini listeler.
- * URL'de `?email=` veya `?id=` parametresiyle eğitici belirlenir.
- */
+function StarRating({ value, size = 'sm' }) {
+  const stars = [1, 2, 3, 4, 5];
+  return (
+    <div className="flex gap-0.5">
+      {stars.map((s) => (
+        <Star
+          key={s}
+          className={`${size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} ${
+            s <= Math.round(value) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function EducatorProfile() {
   const navigate = useAppNavigate();
-  // Eğitici kimliği URL query'sinden okunur: önce e-posta, sonra ID denenir
   const urlParams = new URLSearchParams(window.location.search);
   const idOrEmail = urlParams.get('email') || urlParams.get('id') || '';
 
-  // E-posta ve ID için farklı endpoint kullanılır — API router ayrımına göre
   const endpoint = useMemo(() => {
     if (!idOrEmail) return null;
     if (isEmailLike(idOrEmail)) return `/educators/by-email?email=${encodeURIComponent(idOrEmail)}`;
     return `/educators/${encodeURIComponent(idOrEmail)}`;
   }, [idOrEmail]);
 
+  // Eğitici profil verisi
   const { data, isLoading, isError } = useQuery({
     queryKey: ['educatorPage', idOrEmail],
     queryFn: async () => {
@@ -41,6 +50,43 @@ export default function EducatorProfile() {
     enabled: !!endpoint,
     retry: 1,
   });
+
+  // Sınav türleri (uzmanlık alanı adlarını çözmek için)
+  const { data: examTypes = [] } = useQuery({
+    queryKey: ['examTypesPublic'],
+    queryFn: async () => {
+      const res = await api.get('/site/exam-types');
+      return Array.isArray(res?.data) ? res.data : [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Eğiticiye ait yorumlar
+  const { data: reviews = [] } = useQuery({
+    queryKey: ['educatorReviews', idOrEmail],
+    queryFn: async () => {
+      const educatorId = data?.educator?.id;
+      if (!educatorId) return [];
+      const res = await api.get(`/educators/${educatorId}/reviews?limit=20`);
+      const raw = res?.data ?? res;
+      return Array.isArray(raw) ? raw : [];
+    },
+    enabled: !!data?.educator?.id,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Uzmanlık alanları — tüm hook'lardan sonra, early return'lardan önce hesaplanır
+  const examTypeMap = useMemo(
+    () => Object.fromEntries(examTypes.map((et) => [et.id, et.name])),
+    [examTypes]
+  );
+  const tests = data?.tests?.items || [];
+  const specialties = useMemo(() => {
+    const seen = new Set();
+    return tests
+      .filter((t) => t.examTypeId && !seen.has(t.examTypeId) && seen.add(t.examTypeId))
+      .map((t) => ({ id: t.examTypeId, name: examTypeMap[t.examTypeId] || t.examTypeId }));
+  }, [tests, examTypeMap]);
 
   if (!idOrEmail) {
     return (
@@ -55,10 +101,9 @@ export default function EducatorProfile() {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto animate-pulse">
-        <div className="h-32 bg-slate-200 rounded-2xl mb-6" />
-        <div className="h-6 bg-slate-200 rounded w-1/2 mb-2" />
-        <div className="h-4 bg-slate-200 rounded w-2/3 mb-8" />
+      <div className="max-w-6xl mx-auto animate-pulse">
+        <div className="h-8 bg-slate-200 rounded w-40 mb-6" />
+        <div className="h-48 bg-slate-200 rounded-2xl mb-6" />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-56 bg-slate-200 rounded-2xl" />
@@ -83,10 +128,7 @@ export default function EducatorProfile() {
   }
 
   const educator = data.educator;
-  // İstatistikler API'den gelmeyebilir — boş objeye düşürülür (fail-open)
   const stats = data.stats || {};
-  // Sayfalama yapısından items dizisi alınır; yoksa boş dizi kullanılır
-  const tests = data.tests?.items || [];
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -98,38 +140,73 @@ export default function EducatorProfile() {
         Eğiticilere Dön
       </Link>
 
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-8">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-          <div className="space-y-3">
-            <h1 className="text-3xl font-bold text-slate-900">{educator.displayName}</h1>
-            {educator.bio && <p className="text-slate-600 max-w-2xl">{educator.bio}</p>}
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge className="bg-slate-100 text-slate-700">
-                <BookOpen className="w-4 h-4 mr-2" />
+      {/* Profil Kartı */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
+        <div className="flex flex-col md:flex-row md:items-start gap-6">
+          {/* Avatar */}
+          <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-violet-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <User className="w-10 h-10 text-indigo-600" />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <h1 className="text-3xl font-bold text-slate-900 mb-1">{educator.displayName}</h1>
+
+            {/* Bio */}
+            {educator.bio ? (
+              <p className="text-slate-600 max-w-2xl mb-4">{educator.bio}</p>
+            ) : (
+              <p className="text-slate-400 italic mb-4 text-sm">Henüz tanıtım metni eklenmemiş.</p>
+            )}
+
+            {/* İstatistikler */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <Badge className="bg-slate-100 text-slate-700 border-0">
+                <BookOpen className="w-3.5 h-3.5 mr-1.5" />
                 {stats.totalPublishedTests ?? tests.length} test
               </Badge>
-              <Badge className="bg-amber-100 text-amber-700">
-                <Star className="w-4 h-4 mr-2" />
-                {stats.ratingAvg != null ? Number(stats.ratingAvg).toFixed(1) : '0.0'} ({stats.ratingCount ?? 0})
+              <Badge className="bg-amber-50 text-amber-700 border-0">
+                <Star className="w-3.5 h-3.5 mr-1.5 fill-amber-400 text-amber-400" />
+                {stats.ratingAvg != null ? Number(stats.ratingAvg).toFixed(1) : '0.0'}
+                <span className="ml-1 text-amber-500">({stats.ratingCount ?? 0} yorum)</span>
               </Badge>
               {stats.totalPurchases != null && (
-                <Badge className="bg-indigo-100 text-indigo-700">
-                  <Users className="w-4 h-4 mr-2" />
+                <Badge className="bg-indigo-50 text-indigo-700 border-0">
+                  <Users className="w-3.5 h-3.5 mr-1.5" />
                   {stats.totalPurchases} satış
                 </Badge>
               )}
             </div>
+
+            {/* Uzmanlık Alanları */}
+            {specialties.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="flex items-center gap-1 text-xs font-medium text-slate-500">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  Uzmanlık:
+                </span>
+                {specialties.map((s) => (
+                  <span
+                    key={s.id}
+                    className="text-xs px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 font-medium"
+                  >
+                    {s.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
+      {/* Testler */}
+      <h2 className="text-xl font-semibold text-slate-900 mb-4">Testler</h2>
       {tests.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
+        <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 mb-6">
           <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <p className="text-slate-500">Bu eğiticinin yayında testi yok.</p>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {tests.map((t) => (
             <TestPackageCard
               key={t.id}
@@ -153,7 +230,54 @@ export default function EducatorProfile() {
           ))}
         </div>
       )}
+
+      {/* Yorumlar */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <h2 className="text-xl font-semibold text-slate-900 mb-5 flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-indigo-500" />
+          Yorumlar
+          {reviews.length > 0 && (
+            <span className="text-sm font-normal text-slate-400">({reviews.length})</span>
+          )}
+        </h2>
+
+        {reviews.length === 0 ? (
+          <div className="text-center py-10">
+            <MessageSquare className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">Henüz yorum yapılmamış.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {reviews.map((r) => (
+              <div key={r.id} className="border border-slate-100 rounded-xl p-4">
+                <div className="flex items-start justify-between gap-4 mb-2">
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium mb-1">{r.testTitle}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-slate-500">Test:</span>
+                        <StarRating value={r.testRating} />
+                      </div>
+                      {r.educatorRating != null && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-slate-500">Eğitici:</span>
+                          <StarRating value={r.educatorRating} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-xs text-slate-400 whitespace-nowrap">
+                    {new Date(r.createdAt).toLocaleDateString('tr-TR')}
+                  </span>
+                </div>
+                {r.comment && (
+                  <p className="text-sm text-slate-700 mt-2 leading-relaxed">{r.comment}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-

@@ -108,7 +108,7 @@ export default function TakeTest() {
   // Süre aşımı sayacı (saniye cinsinden, timer'ın üstüne eklenir)
   const [overtimeElapsed, setOvertimeElapsed] = useState(0);
 
-  const { data: purchases = [] } = useQuery({
+  const { data: purchases = [], isLoading: loadingPurchases } = useQuery({
     queryKey: ["purchases", user?.id, testId],
     queryFn: () => entities.Purchase.filter({ test_package_id: testId }),
     enabled: !!user && !!testId,
@@ -130,14 +130,28 @@ export default function TakeTest() {
     enabled: !!resolvedAttemptId && !!user,
   });
 
+  // Test meta verisini her zaman yükle (pre-start ekranı + attempt başlatma için)
   const { data: testDetail } = useQuery({
     queryKey: ["testDetail", testId],
     queryFn: async () => {
       const { data } = await api.get(`/tests/${testId}`);
       return data;
     },
-    enabled: !!testId && !!attemptState,
+    enabled: !!testId,
   });
+
+  // Paket satın alma kontrolü: test bir paketin parçasıysa packageId üzerinden kontrol et
+  const packageId = testDetail?.packageId ?? null;
+  const { data: packageAccess, isLoading: loadingPackageAccess } = useQuery({
+    queryKey: ["packageAccess", packageId, user?.id],
+    queryFn: () => entities.Purchase.getPaymentStatus(packageId),
+    enabled: !!user && !!packageId,
+    staleTime: 30_000,
+  });
+
+  // Erişim belirlendi mi?
+  const accessDetermined = !!testDetail && !loadingPurchases && (!packageId || !loadingPackageAccess);
+  const hasAccess = purchases.length > 0 || packageAccess?.purchased === true;
 
   const questions = attemptState && testDetail
     ? toUIStyle(testDetail.questions || [], attemptState.questions)
@@ -266,7 +280,7 @@ export default function TakeTest() {
       });
       queryClient.invalidateQueries({ queryKey: ["testReview", testId, user?.id] });
       toast.success("Test puanınız kaydedildi!");
-    } catch (error) {
+    } catch {
       toast.error("Bir hata oluştu!");
     }
   };
@@ -285,7 +299,7 @@ export default function TakeTest() {
       });
       queryClient.invalidateQueries({ queryKey: ["educatorReview", testPackage?.educator_email, user?.email] });
       toast.success("Eğitici puanınız kaydedildi!");
-    } catch (error) {
+    } catch {
       toast.error("Bir hata oluştu!");
     }
   };
@@ -314,6 +328,37 @@ export default function TakeTest() {
   const { submitAnswer: queuedSubmitAnswer, pendingCount, isFlushing, clearQueue } = useAnswerQueue(
     resolvedAttemptId ?? null,
   );
+
+  // Attempt oluştur/başlat: POST /tests/:id/start
+  const startAttemptMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post(`/tests/${testId}/start`);
+      return data; // { attemptId, remainingSec }
+    },
+    onSuccess: (data) => {
+      setActiveAttemptId(data.attemptId);
+      setTestStarted(true);
+      const now = Date.now();
+      setStartTime(now);
+      if (test?.is_timed && data.remainingSec) {
+        setTimeLeft(data.remainingSec);
+      } else if (test?.is_timed && test?.duration_minutes) {
+        setTimeLeft(test.duration_minutes * 60);
+      }
+    },
+    onError: (err) => {
+      const code = err?.response?.data?.code ?? err?.code;
+      if (code === 'NO_PURCHASE') {
+        toast.error("Bu test için satın alma kaydınız bulunamadı.");
+      } else if (code === 'INVALID_DURATION') {
+        toast.error("Testin süresi yapılandırılmamış. Eğiticinizle iletişime geçin.");
+      } else if (code === 'NO_QUESTIONS') {
+        toast.error("Bu test henüz soru içermiyor.");
+      } else {
+        toast.error("Test başlatılamadı. Lütfen tekrar deneyin.");
+      }
+    },
+  });
 
   const finishMutation = useMutation({
     mutationFn: () => entities.Attempt.finish(resolvedAttemptId),
@@ -380,12 +425,20 @@ export default function TakeTest() {
       toast.warning("Test başlatma geçici olarak durdurulmuştur. Lütfen daha sonra tekrar deneyin.");
       return;
     }
-    setTestStarted(true);
-    const now = Date.now();
-    setStartTime(now);
-    if (test?.duration_minutes && test?.is_timed) {
-      setTimeLeft(test.duration_minutes * 60);
+    // Devam eden attempt varsa direkt başlat
+    if (resolvedAttemptId) {
+      setTestStarted(true);
+      const now = Date.now();
+      setStartTime(now);
+      if (test?.is_timed && attemptState?.attempt?.remainingSeconds != null) {
+        setTimeLeft(attemptState.attempt.remainingSeconds);
+      } else if (test?.is_timed && test?.duration_minutes) {
+        setTimeLeft(test.duration_minutes * 60);
+      }
+      return;
     }
+    // Yeni attempt oluştur
+    startAttemptMutation.mutate();
   };
 
   const saveAndExit = () => {
@@ -449,11 +502,21 @@ export default function TakeTest() {
     );
   }
 
-  if (testId && !purchase) {
+  // Erişim kontrol edilirken yükleniyor göster
+  if (testId && user && !accessDetermined) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (testId && accessDetermined && !hasAccess) {
+    const detailId = testDetail?.packageId ?? testId;
     return (
       <div className="max-w-2xl mx-auto text-center py-20">
         <p className="text-slate-600 mb-4">Bu testi henüz satın almadınız</p>
-        <Link to={createPageUrl("TestDetail") + `?id=${testId}`}>
+        <Link to={createPageUrl("TestDetail") + `?id=${detailId}`}>
           <Button className="bg-indigo-600 hover:bg-indigo-700">Teste Git</Button>
         </Link>
       </div>
@@ -651,7 +714,9 @@ export default function TakeTest() {
 
           <div className="grid grid-cols-2 gap-4 mb-8 max-w-sm mx-auto">
             <div className="bg-slate-50 rounded-xl p-4">
-              <p className="text-2xl font-bold text-slate-900">{questions.length}</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {testDetail?.questions?.length ?? testDetail?.questionCount ?? 0}
+              </p>
               <p className="text-sm text-slate-500">Soru</p>
             </div>
             <div className="bg-slate-50 rounded-xl p-4">
@@ -667,11 +732,27 @@ export default function TakeTest() {
               <p className="text-sm font-semibold text-amber-800">🔧 Test başlatma bakımdadır</p>
               <p className="text-xs text-amber-600 mt-1">Lütfen daha sonra tekrar deneyin.</p>
             </div>
-          ) : (
-            <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700" onClick={startTest}>
-              Teste Başla
-            </Button>
-          )}
+          ) : (() => {
+            const preStartQCount = testDetail?.questions?.length ?? testDetail?.questionCount ?? 0;
+            if (preStartQCount === 0) {
+              return (
+                <div className="w-full max-w-xs rounded-xl border-2 border-rose-200 bg-rose-50 px-4 py-3 text-center">
+                  <p className="text-sm font-semibold text-rose-800">⚠️ Bu test henüz soru içermiyor</p>
+                  <p className="text-xs text-rose-600 mt-1">Eğitici soruları ekleyene kadar başlatamazsınız.</p>
+                </div>
+              );
+            }
+            return (
+              <Button
+                size="lg"
+                className="bg-indigo-600 hover:bg-indigo-700"
+                onClick={startTest}
+                disabled={startAttemptMutation.isPending}
+              >
+                {startAttemptMutation.isPending ? "Başlatılıyor..." : "Teste Başla"}
+              </Button>
+            );
+          })()}
         </div>
       </div>
     );

@@ -775,10 +775,11 @@ export default function CreateTest() {
   });
 
   const { data: topicList = [] } = useQuery({
-    queryKey: ["topicsFlat", pkgData.examTypeId],
+    queryKey: ["topicsFlat"],
     queryFn: async () => {
       try {
-        return await topicsApi.flat(pkgData.examTypeId || undefined);
+        // examTypeId filtresi olmadan tüm konuları çek (exam türüne bağlı olmayan konular da görünsün)
+        return await topicsApi.flat(undefined);
       } catch {
         return [];
       }

@@ -1,13 +1,16 @@
 export interface PurchaseRecord {
   id: string;
-  testId: string;
+  testId: string | null;
   candidateId: string;
   createdAt: Date;
 }
 
 export interface PurchaseWithAttemptRecord extends PurchaseRecord {
+  packageId: string | null;
   amountCents: number | null;
-  test: { id: string; title: string; status: string; examTypeId: string | null };
+  paymentStatus: string | null;
+  test: { id: string; title: string; status: string; examTypeId: string | null } | null;
+  package: { id: string; title: string; priceCents: number } | null;
   attempt: { id: string; status: string; startedAt: Date; completedAt: Date | null } | null;
 }
 

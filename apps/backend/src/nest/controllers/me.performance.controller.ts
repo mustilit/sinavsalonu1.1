@@ -1,4 +1,4 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get, Req, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { GetTopicPerformanceUseCase } from '../../application/use-cases/GetTopicPerformanceUseCase';
@@ -13,7 +13,7 @@ import { GetTopicPerformanceUseCase } from '../../application/use-cases/GetTopic
 @ApiBearerAuth('bearer')
 export class MePerformanceController {
   constructor(
-    private readonly topicPerformanceUC: GetTopicPerformanceUseCase,
+    @Inject(GetTopicPerformanceUseCase) private readonly topicPerformanceUC: GetTopicPerformanceUseCase,
   ) {}
 
   /**

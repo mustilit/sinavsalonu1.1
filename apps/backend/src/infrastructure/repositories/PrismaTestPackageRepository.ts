@@ -4,6 +4,8 @@ import {
   ITestPackageRepository,
   TestPackageRecord,
   TestPackageTest,
+  TestPackageQuestion,
+  TestPackageQuestionOption,
   CreateTestPackageInput,
   UpdateTestPackageInput,
 } from '../../domain/interfaces/ITestPackageRepository';
@@ -11,15 +13,31 @@ import {
 @Injectable()
 export class PrismaTestPackageRepository implements ITestPackageRepository {
   private mapTest(t: any): TestPackageTest {
+    const questions: TestPackageQuestion[] | undefined = t.questions?.map((q: any) => ({
+      id: q.id,
+      content: q.content,
+      mediaUrl: q.mediaUrl ?? null,
+      order: q.order,
+      topicId: (q as any).topicId ?? null,
+      options: ((q.options ?? []) as any[]).map((o: any): TestPackageQuestionOption => ({
+        id: o.id,
+        content: o.content,
+        mediaUrl: o.mediaUrl ?? null,
+        isCorrect: o.isCorrect,
+      })),
+    }));
+
     return {
       id: t.id,
       title: t.title,
+      examTypeId: t.examTypeId ?? null,
       isTimed: t.isTimed,
       duration: t.duration ?? null,
       durationSec: t.durationSec ?? null,
-      questionCount: t._count?.questions ?? t.questionCount ?? null,
+      questionCount: t.questions?.length ?? t._count?.questions ?? t.questionCount ?? null,
       status: t.status,
       publishedAt: t.publishedAt ?? null,
+      ...(questions !== undefined && { questions }),
     };
   }
 
@@ -66,7 +84,12 @@ export class PrismaTestPackageRepository implements ITestPackageRepository {
         tests: {
           where: { deletedAt: null },
           orderBy: { createdAt: 'asc' },
-          include: { _count: { select: { questions: true } } },
+          include: {
+            questions: {
+              orderBy: { order: 'asc' },
+              include: { options: true },
+            },
+          },
         },
       },
     });
@@ -116,18 +139,53 @@ export class PrismaTestPackageRepository implements ITestPackageRepository {
   }
 
   async publish(id: string): Promise<TestPackageRecord> {
-    const pkg = await (prisma.testPackage as any).update({
-      where: { id },
-      data: { publishedAt: new Date(), isActive: true },
+    const now = new Date();
+    // Paket fiyatını al
+    const pkg = await (prisma.testPackage as any).findUnique({ where: { id } });
+
+    // Her test için gerçek soru sayısını hesapla ve güncelle
+    const tests = await prisma.examTest.findMany({
+      where: { packageId: id, deletedAt: null },
+      select: { id: true },
     });
-    return this.mapRecord(pkg);
+    await Promise.all(
+      tests.map(async (t) => {
+        const cnt = await prisma.examQuestion.count({ where: { testId: t.id } });
+        await prisma.examTest.update({
+          where: { id: t.id },
+          data: {
+            publishedAt: now,
+            status: 'PUBLISHED',
+            priceCents: pkg?.priceCents ?? 0,
+            questionCount: cnt,
+          },
+        });
+      }),
+    );
+
+    // Paketi yayınla
+    await (prisma.testPackage as any).update({
+      where: { id },
+      data: { publishedAt: now, isActive: true },
+    });
+
+    const updated = await (prisma.testPackage as any).findUnique({ where: { id } });
+    return this.mapRecord(updated);
   }
 
   async unpublish(id: string): Promise<TestPackageRecord> {
-    const pkg = await (prisma.testPackage as any).update({
-      where: { id },
-      data: { publishedAt: null, isActive: false },
-    });
+    // Paketi ve pakete bağlı tüm ExamTest'leri aynı anda yayından kaldır
+    await prisma.$transaction([
+      (prisma.testPackage as any).update({
+        where: { id },
+        data: { publishedAt: null, isActive: false },
+      }),
+      prisma.examTest.updateMany({
+        where: { packageId: id, deletedAt: null },
+        data: { publishedAt: null, status: 'DRAFT' },
+      }),
+    ]);
+    const pkg = await (prisma.testPackage as any).findUnique({ where: { id } });
     return this.mapRecord(pkg);
   }
 }

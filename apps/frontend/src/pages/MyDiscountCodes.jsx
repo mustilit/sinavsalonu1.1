@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Percent, Copy } from "lucide-react";
+import { Plus, Percent, Copy, Search, X, PowerOff, Power } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, isWithinInterval, parseISO, startOfDay, endOfDay } from "date-fns";
 import { tr } from "date-fns/locale";
 
 /**
@@ -36,6 +36,14 @@ export default function MyDiscountCodes() {
     test_package_id: "",
     valid_until: ""
   });
+  // Filtre durumu
+  const [filters, setFilters] = useState({
+    search: "",
+    minPercent: "",
+    maxPercent: "",
+    dateFrom: "",
+    dateTo: "",
+  });
   const queryClient = useQueryClient();
 
   // Giriş yapan eğiticinin indirim kodlarını yükle; cache key'e e-posta eklendi (çoklu kullanıcı senaryosu)
@@ -44,6 +52,32 @@ export default function MyDiscountCodes() {
     queryFn: () => entities.DiscountCode.filter({ educator_email: user.email }, "-created_date"),
     enabled: !!user,
   });
+
+  // Aktif filtre sayısını hesapla (rozet için)
+  const activeFilterCount = [filters.search, filters.minPercent, filters.maxPercent, filters.dateFrom, filters.dateTo]
+    .filter(Boolean).length;
+
+  // Filtrelenmiş kod listesi — tüm filtreler istemci tarafında uygulanır
+  const filteredCodes = useMemo(() => {
+    return codes.filter((c) => {
+      // Kod numarası / metin araması
+      if (filters.search && !c.code.toLowerCase().includes(filters.search.toLowerCase())) return false;
+      // İndirim oranı aralığı (backend alanı: percentOff veya discount_percent)
+      const pct = c.percentOff ?? c.discount_percent ?? 0;
+      if (filters.minPercent !== "" && pct < Number(filters.minPercent)) return false;
+      if (filters.maxPercent !== "" && pct > Number(filters.maxPercent)) return false;
+      // Tarih aralığı — kodun geçerlilik başlangıç tarihine (validFrom/valid_from) göre filtrele
+      const refDate = c.createdAt ?? c.created_date;
+      if (refDate) {
+        const d = new Date(refDate);
+        if (filters.dateFrom && d < startOfDay(parseISO(filters.dateFrom))) return false;
+        if (filters.dateTo   && d > endOfDay(parseISO(filters.dateTo)))     return false;
+      }
+      return true;
+    });
+  }, [codes, filters]);
+
+  const clearFilters = () => setFilters({ search: "", minPercent: "", maxPercent: "", dateFrom: "", dateTo: "" });
 
   // Kod oluşturma formunda belirli bir teste kısıtlama yapılabilmesi için eğiticinin testleri
   const { data: myTests = [] } = useQuery({
@@ -66,13 +100,21 @@ export default function MyDiscountCodes() {
       setShowDialog(false);
       setFormData({ code: "", discount_percent: 10, max_uses: 100, test_package_id: "", valid_until: "" });
     },
+    onError: (err) => {
+      const msg = err?.response?.data?.message || err?.message || "İndirim kodu oluşturulamadı";
+      toast.error(msg);
+    },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => entities.DiscountCode.delete(id),
-    onSuccess: () => {
-      toast.success("İndirim kodu silindi");
+  const toggleMutation = useMutation({
+    mutationFn: (id) => entities.DiscountCode.toggle(id),
+    onSuccess: (data) => {
+      const msg = data?.isActive ? "İndirim kodu aktive edildi" : "İndirim kodu pasife alındı";
+      toast.success(msg);
       queryClient.invalidateQueries({ queryKey: ["discountCodes"] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || err?.message || "İşlem başarısız");
     },
   });
 
@@ -109,6 +151,82 @@ export default function MyDiscountCodes() {
         </Button>
       </div>
 
+      {/* Filtre Paneli */}
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-3 items-end">
+            {/* Kod arama */}
+            <div className="flex-1 min-w-[160px] space-y-1">
+              <Label className="text-xs text-slate-500">Kod</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <Input
+                  className="pl-8 h-9 text-sm"
+                  placeholder="Kod ara…"
+                  value={filters.search}
+                  onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* İndirim oranı aralığı */}
+            <div className="space-y-1 min-w-[80px]">
+              <Label className="text-xs text-slate-500">Min % İndirim</Label>
+              <Input
+                type="number"
+                min="1"
+                max="50"
+                className="h-9 text-sm w-24"
+                placeholder="1"
+                value={filters.minPercent}
+                onChange={(e) => setFilters((f) => ({ ...f, minPercent: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1 min-w-[80px]">
+              <Label className="text-xs text-slate-500">Max % İndirim</Label>
+              <Input
+                type="number"
+                min="1"
+                max="50"
+                className="h-9 text-sm w-24"
+                placeholder="50"
+                value={filters.maxPercent}
+                onChange={(e) => setFilters((f) => ({ ...f, maxPercent: e.target.value }))}
+              />
+            </div>
+
+            {/* Oluşturma tarihi aralığı */}
+            <div className="space-y-1 min-w-[140px]">
+              <Label className="text-xs text-slate-500">Başlangıç Tarihi</Label>
+              <Input
+                type="date"
+                className="h-9 text-sm"
+                value={filters.dateFrom}
+                onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1 min-w-[140px]">
+              <Label className="text-xs text-slate-500">Bitiş Tarihi</Label>
+              <Input
+                type="date"
+                className="h-9 text-sm"
+                value={filters.dateTo}
+                onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))}
+              />
+            </div>
+
+            {/* Filtreleri temizle */}
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" className="h-9 text-slate-500 hover:text-slate-800 gap-1.5" onClick={clearFilters}>
+                <X className="w-3.5 h-3.5" />
+                Temizle
+                <Badge className="bg-indigo-100 text-indigo-700 ml-0.5">{activeFilterCount}</Badge>
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
@@ -122,9 +240,15 @@ export default function MyDiscountCodes() {
               <Percent className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <p className="text-slate-500">Henüz indirim kodu oluşturmadınız</p>
             </div>
+          ) : filteredCodes.length === 0 ? (
+            <div className="text-center py-12">
+              <Search className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500">Filtreyle eşleşen kod bulunamadı</p>
+              <Button variant="link" className="text-indigo-600 mt-1" onClick={clearFilters}>Filtreleri temizle</Button>
+            </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {codes.map((code) => (
+              {filteredCodes.map((code) => (
                 <div key={code.id} className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-indigo-50 rounded-xl">
@@ -138,29 +262,46 @@ export default function MyDiscountCodes() {
                         </button>
                       </div>
                       <p className="text-sm text-slate-500">
-                        %{code.discount_percent} indirim • {code.current_uses}/{code.max_uses} kullanım
+                        %{code.percentOff ?? code.discount_percent} indirim • {code.usedCount ?? code.current_uses ?? 0}/{code.maxUses ?? code.max_uses ?? "∞"} kullanım
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <Badge className={code.is_active && code.current_uses < code.max_uses 
-                      ? "bg-emerald-100 text-emerald-700" 
-                      : "bg-slate-100 text-slate-600"
-                    }>
-                      {code.is_active && code.current_uses < code.max_uses ? "Aktif" : "Pasif"}
+                    <Badge className={(() => {
+                      const active  = code.isActive ?? code.is_active ?? true;
+                      const used    = code.usedCount ?? code.current_uses ?? 0;
+                      const max     = code.maxUses  ?? code.max_uses;
+                      const expired = code.validUntil && new Date(code.validUntil) < new Date();
+                      const full    = max != null && used >= max;
+                      return (active && !expired && !full) ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600";
+                    })()}>
+                      {(() => {
+                        const active  = code.isActive ?? code.is_active ?? true;
+                        const used    = code.usedCount ?? code.current_uses ?? 0;
+                        const max     = code.maxUses  ?? code.max_uses;
+                        const expired = code.validUntil && new Date(code.validUntil) < new Date();
+                        if (!active)                    return "Pasif";
+                        if (expired)                    return "Süresi Doldu";
+                        if (max != null && used >= max) return "Limit Doldu";
+                        return "Aktif";
+                      })()}
                     </Badge>
-                    {code.valid_until && (
+                    {(code.validUntil ?? code.valid_until) && (
                       <span className="text-sm text-slate-500">
-                        {format(new Date(code.valid_until), "d MMM yyyy", { locale: tr })}
+                        {format(new Date(code.validUntil ?? code.valid_until), "d MMM yyyy", { locale: tr })}
                       </span>
                     )}
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-rose-600"
-                      onClick={() => deleteMutation.mutate(code.id)}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={toggleMutation.isPending}
+                      className={code.isActive ?? code.is_active ? "text-slate-400 hover:text-rose-600" : "text-emerald-600 hover:text-emerald-700"}
+                      title={code.isActive ?? code.is_active ? "Pasife al" : "Aktive et"}
+                      onClick={() => toggleMutation.mutate(code.id)}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {code.isActive ?? code.is_active
+                        ? <PowerOff className="w-4 h-4" />
+                        : <Power className="w-4 h-4" />}
                     </Button>
                   </div>
                 </div>

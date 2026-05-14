@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { GraduationCap, Target, Users, Award, Heart, ArrowLeft } from "lucide-react";
+import { Target, Users, Award, Heart, ArrowLeft } from "lucide-react";
 
 /**
  * About (Hakkımızda) sayfası — platformun misyonu, vizyonu,

@@ -5,6 +5,7 @@ import { GetSiteSettingsUseCase } from '../../application/use-cases/GetSiteSetti
 import { ListExamTypesUseCase } from '../../application/use-cases/ListExamTypesUseCase';
 import { ListFeaturedEducatorsUseCase } from '../../application/use-cases/ListFeaturedEducatorsUseCase';
 import { GetPopularPackagesUseCase } from '../../application/use-cases/GetPopularPackagesUseCase';
+import { GetPaymentSettingsUseCase } from '../../application/use-cases/GetPaymentSettingsUseCase';
 import type { PrismaClient } from '@prisma/client';
 
 /**
@@ -86,5 +87,13 @@ export class SiteController {
       ? examTypeIds.split(',').map((s) => s.trim()).filter(Boolean)
       : undefined;
     return this.getPopularPackages.execute(parsedExamTypeIds, isNaN(n) ? 6 : n);
+  }
+
+  @Get('payment-settings')
+  @Public()
+  @ApiOkResponse({ description: 'Public payment provider settings (providers enabled, mode, company name)' })
+  async getPublicPaymentSettings() {
+    const uc = new GetPaymentSettingsUseCase();
+    return uc.execute();
   }
 }

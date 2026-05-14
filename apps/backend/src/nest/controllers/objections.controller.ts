@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Req } from '@nestjs/common';
+import { Controller, Post, Body, Req, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiBadRequestResponse, ApiForbiddenResponse, ApiConflictResponse, ApiNotFoundResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { CreateObjectionDto } from './dto/create-objection.dto';
@@ -12,7 +12,7 @@ import { CreateObjectionUseCase } from '../../application/use-cases/CreateObject
 @Controller('objections')
 @ApiTags('objections')
 export class ObjectionsController {
-  constructor(private readonly createObjection: CreateObjectionUseCase) {}
+  constructor(@Inject(CreateObjectionUseCase) private readonly createObjection: CreateObjectionUseCase) {}
 
   @Post()
   @Roles('CANDIDATE')

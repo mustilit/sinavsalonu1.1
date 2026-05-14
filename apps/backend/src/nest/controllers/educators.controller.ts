@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Query, Body, Req, Post, Delete } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Query, Body, Req, Post } from '@nestjs/common';
 import { ApiTags, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ApiErrorResponses } from '../swagger/decorators';
 import { EducatorPageResponseDto } from './dto/educator-page.response.dto';
@@ -9,6 +9,7 @@ import { PatchEducatorProfileDto } from './dto/patch-educator-profile.dto';
 import { CreateDiscountCodeDto } from './dto/create-discount-code.dto';
 import { PurchaseAdDto } from './dto/purchase-ad.dto';
 import { GetEducatorPageUseCase } from '../../application/use-cases/GetEducatorPageUseCase';
+import { ListEducatorReviewsUseCase } from '../../application/use-cases/ListEducatorReviewsUseCase';
 import { UpdateEducatorProfileUseCase } from '../../application/use-cases/UpdateEducatorProfileUseCase';
 import { CreateDiscountCodeUseCase } from '../../application/use-cases/CreateDiscountCodeUseCase';
 import { ListEducatorDiscountCodesUseCase } from '../../application/use-cases/ListEducatorDiscountCodesUseCase';
@@ -18,7 +19,7 @@ import { ListEducatorAdPurchasesUseCase } from '../../application/use-cases/List
 import { GetEducatorAdStatsUseCase } from '../../application/use-cases/GetEducatorAdStatsUseCase';
 import { ListEducatorTestsUseCase } from '../../application/use-cases/ListEducatorTestsUseCase';
 import { ListEducatorPurchasesUseCase } from '../../application/use-cases/ListEducatorPurchasesUseCase';
-import { DeleteDiscountCodeUseCase } from '../../application/use-cases/DeleteDiscountCodeUseCase';
+import { ToggleDiscountCodeUseCase } from '../../application/use-cases/ToggleDiscountCodeUseCase';
 import { PrismaUserRepository } from '../../infrastructure/repositories/PrismaUserRepository';
 import { PrismaExamRepository } from '../../infrastructure/repositories/PrismaExamRepository';
 import { PrismaTestStatsRepository } from '../../infrastructure/repositories/PrismaTestStatsRepository';
@@ -42,14 +43,14 @@ export class EducatorsController {
   constructor(
     @Inject(USER_REPO) private readonly userRepo: IUserRepository,
     @Inject(AUDIT_LOG_REPO) private readonly auditRepo: IAuditLogRepository,
-    private readonly createDiscountCodeUC: CreateDiscountCodeUseCase,
-    private readonly listDiscountCodesUC: ListEducatorDiscountCodesUseCase,
-    private readonly getSalesReportUC: GetEducatorSalesReportUseCase,
-    private readonly purchaseAdUC: PurchaseAdUseCase,
-    private readonly listAdPurchasesUC: ListEducatorAdPurchasesUseCase,
-    private readonly listTestsUC: ListEducatorTestsUseCase,
-    private readonly listPurchasesUC: ListEducatorPurchasesUseCase,
-    private readonly deleteDiscountCodeUC: DeleteDiscountCodeUseCase,
+    @Inject(CreateDiscountCodeUseCase) private readonly createDiscountCodeUC: CreateDiscountCodeUseCase,
+    @Inject(ListEducatorDiscountCodesUseCase) private readonly listDiscountCodesUC: ListEducatorDiscountCodesUseCase,
+    @Inject(GetEducatorSalesReportUseCase) private readonly getSalesReportUC: GetEducatorSalesReportUseCase,
+    @Inject(PurchaseAdUseCase) private readonly purchaseAdUC: PurchaseAdUseCase,
+    @Inject(ListEducatorAdPurchasesUseCase) private readonly listAdPurchasesUC: ListEducatorAdPurchasesUseCase,
+    @Inject(ListEducatorTestsUseCase) private readonly listTestsUC: ListEducatorTestsUseCase,
+    @Inject(ListEducatorPurchasesUseCase) private readonly listPurchasesUC: ListEducatorPurchasesUseCase,
+    @Inject(ToggleDiscountCodeUseCase) private readonly toggleDiscountCodeUC: ToggleDiscountCodeUseCase,
   ) {
     // GetEducatorPageUseCase birden fazla bağımlılık gerektirdiğinden doğrudan örneklenir
     this.pageUc = new GetEducatorPageUseCase(new PrismaUserRepository(), new PrismaExamRepository(), new PrismaTestStatsRepository(), new ReviewAggregationService());
@@ -93,14 +94,14 @@ export class EducatorsController {
     return this.listDiscountCodesUC.execute(educatorId);
   }
 
-  @Delete('me/discount-codes/:id')
+  @Patch('me/discount-codes/:id/toggle')
   @Roles('EDUCATOR')
   @ApiBearerAuth('bearer')
-  @ApiOkResponse({ description: 'Delete educator discount code' })
+  @ApiOkResponse({ description: 'FR-E-09: Indirim kodunu pasife al / aktive et (toggle)' })
   @ApiErrorResponses()
-  async deleteDiscountCode(@Req() req: any, @Param('id') id: string) {
+  async toggleDiscountCode(@Req() req: any, @Param('id') id: string) {
     const educatorId = (req as any).user?.id;
-    return this.deleteDiscountCodeUC.execute(educatorId, id);
+    return this.toggleDiscountCodeUC.execute(educatorId, id);
   }
 
   @Get('me/reports/sales')
@@ -195,6 +196,16 @@ export class EducatorsController {
     const sortBy = q.sortBy;
     const sortDir = q.sortDir as any;
     return this.pageUc.execute(user.id, { page, limit, examTypeId, sortBy, sortDir });
+  }
+
+  @Public()
+  @Get(':id/reviews')
+  @ApiOkResponse({ description: 'Eğiticiye ait tüm testlerin yorumlarını döndürür' })
+  @ApiErrorResponses()
+  async listReviews(@Param('id') id: string, @Query('limit') limit?: string) {
+    const uc = new ListEducatorReviewsUseCase();
+    const l = limit ? parseInt(limit, 10) : 20;
+    return uc.execute(id, isNaN(l) ? 20 : l);
   }
 
   @Public()

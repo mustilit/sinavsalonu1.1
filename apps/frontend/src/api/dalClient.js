@@ -218,25 +218,48 @@ export const entities = {
           p.packageId === opts.test_package_id
         );
       }
-      return list.map((p) => ({
-        id: p.id,
-        user_email: opts.user_email,
-        // Yeni sistemde packageId, eski sistemde testId kullanılır
-        test_package_id: p.packageId ?? p.testId ?? p.test?.id ?? null,
-        test_id: p.testId,
-        package_id: p.packageId,
-        test: p.test,
-        package: p.package,
-        attempt: p.attempt,
-        payment_status: p.paymentStatus,
-        test_package_snapshot: p.package
-          ? { id: p.package.id, title: p.package.title, price: p.package.priceCents / 100 }
-          : (p.test ? testPackageAdapter(p.test) : null),
-      }));
+      return list.map((p) => {
+        // Paketten satın alındıysa packageId üzerinden eşleştir; yoksa testId
+        const pkgId = p.packageId ?? null;
+        const testPkgId = pkgId ?? p.testId ?? p.test?.id ?? null;
+
+        // Test snapshot: paket varsa paket verisinden; yoksa test verisinden
+        let snapshot = null;
+        if (p.package) {
+          snapshot = {
+            id: p.package.id,
+            title: p.package.title,
+            price: p.package.priceCents != null ? p.package.priceCents / 100 : 0,
+          };
+        } else if (p.test) {
+          snapshot = testPackageAdapter(p.test);
+        }
+
+        return {
+          id: p.id,
+          user_email: opts.user_email,
+          // Yeni sistemde packageId, eski sistemde testId kullanılır
+          test_package_id: testPkgId,
+          test_id: p.testId,
+          package_id: pkgId,
+          test: p.test,
+          package: p.package,
+          attempt: p.attempt,
+          payment_status: p.paymentStatus,
+          test_package_snapshot: snapshot,
+          // Paketten gelen ExamTest listesi — TestDetail'de test butonları için
+          tests_snapshot: pkgId && p.test
+            ? [{ id: p.test.id, title: p.test.title, duration_minutes: p.test.durationMinutes ?? 60, test_package_id: testPkgId }]
+            : null,
+        };
+      });
     },
     create: async (body) => {
       const testId = body.test_package_id ?? body.test_id;
-      const { data } = await api.post(`/purchases/${testId}`, { discountCode: body.discount_code });
+      const { data } = await api.post(`/purchases/${testId}`, {
+        discountCode: body.discount_code,
+        paymentProvider: body.payment_provider,
+      });
       return data;
     },
     initiatePayment: async (packageId, provider, callbackUrl) => {
@@ -260,8 +283,15 @@ export const entities = {
           // Önce marketplace/packages endpoint'ini dene (yeni sistem — TestPackage)
           const { data } = await api.get(`/marketplace/packages/${opts.id}`);
           return data ? [publicPackageDetailAdapter(data)] : [];
-        } catch {
-          return [];
+        } catch (err) {
+          const status = err?.response?.status;
+          // 404: paket gerçekten yok → boş döndür (kullanıcıya "bulunamadı" göster)
+          // Diğer hatalar (500, ağ vb.): throw et → TanStack Query retry mekanizması devreye girsin
+          if (status === 404) {
+            return [];
+          }
+          console.error('[dalClient] TestPackage.filter id lookup failed:', err?.message || err, 'id:', opts.id, 'status:', status);
+          throw err;
         }
       }
       // Educator'ın kendi paketleri — GET /packages
@@ -289,16 +319,16 @@ export const entities = {
           return [];
         }
       }
-      const params = { limit: limit || 50, sort: 'newest' };
+      // Yayınlı paket listesi — yeni TestPackage tabanlı endpoint (tek kaynak)
+      const params = { limit: limit || 50 };
       if (opts.exam_type_id) params.examTypeId = opts.exam_type_id;
-      if (opts.educator_email || opts.educatorId) params.educatorId = opts.educatorId ?? opts.educator_email;
-      const { data } = await api.get('/marketplace/tests', { params });
+      const { data } = await api.get('/marketplace/packages', { params });
       const items = data?.items ?? [];
-      return items.map(testPackageAdapter);
+      return items.map(marketplacePackageAdapter);
     },
     list: async (sort, limit) => {
-      const { data } = await api.get('/marketplace/tests', { params: { limit: limit || 100, sort: 'newest' } });
-      return (data?.items ?? []).map(testPackageAdapter);
+      const { data } = await api.get('/marketplace/packages', { params: { limit: limit || 100 } });
+      return (data?.items ?? []).map(marketplacePackageAdapter);
     },
     create: async (body) => {
       const payload = {
@@ -336,9 +366,29 @@ export const entities = {
     filter: async (opts = {}, sort) => {
       if (opts.test_package_id || opts.test_id) {
         const id = opts.test_package_id ?? opts.test_id;
-        const { data } = await api.get(`/tests/${id}`);
-        if (!data) return [];
-        return [{ id: data.id, test_package_id: data.id, order_index: 0, ...data }];
+        // Önce ExamTest olarak dene; bulunamazsa marketplace/packages endpoint'ini dene (TestPackage ID)
+        try {
+          const { data } = await api.get(`/tests/${id}`);
+          if (data) return [{ id: data.id, test_package_id: id, order_index: 0, duration_minutes: data.durationMinutes ?? 60, title: data.title, ...data }];
+        } catch (testErr) {
+          // ExamTest bulunamadı — TestPackage ID olabilir
+        }
+        try {
+          const { data } = await api.get(`/marketplace/packages/${id}`);
+          if (data?.tests?.length) {
+            return data.tests.map((t, i) => ({
+              id: t.id,
+              title: t.title,
+              test_package_id: id,
+              order_index: i,
+              duration_minutes: 60,
+              question_count: t.questionCount ?? 0,
+            }));
+          }
+        } catch (pkgErr) {
+          // Hiçbir şey bulunamadı
+        }
+        return [];
       }
       return [];
     },
@@ -349,16 +399,21 @@ export const entities = {
     filter: async (opts = {}, sort) => {
       if (opts.test_package_id || opts.test_id) {
         const id = opts.test_package_id ?? opts.test_id;
-        const { data } = await api.get(`/tests/${id}`);
-        if (!data?.questions) return [];
-        return (data.questions || []).map((q, i) => ({
-          id: q.id,
-          test_id: data.id,
-          test_package_id: data.id,
-          content: q.content,
-          order_index: q.order ?? i,
-          options: (q.options || []).map((o) => ({ id: o.id, content: o.content, is_correct: o.isCorrect })),
-        }));
+        try {
+          const { data } = await api.get(`/tests/${id}`);
+          if (!data?.questions) return [];
+          return (data.questions || []).map((q, i) => ({
+            id: q.id,
+            test_id: data.id,
+            test_package_id: data.id,
+            content: q.content,
+            order_index: q.order ?? i,
+            options: (q.options || []).map((o) => ({ id: o.id, content: o.content, is_correct: o.isCorrect })),
+          }));
+        } catch (err) {
+          console.warn('[dalClient] Question.filter failed for id:', id, err?.message);
+          return [];
+        }
       }
       return [];
     },
@@ -472,38 +527,49 @@ export const entities = {
       return list.map((d) => ({
         id: d.id,
         code: d.code,
+        percentOff: d.percentOff,
         discount_percent: d.percentOff,
         percent_off: d.percentOff,
+        maxUses: d.maxUses,
         max_uses: d.maxUses,
+        usedCount: d.usedCount,
         current_uses: d.usedCount,
         used_count: d.usedCount,
+        isActive: d.isActive ?? true,
+        is_active: d.isActive ?? true,
+        validFrom: d.validFrom,
         valid_from: d.validFrom,
+        validUntil: d.validUntil,
         valid_until: d.validUntil,
         description: d.description,
+        createdAt: d.createdAt,
         created_date: d.createdAt,
-        is_active: true,
       }));
       } catch {
         return [];
       }
     },
     create: async (body) => {
-      const { data } = await api.post('/educators/me/discount-codes', {
+      const percentOff = body.discount_percent ?? body.percent_off ?? body.percentOff ?? 10;
+      const maxUses    = body.max_uses ?? body.maxUses;
+      const validFrom  = body.valid_from  || null;
+      const validUntil = body.valid_until || null;
+      const description = body.description || null;
+      // Opsiyonel alanları yalnızca değer varsa gönder — null/undefined ile @IsDateString() çakışmasını önler
+      const payload = {
         code: body.code,
-        percentOff: body.discount_percent ?? body.percent_off ?? body.percentOff ?? 10,
-        maxUses: body.max_uses ?? body.maxUses ?? null,
-        validFrom: body.valid_from ? new Date(body.valid_from) : null,
-        validUntil: body.valid_until ? new Date(body.valid_until) : null,
-        description: body.description ?? null,
-      });
+        percentOff,
+        ...(maxUses   != null ? { maxUses }              : {}),
+        ...(validFrom          ? { validFrom }            : {}),
+        ...(validUntil         ? { validUntil }           : {}),
+        ...(description        ? { description }          : {}),
+      };
+      const { data } = await api.post('/educators/me/discount-codes', payload);
       return data;
     },
-    delete: async (id) => {
-      try {
-        await api.delete(`/educators/me/discount-codes/${id}`);
-      } catch (err) {
-        console.warn('[dalClient] DiscountCode.delete failed:', err?.message || err);
-      }
+    toggle: async (id) => {
+      const { data } = await api.patch(`/educators/me/discount-codes/${id}/toggle`);
+      return data;
     },
   },
 
@@ -620,7 +686,7 @@ export const entities = {
 };
 
 /**
- * Adapter: GET /marketplace/packages/:id yanıtını TestDetail sayfasının beklediği shape'e dönüştürür.
+ * Adapter: GET /marketplace/packages/:id → TestDetail sayfasının beklediği shape.
  */
 function publicPackageDetailAdapter(pkg) {
   return {
@@ -631,19 +697,54 @@ function publicPackageDetailAdapter(pkg) {
     educator_name: pkg.educatorUsername ?? '',
     exam_type_id: pkg.examTypeId ?? null,
     exam_type_name: pkg.examTypeName ?? null,
-    question_count: (pkg.tests ?? []).reduce((s, t) => s + (t.questionCount ?? 0), 0),
+    // detail endpoint'te questionCount ve testCount direkt alan olarak geliyor
+    question_count: pkg.questionCount ?? (pkg.tests ?? []).reduce((s, t) => s + (t.questionCount ?? 0), 0),
+    test_count: pkg.testCount ?? (pkg.tests ?? []).length,
     price: pkg.priceCents != null ? pkg.priceCents / 100 : 0,
-    is_published: !!pkg.isActive,
-    is_active: !!pkg.isActive,
+    priceCents: pkg.priceCents ?? 0,
+    difficulty: pkg.difficulty ?? 'medium',
+    cover_image: pkg.coverImageUrl ?? null,
+    has_solutions: pkg.hasSolutions ?? false,
+    is_published: !!pkg.publishedAt,
+    is_active: !!pkg.publishedAt,
     total_sales: pkg.saleCount ?? 0,
     average_rating: pkg.ratingAvg ?? null,
     rating_count: pkg.ratingCount ?? 0,
-    is_timed: (pkg.tests ?? [])[0]?.isTimed ?? false,
-    duration: (pkg.tests ?? [])[0]?.durationMinutes ?? null,
-    created_date: pkg.createdAt,
-    createdAt: pkg.createdAt,
+    is_timed: false,
+    duration: null,
+    created_date: pkg.publishedAt,
+    createdAt: pkg.publishedAt,
     packageId: pkg.id,
     _tests: pkg.tests ?? [],
+  };
+}
+
+/**
+ * Adapter: GET /marketplace/packages (liste) → Explore/Home sayfalarının beklediği shape.
+ */
+function marketplacePackageAdapter(pkg) {
+  return {
+    id: pkg.id,
+    title: pkg.title,
+    description: pkg.description ?? '',
+    educator_email: pkg.educatorId ?? '',
+    educator_name: pkg.educatorUsername ?? '',
+    exam_type_id: pkg.examTypeId ?? null,
+    exam_type_name: pkg.examTypeName ?? null,
+    question_count: pkg.questionCount ?? 0,
+    price: pkg.priceCents != null ? pkg.priceCents / 100 : 0,
+    priceCents: pkg.priceCents ?? 0,
+    difficulty: pkg.difficulty ?? 'medium',
+    is_published: !!pkg.publishedAt,
+    is_active: !!pkg.publishedAt,
+    total_sales: 0,
+    average_rating: null,
+    rating_count: 0,
+    is_timed: false,
+    duration: null,
+    created_date: pkg.publishedAt,
+    createdAt: pkg.publishedAt,
+    packageId: pkg.id,
   };
 }
 

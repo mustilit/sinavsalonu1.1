@@ -1,71 +1,49 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { entities } from "@/api/dalClient";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, BookOpen, Star, User, TrendingUp } from "lucide-react";
+import { Search, BookOpen, Star, User, TrendingUp, GraduationCap } from "lucide-react";
 import api from "@/lib/api/apiClient";
 
 export default function Educators() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedExamTypeId, setSelectedExamTypeId] = useState(null);
 
-  const { data: allTests = [], isLoading } = useQuery({
-    queryKey: ["allPublishedTests"],
-    queryFn: () => entities.TestPackage.filter({ is_published: true }),
+  // Sınav türleri
+  const { data: examTypes = [] } = useQuery({
+    queryKey: ["examTypesPublic"],
+    queryFn: async () => {
+      const res = await api.get("/site/exam-types");
+      return Array.isArray(res?.data) ? res.data : [];
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Public educators (backend supports featured educators)
-  const { data: featured = [] } = useQuery({
-    queryKey: ["featuredEducators"],
+  // Tek kaynak: /site/featured-educators — seçili exam türüne göre filtrele
+  const { data: rawEducators = [], isLoading } = useQuery({
+    queryKey: ["allEducators", selectedExamTypeId],
     queryFn: async () => {
-      const res = await api.get("/site/featured-educators");
+      const params = new URLSearchParams({ limit: "100" });
+      if (selectedExamTypeId) params.set("examTypeIds", selectedExamTypeId);
+      const res = await api.get(`/site/featured-educators?${params}`);
       const data = res?.data ?? res;
       return Array.isArray(data) ? data : (data?.items ?? []);
     },
+    staleTime: 2 * 60 * 1000,
   });
 
-  // Calculate educator stats
-  const educators = Object.values(
-    allTests.reduce((acc, test) => {
-      
-      if (!acc[test.educator_email]) {
-        acc[test.educator_email] = {
-          email: test.educator_email,
-          name: test.educator_name,
-          bio: null,
-          testCount: 0,
-          totalSales: 0,
-          avgRating: 0,
-          ratingCount: 0,
-        };
-      }
-      acc[test.educator_email].testCount++;
-      acc[test.educator_email].totalSales += test.total_sales || 0;
-      if (test.average_rating > 0) {
-        acc[test.educator_email].avgRating += test.average_rating;
-        acc[test.educator_email].ratingCount++;
-      }
-      return acc;
-    }, {})
-  ).map((edu) => ({
-    ...edu,
-    avgRating: edu.ratingCount > 0 ? (edu.avgRating / edu.ratingCount).toFixed(1) : 0,
-  }))
-  .sort((a, b) => b.totalSales - a.totalSales);
-
-  // Merge featured educator metadata when possible (id/email mismatch is tolerated)
-  if (Array.isArray(featured) && featured.length) {
-    for (const f of featured) {
-      const key = f?.id ?? f?.email;
-      if (!key) continue;
-      const e = educators.find((x) => x.email === key);
-      if (!e) continue;
-      if (f?.bio) e.bio = f.bio;
-      if (f?.name) e.name = f.name;
-    }
-  }
+  // Backend shape: { id, username, testCount, saleCount, ratingAvg }
+  const educators = rawEducators
+    .map((e) => ({
+      id: e.id,
+      name: e.username ?? e.name ?? e.id,
+      testCount: e.testCount ?? 0,
+      totalSales: e.saleCount ?? 0,
+      avgRating: e.ratingAvg ?? 0,
+    }))
+    .sort((a, b) => b.totalSales - a.totalSales || b.testCount - a.testCount);
 
   const filteredEducators = educators.filter((edu) =>
     !searchQuery || (edu.name?.toLowerCase() ?? "").includes(searchQuery.toLowerCase())
@@ -78,20 +56,54 @@ export default function Educators() {
         <p className="text-slate-500 mt-2">Platformdaki tüm eğiticileri keşfet</p>
       </div>
 
-      {/* Search */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-8">
+      {/* Arama + Filtre */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6 space-y-3">
+        {/* Arama */}
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <Input
             placeholder="Eğitici ara..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-12 h-12 border-slate-200"
+            className="pl-12 h-11 border-slate-200"
           />
         </div>
+
+        {/* Uzmanlık Alanı (Sınav Türü) Filtreleri */}
+        {examTypes.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap pt-1">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500 shrink-0">
+              <GraduationCap className="w-3.5 h-3.5" />
+              Uzmanlık:
+            </span>
+            <button
+              onClick={() => setSelectedExamTypeId(null)}
+              className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
+                !selectedExamTypeId
+                  ? "bg-indigo-600 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              Tümü
+            </button>
+            {examTypes.map((et) => (
+              <button
+                key={et.id}
+                onClick={() => setSelectedExamTypeId(et.id === selectedExamTypeId ? null : et.id)}
+                className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
+                  selectedExamTypeId === et.id
+                    ? "bg-indigo-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {et.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Results */}
+      {/* Sonuçlar */}
       {isLoading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -112,7 +124,17 @@ export default function Educators() {
             <Search className="w-10 h-10 text-slate-400" />
           </div>
           <h3 className="text-xl font-semibold text-slate-900">Eğitici bulunamadı</h3>
-          <p className="text-slate-500 mt-2">Farklı bir arama terimi deneyin</p>
+          <p className="text-slate-500 mt-2">
+            {selectedExamTypeId ? "Bu uzmanlık alanında eğitici yok" : "Farklı bir arama terimi deneyin"}
+          </p>
+          {selectedExamTypeId && (
+            <button
+              onClick={() => setSelectedExamTypeId(null)}
+              className="mt-4 text-sm text-indigo-600 hover:underline"
+            >
+              Tüm eğiticileri göster
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -120,8 +142,8 @@ export default function Educators() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredEducators.map((educator) => (
               <Link
-                key={educator.email}
-                to={createPageUrl("EducatorProfile") + `?email=${encodeURIComponent(educator.email)}`}
+                key={educator.id}
+                to={createPageUrl("EducatorProfile") + `?id=${encodeURIComponent(educator.id)}`}
                 className="group bg-white rounded-2xl border border-slate-100 p-6 hover:shadow-xl hover:border-indigo-200 transition-all"
               >
                 <div className="flex items-start gap-4">

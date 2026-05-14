@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { PaymentModal } from "@/components/ui/PaymentModal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,8 +32,8 @@ const difficultyLabels = {
 };
 
 export default function TestDetail() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const testId = urlParams.get("id");
+  const [searchParams] = useSearchParams();
+  const testId = searchParams.get("id");
   const queryClient = useQueryClient();
 
   const { user } = useAuth();
@@ -41,6 +42,7 @@ export default function TestDetail() {
   const { purchasesEnabled } = useServiceStatus();
   const [testRating, setTestRating] = useState(0);
   const [testComment, setTestComment] = useState("");
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   const { data: purchases = [] } = useQuery({
     queryKey: ["purchases", user?.id, testId],
@@ -50,47 +52,29 @@ export default function TestDetail() {
 
   const isPurchased = purchases.length > 0;
 
-  const { data: test, isLoading } = useQuery({
-    queryKey: ["test", testId, isPurchased],
+  // Paketin detay bilgisi — her zaman marketplace API'den çekilir (snapshot sorunlarını önler)
+  const { data: test, isLoading, isError: isTestError } = useQuery({
+    queryKey: ["test", testId],
     queryFn: async () => {
-      // If purchased, use snapshot
-      if (purchases.length > 0) {
-        return {
-          ...purchases[0].test_package_snapshot,
-          educator_email: purchases[0].educator_email,
-        };
-      }
-      // Otherwise fetch current test (for unpurchased tests)
-      const tests = await entities.TestPackage.filter({ id: testId, is_published: true });
-      return tests[0];
+      const tests = await entities.TestPackage.filter({ id: testId });
+      return tests[0] ?? null;
     },
-    enabled: !!testId && (purchases !== undefined),
+    enabled: !!testId,
+    staleTime: 60 * 1000,
+    retry: 2, // 404 dışı geçici hatalarda (500, ağ) TanStack Query 2 kez daha dener
   });
 
   const { data: questions = [] } = useQuery({
-    queryKey: ["questions", testId, isPurchased],
-    queryFn: () => {
-      // If purchased, use snapshot
-      if (purchases.length > 0 && purchases[0].questions_snapshot) {
-        return purchases[0].questions_snapshot;
-      }
-      // Otherwise fetch current questions
-      return entities.Question.filter({ test_package_id: testId });
-    },
-    enabled: !!testId && (purchases !== undefined),
+    queryKey: ["questions", testId],
+    queryFn: () => entities.Question.filter({ test_package_id: testId }),
+    enabled: !!testId,
   });
 
+  // Paket içindeki ExamTest listesi — test._tests zaten marketplace yanıtından geliyor
   const { data: tests = [] } = useQuery({
-    queryKey: ["tests", testId, isPurchased],
-    queryFn: () => {
-      // If purchased, use snapshot (only if not empty)
-      if (purchases.length > 0 && purchases[0].tests_snapshot && purchases[0].tests_snapshot.length > 0) {
-        return purchases[0].tests_snapshot;
-      }
-      // Otherwise fetch current tests
-      return entities.Test.filter({ test_package_id: testId }, "order_index");
-    },
-    enabled: !!testId && (purchases !== undefined),
+    queryKey: ["tests_in_pkg", testId],
+    queryFn: () => entities.Test.filter({ test_package_id: testId }, "order_index"),
+    enabled: !!testId,
   });
 
   const realQuestionCount = questions.length;
@@ -163,21 +147,6 @@ export default function TestDetail() {
     }
   });
 
-  const purchaseMutation = useMutation({
-    mutationFn: async () => {
-      await entities.Purchase.create({
-        test_package_id: test.id,
-      });
-    },
-    onSuccess: () => {
-      toast.success("Test başarıyla satın alındı!");
-      queryClient.invalidateQueries({ queryKey: ["purchases"] });
-    },
-    onError: () => {
-      toast.error("Satın alma işlemi başarısız oldu");
-    }
-  });
-
   const handlePurchase = () => {
     if (!user) {
       navigate(loginUrl(), { replace: true });
@@ -187,7 +156,7 @@ export default function TestDetail() {
       toast.warning("Satın alma servislerimiz bakımdadır. Lütfen daha sonra tekrar deneyin.");
       return;
     }
-    purchaseMutation.mutate();
+    setIsPaymentModalOpen(true);
   };
 
   const handleSubmitTestReview = async () => {
@@ -208,7 +177,7 @@ export default function TestDetail() {
       toast.success("Test puanınız kaydedildi!");
       setTestRating(0);
       setTestComment("");
-    } catch (error) {
+    } catch {
       toast.error("Bir hata oluştu!");
     }
   };
@@ -226,10 +195,25 @@ export default function TestDetail() {
   if (!test) {
     return (
       <div className="text-center py-20">
-        <h2 className="text-2xl font-bold text-slate-900">Test bulunamadı</h2>
-        <Link to={createPageUrl("Explore")} className="text-indigo-600 mt-4 inline-block">
-          Testlere Dön
-        </Link>
+        <h2 className="text-2xl font-bold text-slate-900">
+          {isTestError ? "Test yüklenemedi" : "Test bulunamadı"}
+        </h2>
+        <p className="text-slate-500 mt-2 text-sm">
+          {isTestError ? "Sunucuya ulaşılamadı, lütfen sayfayı yenileyin." : "Bu test mevcut değil veya yayından kaldırılmış olabilir."}
+        </p>
+        <div className="flex gap-3 justify-center mt-4">
+          {isTestError && (
+            <button
+              onClick={() => window.location.reload()}
+              className="text-indigo-600 underline text-sm"
+            >
+              Yenile
+            </button>
+          )}
+          <Link to={createPageUrl("Explore")} className="text-indigo-600 inline-block text-sm">
+            Testlere Dön
+          </Link>
+        </div>
       </div>
     );
   }
@@ -432,16 +416,9 @@ export default function TestDetail() {
                   const isCompleted = !!testResult;
                   const isInProgress = !!testProgress;
                   
-                  let buttonText = "Teste Başla";
                   let buttonStyle = { backgroundColor: '#10b981' };
-                  
-                  if (isCompleted) {
-                    buttonText = "Gözden Geçir";
-                    buttonStyle = { backgroundColor: '#6b7280' };
-                  } else if (isInProgress) {
-                    buttonText = "Teste Devam Et";
-                    buttonStyle = { backgroundColor: '#f59e0b' };
-                  }
+                  if (isCompleted) buttonStyle = { backgroundColor: '#6b7280' };
+                  else if (isInProgress) buttonStyle = { backgroundColor: '#f59e0b' };
                   
                   return (
                     <Link 
@@ -474,10 +451,9 @@ export default function TestDetail() {
                 <Button
                   className="w-full h-12 bg-indigo-600 hover:bg-indigo-700"
                   onClick={handlePurchase}
-                  disabled={purchaseMutation.isPending}
                 >
                   <ShoppingCart className="w-5 h-5 mr-2" />
-                  {purchaseMutation.isPending ? "İşleniyor..." : "Satın Al"}
+                  Satın Al
                 </Button>
               )
             )}
@@ -498,6 +474,11 @@ export default function TestDetail() {
           </div>
         </div>
       </div>
+      <PaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        test={test}
+      />
     </div>
   );
 }

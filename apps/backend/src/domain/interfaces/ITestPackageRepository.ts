@@ -1,12 +1,30 @@
+export interface TestPackageQuestionOption {
+  id: string;
+  content: string;
+  mediaUrl: string | null;
+  isCorrect: boolean;
+}
+
+export interface TestPackageQuestion {
+  id: string;
+  content: string;
+  mediaUrl: string | null;
+  order: number;
+  topicId: string | null;
+  options: TestPackageQuestionOption[];
+}
+
 export interface TestPackageTest {
   id: string;
   title: string;
+  examTypeId: string | null;
   isTimed: boolean;
   duration: number | null;
   durationSec: number | null;
   questionCount: number | null;
   status: string;
   publishedAt: Date | null;
+  questions?: TestPackageQuestion[];
 }
 
 export interface TestPackageRecord {

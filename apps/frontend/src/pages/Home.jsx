@@ -266,10 +266,15 @@ export default function Home() {
   const { data: packages = [], isLoading: pkgsLoading } = useQuery({
     queryKey: ["home-popular-packages", examTypeIdsParam],
     queryFn: async () => {
+      // /marketplace/packages kullan — TestPackage ID döner (tek kaynak)
       const params = new URLSearchParams({ limit: "6" });
-      if (examTypeIdsParam) params.set("examTypeIds", examTypeIdsParam);
-      const { data } = await api.get(`/site/popular-packages?${params}`);
-      return Array.isArray(data) ? data : [];
+      if (examTypeIdsParam) {
+        // examTypeIdsParam virgülle ayrılmış olabilir, ilk değeri al
+        const firstType = examTypeIdsParam.split(",")[0]?.trim();
+        if (firstType) params.set("examTypeId", firstType);
+      }
+      const { data } = await api.get(`/marketplace/packages?${params}`);
+      return Array.isArray(data?.items) ? data.items : [];
     },
     staleTime: 3 * 60 * 1000,
   });

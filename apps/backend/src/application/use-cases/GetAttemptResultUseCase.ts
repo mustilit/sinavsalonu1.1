@@ -27,16 +27,30 @@ export class GetAttemptResultUseCase {
     const test = await this.exams.findById(attempt.testId);
     if (!test) throw new BadRequestException({ code: 'TEST_NOT_FOUND', message: 'Test not found' });
 
-    // Test soru sırasını koru — cevap matrisi oluşturmak için ID listesi
-    const questionIds = (test.questions ?? []).map((q: any) => q.id);
-
     // questionId → seçilen seçenek ID'si eşlemesi
     const answerRows = await this.answers.findByAttemptId(attemptId);
     const answersMap: Record<string, string | null> = {};
     for (const a of answerRows) answersMap[a.questionId] = a.selectedOptionId ?? null;
 
-    // Her soru için doğru seçenek ID'lerini toplu çek (N+1 önler)
-    const correctMap = await this.exams.findCorrectOptionIdsByQuestionIds(questionIds);
+    // Snapshot varsa canlı tabloları okumak yerine snapshot'tan hesapla
+    const snapshot: Array<{ id: string; options: Array<{ id: string; isCorrect: boolean }> }> | null =
+      (attempt as any).questionsSnapshot ?? null;
+
+    let questionIds: string[];
+    let correctMap: Record<string, string[]>;
+
+    if (snapshot && snapshot.length > 0) {
+      // Snapshot'tan soru listesi ve doğru seçenekler
+      questionIds = snapshot.map((q) => q.id);
+      correctMap = {};
+      for (const q of snapshot) {
+        correctMap[q.id] = q.options.filter((o) => o.isCorrect).map((o) => o.id);
+      }
+    } else {
+      // Eski attempt'ler için (snapshot yoksa) canlı tablodan oku
+      questionIds = (test.questions ?? []).map((q: any) => q.id);
+      correctMap = await this.exams.findCorrectOptionIdsByQuestionIds(questionIds);
+    }
 
     // isCorrect: null → boş, true → doğru, false → yanlış
     const questions = questionIds.map((qid: string, idx: number) => {

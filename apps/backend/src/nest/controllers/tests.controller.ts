@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Put, Param, Get, Req, Patch, Inject } from '@nestjs/common';
+import { Controller, Post, Body, Put, Param, Get, Req, Patch, Delete, Inject } from '@nestjs/common';
 import { Roles } from '../decorators/roles.decorator';
 import { Public } from '../decorators/public.decorator';
 import { CreateTestUseCase } from '../../application/use-cases/CreateTestUseCase';
@@ -10,6 +10,7 @@ import { UnpublishTestUseCase } from '../../application/use-cases/UnpublishTestU
 import { UpdateTestUseCase } from '../../application/use-cases/UpdateTestUseCase';
 import { UpdateQuestionUseCase } from '../../application/use-cases/UpdateQuestionUseCase';
 import { UpdateOptionUseCase } from '../../application/use-cases/UpdateOptionUseCase';
+import { DeleteQuestionUseCase } from '../../application/use-cases/DeleteQuestionUseCase';
 import { CreateTestDto } from './dto/create-test.dto';
 import { UpdateTestDto } from './dto/update-test.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
@@ -32,6 +33,7 @@ export class TestsController {
     @Inject(UpdateTestUseCase) private readonly updateTestUC: UpdateTestUseCase,
     @Inject(UpdateQuestionUseCase) private readonly updateQuestionUC: UpdateQuestionUseCase,
     @Inject(UpdateOptionUseCase) private readonly updateOptionUC: UpdateOptionUseCase,
+    @Inject(DeleteQuestionUseCase) private readonly deleteQuestionUC: DeleteQuestionUseCase,
   ) {}
 
   /** Yeni test paketi oluşturur — educatorId JWT token'dan alınır, DTO'dan gelmez */
@@ -119,6 +121,18 @@ export class TestsController {
       content: body.content,
       isCorrect: body.isCorrect,
     }, actorId);
+  }
+
+  @Delete('tests/:id/questions/:questionId')
+  @Roles('EDUCATOR', 'ADMIN')
+  async deleteQuestion(
+    @Param('id') testId: string,
+    @Param('questionId') questionId: string,
+    @Req() req: any,
+  ) {
+    const actorId = (req as any).user?.id;
+    await this.deleteQuestionUC.execute(testId, questionId, actorId);
+    return { success: true };
   }
 
   @Public()

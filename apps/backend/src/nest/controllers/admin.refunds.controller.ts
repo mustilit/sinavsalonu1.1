@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Req, Query, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Req, Query, HttpCode, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiConflictResponse, ApiBadRequestResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { ParseUUIDPipe } from '../pipes/parse-uuid.pipe';
@@ -16,9 +16,9 @@ import { ListRefundsQueryDto } from './dto/list-refunds-query.dto';
 @ApiTags('admin/refunds')
 export class AdminRefundsController {
   constructor(
-    private readonly approveRefund: ApproveRefundUseCase,
-    private readonly rejectRefund: RejectRefundUseCase,
-    private readonly listPendingRefunds: ListPendingRefundsUseCase,
+    @Inject(ApproveRefundUseCase) private readonly approveRefund: ApproveRefundUseCase,
+    @Inject(RejectRefundUseCase) private readonly rejectRefund: RejectRefundUseCase,
+    @Inject(ListPendingRefundsUseCase) private readonly listPendingRefunds: ListPendingRefundsUseCase,
   ) {}
 
   @Get()

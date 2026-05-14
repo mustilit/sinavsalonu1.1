@@ -1,4 +1,4 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get, Req, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiForbiddenResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { ListMyPurchasesUseCase } from '../../application/use-cases/ListMyPurchasesUseCase';
@@ -10,7 +10,7 @@ import { ListMyPurchasesUseCase } from '../../application/use-cases/ListMyPurcha
 @Controller('me')
 @ApiTags('me')
 export class MePurchasesController {
-  constructor(private readonly listMyPurchases: ListMyPurchasesUseCase) {}
+  constructor(@Inject(ListMyPurchasesUseCase) private readonly listMyPurchases: ListMyPurchasesUseCase) {}
 
   @Get('purchases')
   @Roles('CANDIDATE', 'ADMIN')

@@ -25,7 +25,11 @@ export class GetAttemptStateUseCase {
     const answerMap: Record<string, string | null> = {};
     for (const a of answers) answerMap[a.questionId] = a.selectedOptionId ?? null;
 
-    const questions = (test.questions ?? []).map((q: any, idx: number) => {
+    // Snapshot varsa canlı soru listesi yerine onu kullan (eğitici güncellemelerinden bağımsız)
+    const questionSource: Array<{ id: string }> =
+      (attempt as any).questionsSnapshot ?? test.questions ?? [];
+
+    const questions = questionSource.map((q: any, idx: number) => {
       const selected = answerMap[q.id] ?? null;
       return { id: q.id, index: idx + 1, answered: selected !== null, selectedOptionId: selected };
     });

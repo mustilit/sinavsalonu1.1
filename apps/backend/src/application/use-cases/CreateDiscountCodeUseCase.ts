@@ -1,7 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { prisma } from '../../infrastructure/database/prisma';
 import { AppError } from '../errors/AppError';
-import { ensureEducatorActive } from '../policies/ensureEducatorActive';
 import type { IUserRepository } from '../../domain/interfaces/IUserRepository';
 import type { IAuditLogRepository } from '../../domain/interfaces/IAuditLogRepository';
 
@@ -42,8 +41,10 @@ export class CreateDiscountCodeUseCase {
   ) {
     const user = await this.userRepo.findById(educatorId);
     if (!user) throw new AppError('USER_NOT_FOUND', 'User not found', 404);
-    // Yalnızca aktif eğiticiler indirim kodu oluşturabilir
-    ensureEducatorActive(user);
+    // Askıya alınmış hesap indirim kodu oluşturamaz; educatorApprovedAt kontrolü yok
+    // (paket oluşturmayla tutarlı: onay beklemeyen eğiticiler de kullanabilir)
+    if (user.role !== 'EDUCATOR') throw new AppError('USER_NOT_EDUCATOR', 'User is not an educator', 403);
+    if (user.status === 'SUSPENDED') throw new AppError('EDUCATOR_SUSPENDED', 'Educator account is suspended', 403);
 
     // Kod normalize edilir: boşluklar temizlenir ve büyük harfe çevrilir
     const code = input.code.trim().toUpperCase();
@@ -98,6 +99,7 @@ export class CreateDiscountCodeUseCase {
       percentOff: created.percentOff,
       maxUses: created.maxUses,
       usedCount: created.usedCount,
+      isActive: (created as any).isActive ?? true,
       validFrom: created.validFrom,
       validUntil: created.validUntil,
       description: created.description,

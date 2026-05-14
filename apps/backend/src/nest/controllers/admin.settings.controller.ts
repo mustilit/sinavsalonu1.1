@@ -5,6 +5,8 @@ import type { PrismaClient } from '@prisma/client';
 import { GetAdminSettingsUseCase } from '../../application/use-cases/GetAdminSettingsUseCase';
 import { UpdateAdminSettingsUseCase } from '../../application/use-cases/UpdateAdminSettingsUseCase';
 import { UpdateAdminSettingsDto } from './dto/update-admin-settings.dto';
+import { GetPaymentSettingsUseCase } from '../../application/use-cases/GetPaymentSettingsUseCase';
+import { UpdatePaymentSettingsUseCase } from '../../application/use-cases/UpdatePaymentSettingsUseCase';
 
 /**
  * Admin uygulama ayarları — satın alma kill-switch gibi özellik bayraklarını
@@ -44,5 +46,25 @@ export class AdminSettingsController {
       adPurchasesEnabled: dto.adPurchasesEnabled,
       minPackagePriceCents: dto.minPackagePriceCents,
     });
+  }
+
+  @Get('payment-settings')
+  @Roles('ADMIN')
+  @ApiBearerAuth('bearer')
+  @ApiOkResponse({ description: 'Payment provider settings' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  async getPaymentSettings() {
+    const uc = new GetPaymentSettingsUseCase();
+    return uc.execute();
+  }
+
+  @Patch('payment-settings')
+  @Roles('ADMIN')
+  @ApiBearerAuth('bearer')
+  @ApiOkResponse({ description: 'Payment settings updated' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  async updatePaymentSettings(@Body() body: any) {
+    const uc = new UpdatePaymentSettingsUseCase();
+    return uc.execute(body);
   }
 }

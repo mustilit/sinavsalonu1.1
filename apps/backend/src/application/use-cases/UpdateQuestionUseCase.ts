@@ -5,9 +5,9 @@ import { AppError } from '../errors/AppError';
 import { ensureEducatorActive } from '../policies/ensureEducatorActive';
 
 /**
- * Soru ve şık güncelleme. Satın alınmış/cevaplanmış testleri etkilemez:
- * - attempt_answers olan sorular güncellenemez
- * - attempt_answers olan şıklar güncellenemez
+ * Soru ve şık güncelleme.
+ * Eğitici her zaman güncelleyebilir; önceden attempt başlatmış adaylar
+ * questionsSnapshot sayesinde orijinal versiyonu görmeye devam eder.
  */
 export class UpdateQuestionUseCase {
   constructor(
@@ -35,15 +35,6 @@ export class UpdateQuestionUseCase {
 
     if (actorId && test.educatorId && test.educatorId !== actorId) {
       throw new AppError('FORBIDDEN_NOT_OWNER', 'Only the educator who owns the test can update it', 403);
-    }
-
-    const hasAttemptAnswers = await this.attemptRepository.hasAnswersForQuestion(questionId);
-    if (hasAttemptAnswers) {
-      throw new AppError(
-        'QUESTION_HAS_ATTEMPTS',
-        'Cannot update question: it has been answered. Purchased/attempted tests are not affected.',
-        409,
-      );
     }
 
     return this.examRepository.updateQuestion(questionId, updates);

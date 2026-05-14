@@ -13,6 +13,7 @@ import { UnpublishTestUseCase } from '../../../application/use-cases/UnpublishTe
 import { UpdateTestUseCase } from '../../../application/use-cases/UpdateTestUseCase';
 import { UpdateQuestionUseCase } from '../../../application/use-cases/UpdateQuestionUseCase';
 import { UpdateOptionUseCase } from '../../../application/use-cases/UpdateOptionUseCase';
+import { DeleteQuestionUseCase } from '../../../application/use-cases/DeleteQuestionUseCase';
 import { PrismaExamRepository } from '../../../infrastructure/repositories/PrismaExamRepository';
 import { PrismaAuditLogRepository } from '../../../infrastructure/repositories/PrismaAuditLogRepository';
 import { PrismaUserRepository } from '../../../infrastructure/repositories/PrismaUserRepository';
@@ -87,6 +88,10 @@ import { EXAM_TYPE_REPO, TOPIC_REPO, USER_REPO } from '../../../application/cons
       useFactory: (examRepo: PrismaExamRepository, userRepo: PrismaUserRepository, attemptRepo: PrismaAttemptRepository) =>
         new UpdateOptionUseCase(examRepo, userRepo, attemptRepo),
       inject: [PrismaExamRepository, USER_REPO, PrismaAttemptRepository],
+    },
+    {
+      provide: DeleteQuestionUseCase,
+      useFactory: () => new DeleteQuestionUseCase(),
     },
   ],
   exports: [TestsService],

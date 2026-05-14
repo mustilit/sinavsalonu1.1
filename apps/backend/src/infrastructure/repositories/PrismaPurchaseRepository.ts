@@ -22,26 +22,32 @@ export class PrismaPurchaseRepository implements IPurchaseRepository {
   }
 
   async findByCandidateId(candidateId: string): Promise<PurchaseWithAttemptRecord[]> {
-    const withTest = await prisma.purchase.findMany({
+    const withRelations = await (prisma.purchase as any).findMany({
       where: { candidateId },
       orderBy: { createdAt: 'desc' },
       include: {
         test: { select: { id: true, title: true, status: true, examTypeId: true } },
+        package: { select: { id: true, title: true, priceCents: true } },
       },
     });
+
     const attempts = await prisma.testAttempt.findMany({
       where: { candidateId },
       select: { id: true, testId: true, status: true, startedAt: true, completedAt: true, submittedAt: true, score: true, overtimeSeconds: true },
     });
     const attemptByTest = new Map(attempts.map((a) => [a.testId, a]));
-    return withTest.map((p) => ({
+
+    return (withRelations as any[]).map((p) => ({
       id: p.id,
-      testId: p.testId,
+      testId: p.testId ?? null,
+      packageId: p.packageId ?? null,
       candidateId: p.candidateId,
       createdAt: p.createdAt,
-      amountCents: p.amountCents,
-      test: p.test,
-      attempt: attemptByTest.get(p.testId) ?? null,
+      amountCents: p.amountCents ?? null,
+      paymentStatus: p.status ?? null,
+      test: p.test ?? null,
+      package: p.package ?? null,
+      attempt: p.testId ? (attemptByTest.get(p.testId) ?? null) : null,
     }));
   }
 }

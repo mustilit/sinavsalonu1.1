@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { GetAdminAdReportUseCase } from '../../application/use-cases/GetAdminAdReportUseCase';
@@ -12,7 +12,7 @@ import { GetAdminAdReportUseCase } from '../../application/use-cases/GetAdminAdR
 @ApiTags('admin/ads/report')
 @ApiBearerAuth('bearer')
 export class AdminAdReportController {
-  constructor(private readonly reportUC: GetAdminAdReportUseCase) {}
+  constructor(@Inject(GetAdminAdReportUseCase) private readonly reportUC: GetAdminAdReportUseCase) {}
 
   /**
    * Reklam satın alım raporunu döndürür.

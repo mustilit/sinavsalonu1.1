@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Body, Req, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Req, HttpCode, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiNotFoundResponse, ApiConflictResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Public } from '../../decorators/public.decorator';
 import { Roles } from '../../decorators/roles.decorator';
@@ -11,8 +11,8 @@ import { AcceptContractDto } from './dto/accept-contract.dto';
 @ApiTags('contracts')
 export class ContractsController {
   constructor(
-    private readonly getActiveContract: GetActiveContractUseCase,
-    private readonly acceptContract: AcceptContractUseCase,
+    @Inject(GetActiveContractUseCase) private readonly getActiveContract: GetActiveContractUseCase,
+    @Inject(AcceptContractUseCase) private readonly acceptContract: AcceptContractUseCase,
   ) {}
 
   @Get('active')

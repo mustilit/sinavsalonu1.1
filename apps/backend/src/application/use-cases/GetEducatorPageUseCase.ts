@@ -16,7 +16,7 @@ export class GetEducatorPageUseCase {
     const page = Math.max(1, opts?.page ?? 1);
     const limit = Math.min(50, Math.max(1, opts?.limit ?? 20));
 
-    const educator = await this.usersRepo.findEducatorById(educatorId);
+    const educator = await this.usersRepo.findById(educatorId);
     if (!educator || educator.role !== 'EDUCATOR') throw new Error('EDUCATOR_NOT_FOUND');
 
     // sortBy: dışarıdan 'PRICE' veya 'NEWEST' gelir; içeride kolon adına eşlenir

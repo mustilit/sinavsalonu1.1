@@ -26,9 +26,10 @@ export class PrismaAttemptRepository implements IAttemptRepository {
   }
 
   async findAttemptById(attemptId: string): Promise<TestAttempt | null> {
-    const row = await prisma.testAttempt.findUnique({
+    // questionsSnapshot, prisma generate sonrası type'a eklenecek; şimdilik any cast
+    const row: any = await (prisma.testAttempt as any).findUnique({
       where: { id: attemptId },
-      select: { id: true, candidateId: true, testId: true, status: true, score: true, startedAt: true, completedAt: true, submittedAt: true },
+      select: { id: true, candidateId: true, testId: true, status: true, score: true, startedAt: true, completedAt: true, submittedAt: true, questionsSnapshot: true },
     });
     if (!row) return null;
     return {
@@ -37,9 +38,10 @@ export class PrismaAttemptRepository implements IAttemptRepository {
       candidateId: row.candidateId,
       startedAt: row.startedAt,
       completedAt: row.completedAt,
-      status: (row.status as any) ?? 'IN_PROGRESS',
+      status: row.status ?? 'IN_PROGRESS',
       score: row.score ?? null,
       submittedAt: row.submittedAt ?? null,
+      questionsSnapshot: row.questionsSnapshot ?? null,
     };
   }
 

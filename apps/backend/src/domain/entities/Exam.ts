@@ -54,4 +54,12 @@ export interface TestAttempt {
   pausedAt?: Date | null;
   finishedAt?: Date | null;
   remainingSec?: number | null;
+  // Attempt başlangıcındaki soru versiyonu snapshot'ı
+  questionsSnapshot?: Array<{
+    id: string;
+    content: string;
+    mediaUrl?: string | null;
+    order: number;
+    options: Array<{ id: string; content: string; mediaUrl?: string | null; isCorrect: boolean }>;
+  }> | null;
 }

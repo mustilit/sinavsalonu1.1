@@ -5,6 +5,7 @@ export interface ExamWithQuestions extends ExamTest {
   /** Türetilebilir: questions.length veya repo _count/include */
   questionCount?: number;
   hasSolutions?: boolean;
+  packageId?: string | null;
 }
 
 export interface IExamRepository {

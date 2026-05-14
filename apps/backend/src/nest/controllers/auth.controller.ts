@@ -14,6 +14,7 @@ import { PrismaUserRepository } from '../../infrastructure/repositories/PrismaUs
 import { PasswordService } from '../../infrastructure/services/PasswordService';
 import { JwtService } from '../../infrastructure/services/JwtService';
 import { LoginBruteforceGuard } from '../guards/login-bruteforce.guard';
+import { delKey } from '../common/rate-limit';
 import { prisma } from '../../infrastructure/database/prisma';
 
 /**
@@ -106,7 +107,7 @@ export class AuthController {
   @HttpCode(200)
   @Public()
   @UseGuards(LoginBruteforceGuard)
-  async login(@Body() body: any) {
+  async login(@Body() body: any, @Req() req: any) {
     const email = body?.email != null ? String(body.email).trim().toLowerCase() : '';
     const password = body?.password != null ? String(body.password) : '';
     if (!email || !password) {
@@ -118,7 +119,16 @@ export class AuthController {
     try {
       // DI bazen dev ortamında undefined kalabiliyor (tsx watch + hot reload). Fail-safe:
       const uc = this.loginUseCase ?? new LoginUseCase(new PrismaUserRepository(), new PasswordService(), new JwtService());
-      return await uc.execute({ email, password });
+      const result = await uc.execute({ email, password });
+      // Başarılı giriş → brute-force sayaçlarını sıfırla (başarılı girişler bloke etmesin)
+      const ip = (req.headers?.['x-forwarded-for']
+        ? String(req.headers['x-forwarded-for']).split(',')[0].trim()
+        : req.ip || 'unknown');
+      await Promise.allSettled([
+        delKey(`login:ip:${ip}`),
+        delKey(`login:email:${email}`),
+      ]);
+      return result;
     } catch (err: any) {
       if (err?.message === 'INVALID_CREDENTIALS') {
         throw new HttpException({ error: 'E-posta veya şifre hatalı.' }, HttpStatus.UNAUTHORIZED);

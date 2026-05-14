@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Query, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Query, Param, Inject } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { Roles } from '../decorators/roles.decorator';
 import { CreateAdPackageDto } from './dto/create-ad-package.dto';
@@ -13,10 +13,10 @@ import { DeleteAdPackageUseCase } from '../../application/use-cases/DeleteAdPack
 @ApiTags('admin/ad-packages')
 export class AdminAdPackagesController {
   constructor(
-    private readonly listUC: ListAdPackagesUseCase,
-    private readonly createUC: CreateAdPackageUseCase,
-    private readonly updateUC: UpdateAdPackageUseCase,
-    private readonly deleteUC: DeleteAdPackageUseCase,
+    @Inject(ListAdPackagesUseCase) private readonly listUC: ListAdPackagesUseCase,
+    @Inject(CreateAdPackageUseCase) private readonly createUC: CreateAdPackageUseCase,
+    @Inject(UpdateAdPackageUseCase) private readonly updateUC: UpdateAdPackageUseCase,
+    @Inject(DeleteAdPackageUseCase) private readonly deleteUC: DeleteAdPackageUseCase,
   ) {}
 
   @Get()

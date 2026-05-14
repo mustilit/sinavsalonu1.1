@@ -121,6 +121,7 @@ model User {
   email              String     @unique
   username           String     @unique
   passwordHash       String
+  bio                String?
   role               UserRole   @default(CANDIDATE)
   status             UserStatus @default(ACTIVE)
   educatorApprovedAt DateTime?
@@ -310,6 +311,10 @@ model TestAttempt {
   // null → süre aşımı yok (zamanında teslim veya süreli olmayan test).
   overtimeSeconds Int?
 
+  // Attempt başladığı andaki soru+seçenek+doğru cevap snapshot'ı (JSON).
+  // Eğitici sonradan soruları güncellese bile bu attempt için orijinal versiyon korunur.
+  questionsSnapshot Json?
+
   test       ExamTest        @relation(fields: [testId], references: [id], onDelete: Cascade)
   candidate  User            @relation("userAttempts", fields: [candidateId], references: [id], onDelete: Cascade)
   answers    AttemptAnswer[]
@@ -369,6 +374,8 @@ model Purchase {
 
   packageId String?
   package   TestPackage? @relation(fields: [packageId], references: [id])
+
+  paymentProvider String? // "iyzico" | "google_pay" | "amazon_pay"
 
   @@unique([testId, candidateId])
   @@index([tenantId])
@@ -458,6 +465,7 @@ model DiscountCode {
   percentOff  Int // 0-100
   maxUses     Int? // nullable unlimited
   usedCount   Int       @default(0)
+  isActive    Boolean   @default(true) // false = eğitici tarafından pasife alındı
   validFrom   DateTime?
   validUntil  DateTime?
   createdAt   DateTime  @default(now())
@@ -701,6 +709,26 @@ model IdempotencyKey {
   @@unique([userId, route, key])
   @@index([expiresAt])
   @@index([userId, route])
+}
+
+// Ödeme sağlayıcı ayarları — admin panelinden yönetilir
+model PaymentSettings {
+  id                  Int      @id @default(1)
+  mode                String   @default("test")    // "test" | "live"
+  iyzicoEnabled       Boolean  @default(true)
+  iyzicoApiKey        String?
+  iyzicoSecretKey     String?
+  iyzicoBaseUrl       String   @default("https://sandbox-api.iyzipay.com")
+  googlePayEnabled    Boolean  @default(true)
+  googlePayMerchantId String?
+  amazonPayEnabled    Boolean  @default(true)
+  amazonPayMerchantId String?
+  companyName         String?
+  companyTaxId        String?
+  companyAddress      String?
+  updatedAt           DateTime @updatedAt
+
+  @@map("payment_settings")
 }
 
 // Worker rolü: sınırlı admin; hangi sayfalara erişebildiği burada saklanır

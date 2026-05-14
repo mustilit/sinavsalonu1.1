@@ -102,7 +102,7 @@ import { ListEducatorAdPurchasesUseCase } from '../application/use-cases/ListEdu
 import { GetEducatorAdStatsUseCase } from '../application/use-cases/GetEducatorAdStatsUseCase';
 import { ListEducatorTestsUseCase } from '../application/use-cases/ListEducatorTestsUseCase';
 import { ListEducatorPurchasesUseCase } from '../application/use-cases/ListEducatorPurchasesUseCase';
-import { DeleteDiscountCodeUseCase } from '../application/use-cases/DeleteDiscountCodeUseCase';
+import { ToggleDiscountCodeUseCase } from '../application/use-cases/ToggleDiscountCodeUseCase';
 import { AttemptsController } from './controllers/attempts.controller';
 import { MetricsController } from './controllers/metrics.controller';
 import { AdminCandidatesController } from './controllers/admin.candidates.controller';
@@ -379,6 +379,7 @@ const throttleDisabled = process.env.THROTTLE_DISABLED === '1';
     {
       provide: ListEducatorAdPurchasesUseCase,
       useFactory: (userRepo: PrismaUserRepository) => new ListEducatorAdPurchasesUseCase(userRepo),
+      inject: [USER_REPO],
     },
     // GetEducatorAdStatsUseCase bağımlılık gerektirmiyor — doğrudan prisma kullanır
     GetEducatorAdStatsUseCase,
@@ -393,8 +394,8 @@ const throttleDisabled = process.env.THROTTLE_DISABLED === '1';
       inject: [USER_REPO],
     },
     {
-      provide: DeleteDiscountCodeUseCase,
-      useFactory: (userRepo: PrismaUserRepository) => new DeleteDiscountCodeUseCase(userRepo),
+      provide: ToggleDiscountCodeUseCase,
+      useFactory: (userRepo: PrismaUserRepository) => new ToggleDiscountCodeUseCase(userRepo),
       inject: [USER_REPO],
     },
     GetCandidateReportUseCase,

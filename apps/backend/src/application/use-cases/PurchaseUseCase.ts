@@ -26,7 +26,7 @@ export class PurchaseUseCase {
    * @param candidateId  - Satın almayı yapan adayın ID'si.
    * @param discountCode - Opsiyonel indirim kodu.
    */
-  async execute(testId: string, candidateId: string, discountCode?: string) {
+  async execute(testId: string, candidateId: string, discountCode?: string, paymentProvider?: string) {
     if (!testId || !candidateId) throw new BadRequestException({ code: 'INVALID_INPUT', message: 'Missing testId or candidateId' });
 
     // FR-Y-05: Satın alma kill-switch'i — admin panelinden geçici durdurulabilir
@@ -36,9 +36,36 @@ export class PurchaseUseCase {
     }
 
     // Ön kontroller: test yayınlanmış olmalı, aday aktif olmalı
-    const test = await this.prisma.examTest.findUnique({ where: { id: testId } });
-    if (!test) throw new BadRequestException({ code: 'TEST_NOT_FOUND', message: 'Test not found' });
-    if ((test as any).status && (test as any).status !== 'PUBLISHED') {
+    // testId bir ExamTest ID'si olabilir (eski akış) veya TestPackage ID'si (yeni akış)
+    const foundTest = await this.prisma.examTest.findUnique({ where: { id: testId } });
+    let resolvedTest: any;
+    let packageId: string | undefined;
+
+    if (!foundTest) {
+      // TestPackage ID ile satın alma denemesi — paketteki ilk testi bul
+      const pkg = await (this.prisma.testPackage as any).findUnique({
+        where: { id: testId },
+        include: { tests: { where: { deletedAt: null }, orderBy: { createdAt: 'asc' }, take: 1 } },
+      });
+      if (!pkg) throw new BadRequestException({ code: 'TEST_NOT_FOUND', message: 'Test not found' });
+      if (!pkg.publishedAt) throw new BadRequestException({ code: 'TEST_NOT_PUBLISHED', message: 'Package is not published' });
+      if (!pkg.tests?.length) throw new BadRequestException({ code: 'PACKAGE_EMPTY', message: 'Package has no tests' });
+      resolvedTest = { ...pkg.tests[0] };
+      packageId = pkg.id;
+      // priceCents paket fiyatından alınır; test fiyatı sıfır olabilir
+      if (!resolvedTest.priceCents && pkg.priceCents != null) {
+        resolvedTest.priceCents = pkg.priceCents;
+      }
+    } else {
+      resolvedTest = foundTest;
+    }
+
+    const test = resolvedTest;
+
+    // ExamTest status kontrolü yalnızca standalone (paket dışı) alımlarda geçerlidir.
+    // TestPackage ID ile alımda paketin publishedAt kontrolü zaten yapıldı (yukarıda).
+    // Paket içindeki ExamTest'ler DRAFT kalabilir; erişimi paketin yayın durumu belirler.
+    if (!packageId && test.status && test.status !== 'PUBLISHED') {
       throw new BadRequestException({ code: 'TEST_NOT_PUBLISHED', message: 'Test is not published' });
     }
 
@@ -84,19 +111,23 @@ export class PurchaseUseCase {
       // Satın alma, deneme oluşturma ve audit kaydı tek transaction içinde yapılır
       const result = await prismaRetry(() =>
         this.prisma.$transaction(async (tx) => {
+        // testId: ExamTest ID'si (packageId varsa test.id kullanılır, yoksa orijinal testId)
+        const examTestId = test.id;
         const purchase = await tx.purchase.create({
           data: {
             tenantId,
-            testId,
+            testId: examTestId,
             candidateId,
             amountCents: finalAmountCents,
             currency: (test as any).currency ?? 'TRY',
             ...(discountApplied ? { discountCodeId: discountApplied.id } : {}),
+            ...(packageId ? { packageId } : {}),
+            ...(paymentProvider ? { paymentProvider } : {}),
           },
         });
 
         const attempt = await tx.testAttempt.create({
-          data: { testId, candidateId, status: 'IN_PROGRESS' },
+          data: { testId: examTestId, candidateId, status: 'IN_PROGRESS' },
         });
 
         await tx.auditLog.create({
@@ -144,7 +175,7 @@ export class PurchaseUseCase {
       try {
         const { QueueService } = require('../../infrastructure/queue/queue.service');
         const qs = new QueueService();
-        await qs.enqueueJob('stats-queue', 'refresh', { testId });
+        await qs.enqueueJob('stats-queue', 'refresh', { testId: test?.id ?? testId });
       } catch {}
       throw new InternalServerErrorException({ code: 'PURCHASE_FAILED', message: 'Purchase failed' });
     }
