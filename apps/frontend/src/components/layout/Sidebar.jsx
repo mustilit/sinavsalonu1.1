@@ -19,6 +19,7 @@ import {
   Banknote,
   ShieldAlert,
   Megaphone,
+  RefreshCw,
 } from "lucide-react";
 
 export default function Sidebar({ user, currentPage }) {
@@ -47,6 +48,7 @@ export default function Sidebar({ user, currentPage }) {
     { name: "İndirim Kodları", page: "MyDiscountCodes", icon: Award },
     // Reklam yönetimi: eğiticinin öne çıkarma satın alması ve gösterim takibi
     { name: "Reklamlarım", page: "MyAds", icon: Megaphone },
+    { name: "İade Talepleri", page: "EducatorRefunds", icon: RefreshCw },
     { name: "Hata Bildirimleri", page: "QuestionReports", icon: Settings },
     { name: "Profil Ayarları", page: "EducatorSettings", icon: User },
   ] : [

@@ -28,9 +28,10 @@ export class RejectRefundUseCase {
 
     const refund = await this.refundRepo.findById(refundId);
     if (!refund) throw new AppError('REFUND_NOT_FOUND', 'Refund request not found', 404);
-    // Daha önce karar verilmişse çakışma hatası döndür
-    if (refund.status !== 'PENDING') {
-      throw new AppError('REFUND_ALREADY_DECIDED', 'Refund has already been approved or rejected', 409);
+    // Admin yalnızca educator'ın onayladığı, aday itiraz ettiği veya süresi dolmuş talepleri reddedebilir
+    const adminRejectableStatuses = ['EDUCATOR_APPROVED', 'APPEAL_PENDING', 'ESCALATED'];
+    if (!adminRejectableStatuses.includes(refund.status)) {
+      throw new AppError('REFUND_NOT_ACTIONABLE', 'Refund is not in a state that admin can reject', 409);
     }
 
     const now = new Date();

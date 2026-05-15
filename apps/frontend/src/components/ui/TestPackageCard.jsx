@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Clock, BookOpen, Star, User, Eye, Play } from "lucide-react";
+import { Clock, BookOpen, FileText, Star, User, Eye, Play } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -64,7 +64,7 @@ export default function TestPackageCard({ test, onBuy, isPurchased, isCompleted,
             </div>
           }
           <div className="flex items-center gap-1">
-            <BookOpen className="w-4 h-4" />
+            <FileText className="w-4 h-4" />
             <span>{test.question_count || 0} Soru</span>
           </div>
           {test.duration_minutes &&
@@ -115,9 +115,11 @@ export default function TestPackageCard({ test, onBuy, isPurchased, isCompleted,
           </div>
           {isPurchased ?
           <Link to={createPageUrl("TestDetail") + `?id=${test.id}${isCompleted ? '&review=true' : ''}`}>
-              <Button size="sm" style={{backgroundColor: isCompleted ? '#f97316' : '#10b981'}} className="hover:opacity-90 flex items-center gap-1">
+              <Button size="sm" style={{backgroundColor: isCompleted ? '#94a3b8' : isInProgress ? '#f97316' : '#10b981'}} className="hover:opacity-90 flex items-center gap-1">
                 {isCompleted ? (
                   <><Eye className="w-4 h-4" /> Gözden Geçir</>
+                ) : isInProgress ? (
+                  <><Play className="w-4 h-4" /> Devam Et</>
                 ) : (
                   <><Play className="w-4 h-4" /> Teste Başla</>
                 )}

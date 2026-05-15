@@ -1,8 +1,18 @@
-/** İade talebi listeleme sorgu DTO'su — varsayılan durum: PENDING */
 import { IsOptional, IsIn } from 'class-validator';
+
+const VALID_STATUSES = [
+  'actionable',
+  'PENDING',
+  'EDUCATOR_APPROVED',
+  'EDUCATOR_REJECTED',
+  'APPEAL_PENDING',
+  'ESCALATED',
+  'APPROVED',
+  'REJECTED',
+] as const;
 
 export class ListRefundsQueryDto {
   @IsOptional()
-  @IsIn(['PENDING', 'APPROVED', 'REJECTED'], { message: 'status must be PENDING, APPROVED, or REJECTED' })
-  status?: 'PENDING' | 'APPROVED' | 'REJECTED' = 'PENDING';
+  @IsIn(VALID_STATUSES)
+  status?: (typeof VALID_STATUSES)[number] = 'actionable';
 }

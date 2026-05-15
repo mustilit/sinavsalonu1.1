@@ -79,6 +79,11 @@ import { PrismaPurchaseRepository } from '../infrastructure/repositories/PrismaP
 import { ListPendingRefundsUseCase } from '../application/use-cases/ListPendingRefundsUseCase';
 import { RefundProcessor } from '../application/services/RefundProcessor';
 import { PrismaRefundRepository } from '../infrastructure/repositories/PrismaRefundRepository';
+import { ListEducatorRefundsUseCase } from '../application/use-cases/ListEducatorRefundsUseCase';
+import { EducatorApproveRefundUseCase } from '../application/use-cases/EducatorApproveRefundUseCase';
+import { EducatorRejectRefundUseCase } from '../application/use-cases/EducatorRejectRefundUseCase';
+import { EscalateOverdueRefundsUseCase } from '../application/use-cases/EscalateOverdueRefundsUseCase';
+import { EducatorRefundsController } from './controllers/educator.refunds.controller';
 import { EXAM_TYPE_REPO, TOPIC_REPO, USER_REPO, OBJECTION_REPO, AUDIT_LOG_REPO, CONTRACT_REPO } from '../application/constants';
 import { ContractsModule } from './modules/contracts/contracts.module';
 import { GetAdminSettingsUseCase } from '../application/use-cases/GetAdminSettingsUseCase';
@@ -200,7 +205,7 @@ const throttleDisabled = process.env.THROTTLE_DISABLED === '1';
     (require('./modules/refunds/refunds.module').RefundsModule),
     ContractsModule,
   ],
-  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AdminCandidatesController, AdminEducatorReportController, AdminCommissionController, AdminAdReportController, MePerformanceController, MeHeartbeatController, AdminWorkersController, PackagesController, UploadController, AttemptsController],
+  controllers: [RootController, HealthController, NotificationsController, AdminDlqController, TestsPerformanceController, HomeController, SiteController, ReviewsController, EducatorsController, FollowsController, CspReportController, AdminExamTypesController, AdminTopicsController, AdminEducatorsController, AdminUsersController, ObjectionsController, EducatorObjectionsController, AdminObjectionsController, AdminRefundsController, AdminSettingsController, AdminSiteSettingsController, AdminContractsController, AdminAuditController, AdminAdPackagesController, AdPackagesController, MeRefundsController, MePurchasesController, MePreferencesController, MetricsController, AdminCandidatesController, AdminEducatorReportController, AdminCommissionController, AdminAdReportController, MePerformanceController, MeHeartbeatController, AdminWorkersController, PackagesController, UploadController, AttemptsController, EducatorRefundsController],
   providers: [
     SeedService,
     ...(throttleDisabled ? [] : [{ provide: APP_GUARD, useClass: CustomThrottlerGuard }]),
@@ -324,6 +329,26 @@ const throttleDisabled = process.env.THROTTLE_DISABLED === '1';
     {
       provide: ListPendingRefundsUseCase,
       useFactory: (refundRepo: PrismaRefundRepository) => new ListPendingRefundsUseCase(refundRepo),
+      inject: [PrismaRefundRepository],
+    },
+    {
+      provide: ListEducatorRefundsUseCase,
+      useFactory: (refundRepo: PrismaRefundRepository) => new ListEducatorRefundsUseCase(refundRepo),
+      inject: [PrismaRefundRepository],
+    },
+    {
+      provide: EducatorApproveRefundUseCase,
+      useFactory: (refundRepo: PrismaRefundRepository) => new EducatorApproveRefundUseCase(refundRepo),
+      inject: [PrismaRefundRepository],
+    },
+    {
+      provide: EducatorRejectRefundUseCase,
+      useFactory: (refundRepo: PrismaRefundRepository) => new EducatorRejectRefundUseCase(refundRepo),
+      inject: [PrismaRefundRepository],
+    },
+    {
+      provide: EscalateOverdueRefundsUseCase,
+      useFactory: (refundRepo: PrismaRefundRepository) => new EscalateOverdueRefundsUseCase(refundRepo),
       inject: [PrismaRefundRepository],
     },
     { provide: GetAdminSettingsUseCase, useFactory: () => new GetAdminSettingsUseCase() },

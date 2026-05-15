@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
+import html2canvas from "html2canvas";
 import { entities } from "@/api/dalClient";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery } from "@tanstack/react-query";
@@ -14,7 +15,6 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StatCard from "@/components/ui/StatCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -27,13 +27,93 @@ import {
   Award,
   Filter,
   AlertTriangle,
+  Share2,
+  Download,
+  ChevronDown,
 } from "lucide-react";
+
+const PAGE_SIZE = 15;
+
+/** Filtrelenmiş sonuçları XLSX olarak indirir */
+async function exportToXLSX(rows, safeFormatDate) {
+  const XLSX = await import("xlsx");
+  const data = rows.map((r) => ({
+    "Test": r.test_package_title || r.test_title || "Test",
+    "Puan": r.score ?? 0,
+    "Doğru": r.correct_count ?? 0,
+    "Yanlış": r.wrong_count ?? 0,
+    "Boş": r.empty_count ?? 0,
+    "Toplam Soru": r.question_count ?? "",
+    "Süre (dk)": r.time_spent_seconds ? Math.floor(r.time_spent_seconds / 60) : "",
+    "Tarih": safeFormatDate(r.created_date),
+    "Gecikme (sn)": r.overtime_seconds ?? 0,
+    "Durum": r.score >= 80 ? "Mükemmel" : r.score >= 60 ? "İyi" : r.score >= 40 ? "Orta" : "Geliştirilmeli",
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Sonuçlarım");
+  XLSX.writeFile(wb, `sinav-salonu-sonuclar-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 export default function MyResults() {
   const { user } = useAuth();
+  const shareRef = useRef(null);
+  const [isSharing, setIsSharing] = useState(false);
+
+  const handleShare = useCallback(async () => {
+    if (!shareRef.current || isSharing) return;
+    setIsSharing(true);
+    try {
+      const canvas = await html2canvas(shareRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+
+      // "Sınav Salonu" imzası — sadece paylaşılan görselde
+      const ctx = canvas.getContext("2d");
+      const scale = 2;
+      const stripH = 40 * scale;
+      ctx.fillStyle = "rgba(99,102,241,0.08)";
+      ctx.fillRect(0, canvas.height - stripH, canvas.width, stripH);
+      ctx.font = `600 ${13 * scale}px Inter, system-ui, sans-serif`;
+      ctx.fillStyle = "#6366f1";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Sınav Salonu", canvas.width - 20 * scale, canvas.height - stripH / 2);
+
+      canvas.toBlob(async (blob) => {
+        const file = new File([blob], "sinav-salonu-rapor.png", { type: "image/png" });
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], title: "Sınav Salonu Raporun" });
+        } else {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "sinav-salonu-rapor.png";
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      }, "image/png");
+    } catch {
+      // sessizce geç
+    } finally {
+      setIsSharing(false);
+    }
+  }, [isSharing]);
+
   const [filterTest, setFilterTest] = useState("all");
   const [filterTimeRange, setFilterTimeRange] = useState("all");
+  const [filterExamType, setFilterExamType] = useState("all");
   const [chartType, setChartType] = useState("performance");
+  const [page, setPage] = useState(1);
+
+  const { data: examTypes = [] } = useQuery({
+    queryKey: ["examTypes"],
+    queryFn: () => entities.ExamType.filter({ is_active: true }),
+  });
+  const examTypeMap = Object.fromEntries(examTypes.map(e => [e.id, e.name]));
 
   const { data: rawResults, isLoading, isError } = useQuery({
     queryKey: ["myResults", user?.id],
@@ -46,9 +126,18 @@ export default function MyResults() {
     ? rawResults
     : (Array.isArray(rawResults?.data) ? rawResults.data : []);
 
+  // Sonuçlardan benzersiz sınav türleri — isim examTypeMap'ten çözülür
+  const uniqueExamTypes = [...new Map(
+    results.filter(r => r.exam_type_id).map(r => [
+      r.exam_type_id,
+      { id: r.exam_type_id, name: examTypeMap[r.exam_type_id] || r.exam_type_name || r.exam_type_id }
+    ])
+  ).values()];
+
   // Filter results (güvenli tarih ve id erişimi)
   const filteredResults = results.filter((r) => {
     if (filterTest !== "all" && r.test_package_id !== filterTest) return false;
+    if (filterExamType !== "all" && r.exam_type_id !== filterExamType) return false;
     if (filterTimeRange !== "all" && r.created_date) {
       const createdDate = new Date(r.created_date);
       if (Number.isNaN(createdDate.getTime())) return true;
@@ -154,9 +243,8 @@ export default function MyResults() {
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4 flex-wrap">
+      <div className="mb-6 pb-4 border-b border-slate-200">
+        <div className="flex items-center gap-4 flex-wrap">
             <Filter className="w-5 h-5 text-slate-500" />
             <Select value={filterTest} onValueChange={setFilterTest}>
               <SelectTrigger className="w-64">
@@ -166,6 +254,17 @@ export default function MyResults() {
                 <SelectItem value="all">Tüm Paketler</SelectItem>
                 {uniquePackages.map((pkg) => (
                   <SelectItem key={pkg.id} value={pkg.id}>{pkg.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterExamType} onValueChange={setFilterExamType}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Tüm Sınav Türleri" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tüm Sınav Türleri</SelectItem>
+                {uniqueExamTypes.map((et) => (
+                  <SelectItem key={et.id} value={et.id}>{et.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -180,59 +279,77 @@ export default function MyResults() {
                 <SelectItem value="3months">Son 3 Ay</SelectItem>
               </SelectContent>
             </Select>
-            {(filterTest !== "all" || filterTimeRange !== "all") && (
+            {(filterTest !== "all" || filterExamType !== "all" || filterTimeRange !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
                   setFilterTest("all");
+                  setFilterExamType("all");
                   setFilterTimeRange("all");
+                  setPage(1);
                 }}
               >
                 Filtreleri Temizle
               </Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+      </div>
 
-      {/* Stats */}
+      {/* Paylaş butonu — paylaşılabilir alanın sağ üstünde, dışında */}
+      <div className="flex justify-end mb-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleShare}
+          disabled={isSharing}
+          className="text-indigo-600 hover:text-indigo-700"
+        >
+          <Share2 className="w-4 h-4 mr-1.5" />
+          {isSharing ? "Hazırlanıyor…" : "Paylaş"}
+        </Button>
+      </div>
+
+      {/* Stats + Grafik paylaşılabilir alan */}
+      <div ref={shareRef} className="bg-white rounded-xl p-4 -mx-4">
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard
           title="Toplam Test"
           value={stats.totalTests}
           icon={BarChart3}
-          bgColor="bg-indigo-500"
+          iconColor="text-indigo-500"
         />
         <StatCard
           title="Ortalama Puan"
           value={stats.avgScore}
           icon={TrendingUp}
-          bgColor="bg-violet-500"
+          iconColor="text-violet-500"
         />
         <StatCard
           title="Toplam Doğru"
           value={stats.totalCorrect}
           icon={CheckCircle}
-          bgColor="bg-emerald-500"
+          iconColor="text-emerald-500"
         />
         <StatCard
           title="Toplam Yanlış"
           value={stats.totalWrong}
           icon={XCircle}
-          bgColor="bg-rose-500"
+          iconColor="text-rose-500"
         />
       </div>
 
       {/* Performance Chart */}
       {results.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Haftalık İstatistikler</CardTitle>
+        <div className="mb-6 pb-6 border-b border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-slate-800">Gelişim</h2>
+            <div data-html2canvas-ignore="true">
               <Select value={chartType} onValueChange={setChartType}>
-                <SelectTrigger className="w-48">
-                  <SelectValue />
+                <SelectTrigger className="w-40 shrink-0">
+                  <span className="truncate text-sm">
+                    {chartType === "performance" ? "Performans" : chartType === "questions" ? "Çözülen Soru" : "Çalışma Süresi"}
+                  </span>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="performance">Performans</SelectItem>
@@ -241,9 +358,8 @@ export default function MyResults() {
                 </SelectContent>
               </Select>
             </div>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            </div>
+          <ResponsiveContainer width="100%" height={300}>
               {chartType === "performance" ? (
                 <LineChart data={weeklyData}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -331,16 +447,32 @@ export default function MyResults() {
                 </LineChart>
               )}
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </div>
       )}
 
+      </div>{/* /shareRef */}
+
       {/* Results Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Test Geçmişi</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="pb-6 border-b border-slate-200">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-slate-800">
+            Test Geçmişi
+            {filteredResults.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-slate-400">({filteredResults.length})</span>
+            )}
+          </h2>
+          {filteredResults.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => exportToXLSX(filteredResults, safeFormatDate)}
+              className="text-slate-500 hover:text-slate-700"
+            >
+              <Download className="w-4 h-4 mr-1.5" />
+              Excel'e Aktar
+            </Button>
+          )}
+        </div>
           {isLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
@@ -355,15 +487,14 @@ export default function MyResults() {
               </p>
             </div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Test</TableHead>
                     <TableHead className="text-center">Puan</TableHead>
-                    <TableHead className="text-center">Doğru</TableHead>
-                    <TableHead className="text-center">Yanlış</TableHead>
-                    <TableHead className="text-center">Boş</TableHead>
+                    <TableHead className="text-center">D / Y / B</TableHead>
                     <TableHead className="text-center">Süre</TableHead>
                     <TableHead>Tarih</TableHead>
                     <TableHead className="text-center">Gecikme</TableHead>
@@ -371,36 +502,40 @@ export default function MyResults() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredResults.map((result, idx) => (
+                  {filteredResults.slice(0, page * PAGE_SIZE).map((result, idx) => {
+                    const answeredSum = (result.correct_count ?? 0) + (result.wrong_count ?? 0) + (result.empty_count ?? 0);
+                    const total = result.question_count ?? (answeredSum > 0 ? answeredSum : null);
+                    const mins = result.time_spent_seconds ? Math.floor(result.time_spent_seconds / 60) : null;
+                    const secs = result.time_spent_seconds ? result.time_spent_seconds % 60 : null;
+                    return (
                     <TableRow key={result?.id ? String(result.id) : "row-" + idx}>
                       <TableCell className="font-medium">
                         {getTestTitle(result)}
+                        {total && <span className="ml-1 text-xs text-slate-400">({total} soru)</span>}
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="font-bold text-lg">{result.score}</span>
                       </TableCell>
-                      <TableCell className="text-center text-emerald-600 font-medium">
-                        {result.correct_count ?? "-"}
-                      </TableCell>
-                      <TableCell className="text-center text-rose-600 font-medium">
-                        {result.wrong_count ?? "-"}
-                      </TableCell>
-                      <TableCell className="text-center text-slate-500">
-                        {result.empty_count ?? "-"}
+                      <TableCell className="text-center text-sm">
+                        <span className="text-emerald-600 font-medium">{result.correct_count ?? 0}</span>
+                        <span className="text-slate-300 mx-1">/</span>
+                        <span className="text-rose-500 font-medium">{result.wrong_count ?? 0}</span>
+                        <span className="text-slate-300 mx-1">/</span>
+                        <span className="text-slate-400">{result.empty_count ?? 0}</span>
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1 text-slate-500">
-                          <Clock className="w-4 h-4" />
-                          {result.time_spent_seconds 
-                            ? `${Math.floor(result.time_spent_seconds / 60)}dk`
-                            : "-"
-                          }
-                        </div>
+                        {mins !== null ? (
+                          <div className="flex items-center justify-center gap-1 text-slate-500 text-sm">
+                            <Clock className="w-3.5 h-3.5" />
+                            {mins >= 60
+                              ? `${Math.floor(mins / 60)}sa ${mins % 60}dk`
+                              : `${mins}dk ${secs}s`}
+                          </div>
+                        ) : <span className="text-slate-300">—</span>}
                       </TableCell>
-                      <TableCell className="text-slate-500">
+                      <TableCell className="text-slate-500 text-sm">
                         {safeFormatDate(result.created_date)}
                       </TableCell>
-                      {/* Gecikme sütunu — süre aşımı olduysa amber badge */}
                       <TableCell className="text-center">
                         {result.overtime_seconds > 0 ? (
                           <Badge className="bg-amber-100 text-amber-700 gap-1">
@@ -415,24 +550,35 @@ export default function MyResults() {
                         {getScoreBadge(result.score ?? 0)}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
+            {filteredResults.length > page * PAGE_SIZE && (
+              <div className="flex justify-center mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => p + 1)}
+                  className="text-slate-600"
+                >
+                  <ChevronDown className="w-4 h-4 mr-1.5" />
+                  Daha Fazla Göster ({filteredResults.length - page * PAGE_SIZE} kaldı)
+                </Button>
+              </div>
+            )}
+            </>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       {/* ─── Gelişime Açık Yönler — süre aşımı olan testler ─── */}
       {overtimeResults.length > 0 && (
-        <Card className="mt-6 border-amber-200 bg-amber-50/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-amber-800 text-base">
-              <AlertTriangle className="w-5 h-5 text-amber-600" />
-              Gelişime Açık Yön: Süre Yönetimi
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="mt-6 pt-6 border-t border-amber-200">
+          <h2 className="flex items-center gap-2 text-amber-800 text-base font-semibold mb-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600" />
+            Gelişime Açık Yön: Süre Yönetimi
+          </h2>
             <p className="text-sm text-amber-700 mb-4">
               Aşağıdaki {overtimeResults.length} testte izin verilen süreden daha geç teslim yaptın.
               Sınav koşullarında gecikmeli teslim mümkün değildir — süre yönetimine odaklanmak
@@ -466,8 +612,7 @@ export default function MyResults() {
             <p className="text-xs text-amber-600 mt-4 italic">
               💡 İpucu: Her soruya ortalama {Math.round((filteredResults[0]?.time_spent_seconds ?? 0) / Math.max(1, (filteredResults[0]?.correct_count ?? 0) + (filteredResults[0]?.wrong_count ?? 0))) || "?"} saniye ayırmayı hedefle. Zorlandığın soruları işaretleyip geç, sonunda dön.
             </p>
-          </CardContent>
-        </Card>
+        </div>
       )}
     </div>
   );

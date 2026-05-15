@@ -29,7 +29,7 @@ export class CreateRefundRequestUseCase {
     if (purchaseRefundAllowed < 10) throw new BadRequestException({ code: 'NOT_ELIGIBLE_FOR_REFUND', message: 'Not enough objections' });
 
     const testId = await this.getTestIdFromPurchase(purchaseId);
-    const created = await this.refundRepo.create({ purchaseId, candidateId, testId, reason });
+    const created = await this.refundRepo.create({ purchaseId, candidateId, educatorId: '', testId, reason });
 
     // audit
     try {

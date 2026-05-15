@@ -52,6 +52,7 @@ export const PAGE_ROLES = {
   QuestionReports: [ROLES.EDUCATOR],
   CreateTest: [ROLES.EDUCATOR],
   EditTest: [ROLES.EDUCATOR],
+  EducatorRefunds: [ROLES.EDUCATOR],
 
   // AdminAdReport: Reklam satın alım raporu — yalnızca admin
   AdminAdReport: [ROLES.ADMIN],

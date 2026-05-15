@@ -14,6 +14,7 @@ import { PrismaReviewRepository } from '../../infrastructure/repositories/Prisma
 import { PrismaPurchaseRepository } from '../../infrastructure/repositories/PrismaPurchaseRepository';
 import { PrismaAttemptRepository } from '../../infrastructure/repositories/PrismaAttemptRepository';
 import { PrismaAuditLogRepository } from '../../infrastructure/repositories/PrismaAuditLogRepository';
+import { prisma } from '../../infrastructure/database/prisma';
 
 /**
  * Test değerlendirme işlemlerini yönetir: yorum/puan oluşturma veya güncelleme,
@@ -42,7 +43,7 @@ export class ReviewsController {
   @ApiBearerAuth('bearer')
   @ApiOkResponse({ type: ReviewUpsertResponseDto })
   @ApiErrorResponses()
-  async create(@Param('id') id: string, @Body() body: { testRating: number; educatorRating?: number; comment?: string }, @Req() req: any) {
+  async create(@Param('id') id: string, @Body() body: { testRating?: number; educatorRating?: number; comment?: string }, @Req() req: any) {
     const candidateId = req.user?.id;
     return this.createUc.execute(id, candidateId, body);
   }
@@ -65,6 +66,23 @@ export class ReviewsController {
   @ApiErrorResponses()
   async agg(@Param('id') id: string) {
     return this.aggUc.execute(id);
+  }
+
+  @Get('tests/:id/my-review')
+  @ApiBearerAuth('bearer')
+  @ApiErrorResponses()
+  async myReview(@Param('id') id: string, @Req() req: any) {
+    const candidateId = req.user?.id;
+    if (!candidateId) return null;
+    const review = await prisma.review.findFirst({ where: { testId: id, candidateId } } as any);
+    if (!review) return null;
+    return {
+      id: review.id,
+      testRating: (review as any).testRating,
+      educatorRating: (review as any).educatorRating,
+      comment: (review as any).comment,
+      createdAt: (review as any).createdAt,
+    };
   }
 }
 

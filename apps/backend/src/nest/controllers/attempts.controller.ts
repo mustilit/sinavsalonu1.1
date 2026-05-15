@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Inject, Param, Patch, Post, Req } from '@nestjs/common';
 import { Roles } from '../decorators/roles.decorator';
 import type { PrismaClient } from '@prisma/client';
 import { StartTestAttemptUseCase } from '../../application/use-cases/StartTestAttemptUseCase';
@@ -34,9 +34,11 @@ export class AttemptsController {
   private readonly getResultUC: GetAttemptResultUseCase;
   private readonly submitAttemptUC: SubmitAttemptUseCase;
   private readonly timeoutUC: TimeoutAttemptUseCase;
+  private readonly prisma: PrismaClient;
 
   constructor(@Inject(PrismaService) prismaService: PrismaService) {
-    const prisma: PrismaClient = prismaService.client;
+    this.prisma = prismaService.client;
+    const prisma: PrismaClient = this.prisma;
     this.startUC = new StartTestAttemptUseCase(prisma);
     this.pauseUC = new PauseTestAttemptUseCase(prisma);
     this.resumeUC = new ResumeTestAttemptUseCase(prisma);
@@ -105,6 +107,35 @@ export class AttemptsController {
   async state(@Param('id') attemptId: string, @Req() req: any) {
     const userId = (req as any).user?.id;
     return this.getStateUC.execute(attemptId, userId);
+  }
+
+  /** Periyodik ilerleme kaydı — elapsedSeconds → metadata */
+  @Patch('attempts/:id/checkpoint')
+  @Roles('CANDIDATE')
+  async checkpoint(
+    @Param('id') attemptId: string,
+    @Body() body: { elapsedSeconds?: number },
+    @Req() req: any,
+  ) {
+    const userId = (req as any).user?.id;
+    const row = await this.prisma.testAttempt.findUnique({
+      where: { id: attemptId },
+      select: { candidateId: true, status: true, metadata: true },
+    });
+    if (!row || row.candidateId !== userId) throw new ForbiddenException();
+    if (row.status !== 'IN_PROGRESS') return { ok: true };
+    const prev = (row.metadata as any) ?? {};
+    await (this.prisma.testAttempt as any).update({
+      where: { id: attemptId },
+      data: {
+        metadata: {
+          ...prev,
+          elapsedSeconds: body.elapsedSeconds ?? prev.elapsedSeconds ?? 0,
+          savedAt: new Date().toISOString(),
+        },
+      },
+    });
+    return { ok: true };
   }
 
   /** dalClient.js finish → POST /attempts/:id/finish */

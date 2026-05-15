@@ -62,4 +62,6 @@ export interface TestAttempt {
     order: number;
     options: Array<{ id: string; content: string; mediaUrl?: string | null; isCorrect: boolean }>;
   }> | null;
+  // Periyodik ilerleme kaydı (elapsedSeconds, savedAt vb.)
+  metadata?: Record<string, unknown> | null;
 }

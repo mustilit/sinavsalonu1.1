@@ -2,14 +2,17 @@ import { prisma } from '../database/prisma';
 import { IReviewRepository, ReviewRecord } from '../../domain/interfaces/IReviewRepository';
 
 export class PrismaReviewRepository implements IReviewRepository {
-  async upsertReview(input: { testId: string; educatorId: string; candidateId: string; testRating: number; educatorRating?: number; comment?: string }): Promise<ReviewRecord> {
-    // Use Prisma upsert for atomic upsert by unique compound key
+  async upsertReview(input: { testId: string; educatorId: string; candidateId: string; testRating?: number; educatorRating?: number; comment?: string }): Promise<ReviewRecord> {
+    const existing = await prisma.review.findUnique({
+      where: { testId_candidateId: { testId: input.testId, candidateId: input.candidateId } } as any,
+    });
+    const resolvedTestRating = input.testRating ?? existing?.testRating ?? 1;
     const created = await prisma.review.upsert({
       where: { testId_candidateId: { testId: input.testId, candidateId: input.candidateId } } as any,
       update: {
-        testRating: input.testRating,
-        educatorRating: input.educatorRating ?? null,
-        comment: input.comment ?? null,
+        ...(input.testRating !== undefined && { testRating: input.testRating }),
+        ...(input.educatorRating !== undefined && { educatorRating: input.educatorRating }),
+        ...(input.comment !== undefined && { comment: input.comment }),
         educatorId: input.educatorId,
         updatedAt: new Date(),
       },
@@ -17,7 +20,7 @@ export class PrismaReviewRepository implements IReviewRepository {
         testId: input.testId,
         educatorId: input.educatorId,
         candidateId: input.candidateId,
-        testRating: input.testRating,
+        testRating: resolvedTestRating,
         educatorRating: input.educatorRating ?? null,
         comment: input.comment ?? null,
       },

@@ -1,161 +1,195 @@
 ---
 name: exam-domain
-description: Sinav Salonu domain modeli — Test, ExamQuestion, Attempt, User, Purchase ve AdminSettings varlıkları, aralarındaki ilişkiler ve iş kuralları. Yeni özellik veya veri modeli üzerinde çalışırken referans alın.
+description: Sinav Salonu domain modeli — Test/ExamTest, ExamQuestion, Attempt, User (STUDENT/EDUCATOR/ADMIN), TestPackage (satın alma birimi), Purchase, AdminSettings, BackupLog, DiscountCode, AdPackage. Yeni özellik veya veri modeli üzerinde çalışırken referans alın.
 ---
 
 # Sinav Salonu — Domain Modeli
 
 ## Amaç
 
-Test/sınav pazar yeri. Educator (eğitici) sınav oluşturur ve fiyatlandırır. Student (öğrenci) sınavı satın alır, çözer, skorunu görür. Admin yönetim yapar.
+Test/sınav pazar yeri. Educator (eğitici) testler oluşturur ve bunları TestPackage'lar halinde fiyatlandırıp satar. Student (öğrenci) **TestPackage** satın alır, paket içindeki testleri çözer, skorunu görür. Admin yönetim ve moderasyon yapar.
 
-> **Not:** Kod tabanında rol adı `EDUCATOR`'dır. `AUTHOR` terimi kullanılmaz.
+**Önemli:** Satın alma birimi **TestPackage**'dır, tekil Test değildir. Tekil testler doğrudan satılmaz.
 
-## Varlıklar
+## Roller
+
+Tüm projede sadece bu üç rol kullanılır:
+
+- **STUDENT** — paket satın alır, içindeki testleri çözer, skorlarını görüntüler.
+- **EDUCATOR** — test ve paket oluşturur, fiyatlar, yayımlar, indirim kodu üretir, kendi satışlarını görüntüler.
+- **ADMIN** — global yönetim, moderasyon, ayarlar, yedekleme.
+
+**AUTHOR** terimi **kullanılmaz** — eski referanslar varsa düzelt.
+
+Admin alt yetkilendirmesi için **Worker Permissions** sistemi var (`apps/backend/src/nest/guards/WorkerPermissions`). Bu farklı bir rol değil, ADMIN'in alt yetki bölümlemesidir.
+
+## Temel Varlıklar
 
 ### User
-Tüm kullanıcıların temel kaydı.
 
 - `id, email, name, role (STUDENT | EDUCATOR | ADMIN), passwordHash, createdAt, updatedAt`
-- Educator hem sınav yazıp hem öğrenci olarak çözebilsin istenirse ikincil rol alanı veya izinler tablosu gerekir.
+- Worker permissions ADMIN için ek izin matrisi (ayrı tablo).
 
-### ExamTest (Test)
-Satılabilir sınav paketi.
+### Test (ExamTest)
 
-- `id, title, description, price, durationMinutes, educatorId, status (DRAFT | PUBLISHED | UNPUBLISHED), createdAt, updatedAt`
-- `status = DRAFT` → listelemede görünmez, satın alınamaz.
-- `questions[]` ilişkisi — silinirken cascade değil, test aktif satıştaysa silinemez.
+Tekil sınav. **Doğrudan satılmaz** — TestPackage içine yerleştirilir.
+
+- `id, title, description, durationMinutes, educatorId, publishedAt (nullable), createdAt, updatedAt`
+- Tekil `price` alanı varsa: bilgilendirici/sıralama amaçlı, transactional değil.
+- `publishedAt = null` → taslak. Pakete eklense bile listelemede görünmez.
+- `questions[]` ilişkisi: ExamQuestion[].
+- Aktif Purchase'a bağlı bir TestPackage içindeyse silinmez.
 
 ### TestPackage
-Birden fazla Test'i bir araya getiren paket (bundle).
 
-- `id, title, educatorId, tests[]`
-- Her pakete eklenebilecek maksimum Test sayısı `AdminSettings.maxTestsPerPackage` ile sınırlandırılır (varsayılan: 10). Bu kontrol test-paket atama noktasında yapılır.
+**Satın alınabilir birim.** Bir veya birden fazla Test'i kapsar.
 
-### ExamQuestion (Soru)
-Bir teste ait soru.
+- `id, title, description, price (Decimal), educatorId, publishedAt (nullable), createdAt, updatedAt`
+- `tests[]` ilişkisi: TestPackage ↔ ExamTest (many-to-many veya join tablosu).
+- `maxTestsPerPackage` admin ayarı ile sınırlandırılır (`AdminSettings`).
+- `publishedAt = null` iken listelemede görünmez, satın alınamaz.
+- Paket yayımlanabilsin diye: en az 1 test, `price >= 0`, title boş olmamalı.
+- **Yayımlanmış paketin testleri değiştirilemez** (içerik garantisi). Başlık/açıklama değişebilir.
 
-- `id, testId, content, choices (JSON), correctIndex, explanation, orderIndex, points`
-- `choices` JSON olarak saklanır: `[{text, isCorrect}]`.
-- Öğrenciye dönerken `correctIndex` ve `explanation` **yalnızca submit sonrası** gönderilir.
-- **Kopya soru tespiti:** Eğitici soru metnini girip alanı terk ettiğinde (`onBlur`), backend'e `POST /educators/me/questions/check-duplicate` çağrısı yapılır. Aynı eğiticinin tüm sorularıyla Jaccard benzerliği ≥ 0.75 ise amber uyarı gösterilir. Eğitici ısrar ederek devam edebilir.
+### ExamQuestion
+
+Bir teste ait çoktan seçmeli soru.
+
+- `id, examTestId, content, choices (JSON), correctIndex, explanation, orderIndex, points`
+- Choices format: `[{text: '...'}]` + ayrı `correctIndex`, ya da `[{text, isCorrect}]`.
+- STUDENT'a dönerken `correctIndex` ve `explanation` **yalnızca submit sonrası** servis edilir.
+- **Kopya soru tespiti:** EDUCATOR soru girerken (blur), aynı educator'ın diğer sorularıyla Jaccard benzerliği ≥ %75 ise amber uyarı. Israr ederek devam edilebilir.
 
 ### Attempt
-Bir kullanıcının bir sınavı çözme oturumu.
 
-- `id, userId, testId, startedAt, submittedAt (nullable), score (nullable), status (IN_PROGRESS | SUBMITTED | EXPIRED)`
-- `answers` ilişkisi — her soru için `Answer { attemptId, questionId, selectedIndex, isCorrect, answeredAt }`.
-- **Tek aktif attempt kuralı:** bir kullanıcı aynı sınavda aynı anda tek `IN_PROGRESS` sahibi olabilir.
-- **Süre kuralı:** `startedAt + durationMinutes < now()` iken submit yoksa `EXPIRED`; skor `answers` üzerinden hesaplanır.
+STUDENT'ın bir Test'i çözme oturumu. **Tekil Test üzerinden açılır** ama yetki TestPackage Purchase üzerinden doğrulanır.
+
+- `id, userId, examTestId, startedAt, submittedAt (nullable), score (nullable), status (IN_PROGRESS | SUBMITTED | EXPIRED)`
+- Cevaplar: `Answer { attemptId, examQuestionId, selectedIndex, isCorrect, answeredAt }`.
+- **Attempt açma kuralı:** STUDENT'ın `userId`'si, ilgili Test'i içeren herhangi bir TestPackage için `Purchase` (status `PAID`) sahibi olmalı.
+- **Tek aktif attempt:** Aynı kullanıcı aynı Test'te aynı anda tek `IN_PROGRESS`.
+- **Süre kuralı:** `startedAt + durationMinutes < now()` iken submit yoksa `EXPIRED`, skor cevaplardan hesaplanır.
 
 ### Purchase
-User-Test satın alma ilişkisi.
 
-- `userId, testId, paidAt, amount, paymentProvider, providerRef`
-- Composite PK `(userId, testId)` — aynı testi iki kez satın alamaz.
+STUDENT ↔ TestPackage satın alma ilişkisi, ödeme kaydı. **Tekil Test ile bağlantısı yoktur.**
 
-### DiscountCode
-Eğiticinin oluşturduğu indirim kodu.
-
-- `id, educatorId, code, percentOff, maxUses, usedCount, validFrom, validUntil, description`
-- Yalnızca sahibi eğitici silebilir.
-
-### AdPackage / AdPurchase
-Eğiticinin test veya kendi profili için reklam satın alması.
-
-- `AdPackage`: Admin tarafından tanımlanır (fiyat, gösterim sayısı).
-- `AdPurchase`: `educatorId, adPackageId, testId (nullable), targetType (TEST | EDUCATOR), impressionsTotal, impressionsLeft`.
+- `id, userId, testPackageId, paidAt, amount, paymentProvider, providerRef, status (PENDING | PAID | FAILED | REFUNDED), refundedAt (nullable), discountCodeId (nullable), discountAmount (nullable)`
+- **Unique constraint:** `(userId, testPackageId)` — aynı paketi iki kez satın alamaz.
+- Purchase + Payment kaydı **aynı transaction** içinde yazılır.
 
 ### AdminSettings
-Admin panelinden yönetilen global ayarlar. Tek satır (id = 1).
 
-| Alan | Tip | Açıklama |
-|---|---|---|
-| `commissionRate` | Decimal | Platform komisyon oranı |
-| `maxTestsPerPackage` | Int (default: 10) | Bir pakete eklenebilecek maksimum Test sayısı |
-| `maxQuestionsPerTest` | Int | Teste eklenebilecek maksimum soru sayısı |
-| `backupEnabled` | Boolean | Otomatik yedekleme açık/kapalı |
-| `backupTime` | String (HH:MM) | Yedekleme saati |
-| `backupDir` | String | Yerel yedek dizini |
+Admin panelinden yönetilen global ayarlar.
+
+- Komisyon oranı, içerik limitleri (`maxQuestionsPerTest`, `maxTestsPerPackage`), **yedekleme zamanlayıcısı** (saat ve hedef dizin).
+- Tek satır mantığı: upsert pattern.
 
 ### BackupLog
-Veritabanı yedekleme sonuçlarının audit log tablosu.
 
-- `id, startedAt, finishedAt, status (RUNNING | SUCCESS | FAILED), filePath, fileSizeMb, errorMessage, durationSec`
-- Her gece `BackupSchedulerService` (cron: saatte bir kontrol, `backupTime` saatinde tetiklenir) tarafından `RunDatabaseBackupUseCase` çalıştırılır.
-- Yedek dosyaları: `backup_YYYYMMDD.sql.gz` — son 2 gün saklanır, eskiler silinir.
+DB yedekleme audit log.
+
+- `id, scheduledAt, executedAt, durationMs, sizeBytes, status (SUCCESS | FAILED), targetPath, error (nullable)`
+- `BackupSchedulerService` cron olarak çalışır, `pg_dump` → gzip. Son 2 gün saklanır.
+
+### DiscountCode
+
+EDUCATOR'ın oluşturduğu indirim kodu. **TestPackage üzerine uygulanır.**
+
+- `id, code, educatorId, discountPercent, validFrom, validUntil, usageLimit, usageCount, testPackageId (opsiyonel — belirli pakete özel; null ise educator'ın tüm paketleri)`
+- Doğrulama: aktif tarih aralığı + usage limit + (opsiyonel) paket eşleşmesi + paketi yaratan educator ile kod sahibi educator aynı mı.
+
+### AdPackage / AdPurchase
+
+Reklam paketi ve satın alma kaydı. **TestPackage Purchase'ından ayrı bir akış.**
+
+- `AdPackage: id, title, durationDays, price, slot (homepage_top, sidebar, vb.)`
+- `AdPurchase: id, adPackageId, educatorId, testPackageId (reklamı yapılan paket), startsAt, endsAt, paidAt, status`
+- Yayında olan reklamları gösterirken `now() between startsAt and endsAt`.
 
 ## İş Kuralları
 
 **Yayımlama**
-- Test yayımlanabilmesi için: en az 1 soru, `price ≥ 0`, title boş olmamalı.
-- Yayımlanmış testin soruları/puanları **değiştirilemez**. Başlık/açıklama değişebilir.
+- Test yayımlanabilsin: en az 1 soru, title var.
+- TestPackage yayımlanabilsin: en az 1 yayımlanmış Test, `price >= 0`, title var.
+- Yayımlanmış paketin testleri ve testlerin soruları **değiştirilemez** (cevap anahtarı garantisi). Meta (başlık/açıklama) değişebilir.
+- Paket unpublish edilebilir: yeni satışı durdurur, mevcut Purchase ve Attempt korunur.
 
-**Satın alma**
-- Kullanıcı kendi yazdığı testi satın alamaz.
-- Aynı kullanıcı ikinci kez satın alamaz.
-- Purchase + Payment kaydı **aynı transaction** içinde.
+**Satın alma (TestPackage Purchase)**
+- **STUDENT** satın alır. EDUCATOR ve ADMIN paket satın almaz.
+- EDUCATOR kendi yarattığı paketi satın alamaz (`testPackage.educatorId !== userId` kontrolü).
+- Aynı STUDENT aynı paketi ikinci kez satın alamaz (DB unique constraint).
+- Purchase + Payment kaydı **aynı `prisma.$transaction`** içinde.
+- DiscountCode kullanılıyorsa: `discountCodeId` + `discountAmount` Purchase'a yazılır, DiscountCode'un `usageCount` artar.
+- Ücretsiz paket (`price = 0`): yine Purchase kaydı oluşur (yetki kontrolü için), ama provider çağrısı atlanır.
 
-**Çözme**
-- Satın almayan çözemez (`price = 0` senaryosu ayrı).
-- Attempt başladıktan sonra soru listesi dondurulur.
-- Submit'te: her cevabın `isCorrect` hesapla, `score = correct/total` veya puan toplamı.
-
-**Kopya soru tespiti**
-- Eğitici soru alanından ayrıldığında (blur), metin ≥ 15 karakter ise backend kontrol tetiklenir.
-- `CheckDuplicateQuestionUseCase`: eğiticinin tüm testlerindeki (DRAFT dahil) tüm sorular karşılaştırılır.
-- Algoritma: normalize (küçük harf, noktalama kaldır) → Jaccard benzerliği kelime setleri üzerinde.
-- Eşik: ≥ 0.75 → uyarı. Eğitici ısrar edebilir; yalnızca advisory'dir.
-- Düzenleme modunda `excludeQuestionId` ile kendisi hariç tutulur.
+**Test çözme (Attempt)**
+- STUDENT bir Test için Attempt açabilir IFF: o Test'i içeren herhangi bir TestPackage için `PAID` Purchase'ı var.
+- Attempt başladıktan sonra soru listesi dondurulur (paket yayımdaysa zaten değişmez).
+- Submit'te: her cevabın `isCorrect` hesapla, `score = correctCount / totalQuestions` veya puan toplamı.
+- Süre dolduğunda otomatik `EXPIRED`, skor son cevaplarla hesaplanır.
 
 **Yedekleme**
-- `BackupSchedulerService` saatte bir kontrol eder, `backupTime` saatine ulaşıldığında ve o gün henüz yedek alınmadıysa çalışır.
-- Yedekler `backupDir`'e yazılır. Son 2 gün dışındaki `backup_*.sql.gz` dosyaları silinir.
-- Sonuç `backup_logs` tablosuna yazılır. Admin panelinden log geçmişi ve manuel tetikleme mevcut.
+- AdminSettings'te ayarlanan saatte cron tetiklenir.
+- `pg_dump` → gzip → hedef dizin.
+- BackupLog tablosuna sonuç + hata yazılır.
+- Son 2 gün dışındakiler silinir.
 
 **Rol izinleri**
 
 | Aksiyon | STUDENT | EDUCATOR | ADMIN |
 |---------|---------|----------|-------|
-| Test listele | ✓ | ✓ | ✓ |
+| Paket listele | ✓ | ✓ | ✓ |
 | Test oluştur | - | ✓ | ✓ |
-| Kendi testini düzenle | - | ✓ | ✓ |
-| Başkasının testini düzenle | - | - | ✓ |
-| Test satın al | ✓ | - | - |
-| Test çöz | ✓ (satın almışsa) | - | - |
-| İndirim kodu oluştur | - | ✓ | - |
-| Reklam satın al | - | ✓ | - |
-| Admin ayarlarını değiştir | - | - | ✓ |
-| Yedekleme yönet | - | - | ✓ |
+| TestPackage oluştur | - | ✓ | ✓ |
+| Kendi paketini düzenle | - | ✓ | ✓ |
+| Başkasının paketini düzenle | - | - | ✓ |
+| **TestPackage satın al** | **✓** | **-** | **-** |
+| Pakette test çöz | ✓ (paket satın almışsa) | - | - |
+| DiscountCode yarat | - | ✓ (kendi paketleri için) | ✓ |
+| Skor görüntüle | kendi | kendi yazdığı paketler + kendi çözdüğü | tüm |
+| AdPackage satın al (reklam) | - | ✓ | ✓ |
+| AdminSettings | - | - | ✓ |
+| BackupLog | - | - | ✓ |
 
 ## Kenar Durumlar
 
-- **Süre dolduğunda client offline** → server-side `EXPIRED` transition. Cron veya lazy check (kullanıcı görüntülediğinde).
-- **Ödeme iade** → Purchase silinmez, `refundedAt` eklenir. Attempt'lere dokunma (geçmiş sonuç kalır).
-- **Educator silindi** → testler ortada kalmasın: `archived` durum veya `anonymous-educator` placeholder.
-- **Soru sonradan yanlış bulundu** → yayımlanmışta değiştirme. Gelecek attempt'ler için yeniden yayımla. Geçmişe dokunma.
-- **Yedekleme başarısız** → `BackupLog.status = FAILED`, `errorMessage` dolu. Sonraki gün yeniden denenir.
+- **Attempt sürdürürken paket unpublish edildi** → mevcut attempt etkilenmez (Purchase ve Attempt korunur), yeni attempt açılamaz.
+- **Süre dolduğunda client offline** → server-side `EXPIRED` transition (cron veya lazy check kullanıcı dönünce).
+- **Ödeme iade** → Purchase silinmez, `status = REFUNDED` + `refundedAt`. Geçmiş Attempt'lere dokunma — skor kalır. STUDENT iade sonrası paketteki testleri **yeni attempt açarak çözemez** (Purchase status `PAID` değil).
+- **EDUCATOR silindi** → paketleri ortada kalmasın: `archived` flag veya `anonymous-educator` placeholder. Mevcut Purchase'lar etkilenmez.
+- **Soru sonradan yanlış bulundu** → yayımlanmışta düzeltme yasak. Yeni versiyon (yeni Test, yeni paket) yarat. Eski attempt'lere dokunma.
+- **DiscountCode expired ama checkout açıkken STUDENT submit etti** → backend doğrulamasında reddet, frontend'e taze hata göster.
+- **AdPurchase zaman aşımı** → cron veya lazy check ile aktif reklam kümesinden çıkar.
 
 ## Türkçe-İngilizce Haritası
 
-Kod İngilizce, UI Türkçe. API yanıtları İngilizce alan adlı.
+Kod İngilizce, UI Türkçe. API yanıtları İngilizce alan adlı, frontend'de çevrilir.
 
-| TR | EN | Alan |
-|----|----|----|
-| Sınav / Test | ExamTest | `test` |
-| Soru | ExamQuestion | `question` |
+| TR | EN | Alan/Tip |
+|----|----|--------|
+| Sınav | Exam Test | `ExamTest` / `examTest` |
+| Test paketi | Test package | `TestPackage` / `testPackage` |
+| Soru | Question | `examQuestion` |
 | Seçenek | Choice | `choice` |
-| Deneme | Attempt | `attempt` |
+| Deneme/Çözme | Attempt | `attempt` |
 | Skor | Score | `score` |
 | Satın alma | Purchase | `purchase` |
-| Eğitici | Educator | `educator` |
+| Eğitici | Educator | `educator` (AUTHOR DEĞİL) |
 | Öğrenci | Student | `student` |
-| Paket | TestPackage | `package` |
-| İndirim kodu | DiscountCode | `discountCode` |
-| Yedek | Backup | `backup` |
+| Yönetici | Admin | `admin` |
+| İndirim kodu | Discount code | `discountCode` |
+| Reklam paketi | Ad package | `adPackage` |
+| Yedek log | Backup log | `backupLog` |
+| Yönetici ayarları | Admin settings | `adminSettings` |
 
 ## Notlar
 
-- Domain bilgisinin tek kaynağı burası — yeni varlık eklerken güncelle.
-- Genel NestJS/Prisma pattern'leri ilgili skill'lerde (`nestjs-module`, `prisma-schema`).
-- Gerçek Prisma şeması: `apps/backend/prisma/schema.prisma`.
+- Yeni varlık eklerken bu dosyayı güncelle. Domain bilgisinin tek kaynağı burası.
+- Satın alma uçtan uca akışı için `purchase-flow` skill'i.
+- Ödeme provider entegrasyonu için `payment-domain` skill'i.
+- Schema değişikliği için `prisma-schema` + `migration-planner`.
+- API eklerken `api-contract` + dalClient.js güncellemesi.
+- Form yazarken `form-mutation`.
+- Hata yönetimi `error-handling`.
+- Eski yapıyı bozmamak için `backward-compatibility`.

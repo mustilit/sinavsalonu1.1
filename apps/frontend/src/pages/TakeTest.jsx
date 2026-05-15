@@ -12,6 +12,8 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Flag,
   AlertCircle,
   CheckCircle,
@@ -22,6 +24,8 @@ import {
   Trash2,
   Pencil,
   Eraser,
+  Save,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -116,6 +120,12 @@ export default function TakeTest() {
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [hasDrawings, setHasDrawings] = useState(false);
   const canvasRef = useRef(null);
+  const navScrollRef = useRef(null);
+  const answerSheetScrollRef = useRef(null);
+  // Her 3 cevapta bir DB checkpoint tetiklemek için sayaç
+  const checkpointCountRef = useRef(0);
+  const [navAtTop, setNavAtTop] = useState(true);
+  const [navAtBottom, setNavAtBottom] = useState(false);
 
   // Soru değişince çizim modunu kapat (canvas kendi çizgilerini zaten sıfırlar)
   useEffect(() => {
@@ -250,10 +260,12 @@ export default function TakeTest() {
       if (typeof attemptState.attempt?.remainingSeconds === "number") {
         setTimeLeft(attemptState.attempt.remainingSeconds);
       }
-      // Süresiz test: localStorage'dan geçen süreyi yükle
+      // Süresiz test: elapsed time — localStorage öncelikli, DB fallback
       if (!testDetail?.isTimed && resolvedAttemptId) {
-        const saved = parseInt(localStorage.getItem(`elapsed_${resolvedAttemptId}`) || '0', 10);
-        setElapsedSec(isNaN(saved) ? 0 : saved);
+        const fromStorage = parseInt(localStorage.getItem(`elapsed_${resolvedAttemptId}`) || '0', 10);
+        const fromDb = attemptState.attempt?.savedElapsedSeconds ?? 0;
+        const elapsed = (fromStorage > 0) ? fromStorage : fromDb;
+        setElapsedSec(isNaN(elapsed) ? 0 : elapsed);
       }
       setTestStarted(true);
       const started = attemptState.attempt?.startedAt ? new Date(attemptState.attempt.startedAt).getTime() : Date.now();
@@ -307,9 +319,10 @@ export default function TakeTest() {
         reviewer_email: user.email,
         reviewer_name: user.username || user.full_name,
         review_type: "educator",
+        test_package_id: testId,
         educator_email: testPackage?.educator_email,
         educator_name: testPackage?.educator_name,
-        rating: educatorRating,
+        educator_rating: educatorRating,
         comment: educatorComment,
       });
       queryClient.invalidateQueries({ queryKey: ["educatorReview", testPackage?.educator_email, user?.email] });
@@ -445,6 +458,40 @@ export default function TakeTest() {
     return () => clearInterval(timer);
   }, [testStarted, testFinished, isReviewMode, test?.is_timed]);
 
+  // Navigasyon paneli: başlangıç scroll durumunu hesapla
+  useEffect(() => {
+    const el = navScrollRef.current;
+    if (!el) return;
+    setNavAtBottom(el.scrollHeight <= el.clientHeight);
+  }, [questions]);
+
+  // Aktif soruyu sağ panelin ortasına getir
+  useEffect(() => {
+    const el = navScrollRef.current;
+    if (!el) return;
+    const btn = el.querySelector(`[data-nav-idx="${currentIndex}"]`);
+    if (!btn) return;
+    const target = btn.offsetTop - el.clientHeight / 2 + btn.offsetHeight / 2;
+    el.scrollTo({ top: target, behavior: "smooth" });
+  }, [currentIndex]);
+
+  // Cevaplarım dialogu açıldığında aktif satırı ortaya getir
+  useEffect(() => {
+    if (!showAnswerSheet) return;
+    // Dialog animasyonunun (Radix ~150ms) bitmesini bekle
+    const t = setTimeout(() => {
+      const el = answerSheetScrollRef.current;
+      if (!el) return;
+      const btn = el.querySelector(`[data-sheet-idx="${currentIndex}"]`);
+      if (!btn) return;
+      const btnTop    = btn.offsetTop;
+      const btnHeight = btn.offsetHeight;
+      const elHeight  = el.clientHeight;
+      el.scrollTop = btnTop - elHeight / 2 + btnHeight / 2;
+    }, 160);
+    return () => clearTimeout(t);
+  }, [showAnswerSheet, currentIndex]);
+
   // answerMutation yerine useAnswerQueue kullanılıyor — localStorage yedekli, retry'lı
 
   const { testAttemptsEnabled } = useServiceStatus();
@@ -492,6 +539,14 @@ export default function TakeTest() {
     setAnswers((prev) => ({ ...prev, [q.id]: letter }));
     // Kuyruğa ekle + API'ye gönder (offline ise kuyrukta bekler)
     queuedSubmitAnswer(q.id, optionId);
+    // Her 3 cevapta elapsed time'ı DB'ye kaydet
+    checkpointCountRef.current += 1;
+    if (checkpointCountRef.current >= 3) {
+      checkpointCountRef.current = 0;
+      if (resolvedAttemptId) {
+        api.patch(`/attempts/${resolvedAttemptId}/checkpoint`, { elapsedSeconds: elapsedSec }).catch(() => {});
+      }
+    }
   };
 
   const clearAnswer = () => {
@@ -809,82 +864,75 @@ export default function TakeTest() {
       />
 
       <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6 flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4 flex-wrap">
-          {isReviewMode && (
-            <Badge className="bg-indigo-100 text-indigo-700">Gözden Geçirme Modu</Badge>
+        {/* Sol: eylem butonları */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {isReviewMode ? (
+            <>
+              <Badge className="bg-indigo-100 text-indigo-700">Gözden Geçirme Modu</Badge>
+              <Link to={createPageUrl("MyTests")}>
+                <Button variant="ghost" className="text-slate-600">Testlerime Dön</Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                className="text-rose-600 hover:bg-rose-50"
+                onClick={handleFinish}
+              >
+                <LogOut className="w-4 h-4 mr-1.5" />
+                Testi Bitir
+              </Button>
+              <Button variant="ghost" className="text-slate-600 hover:bg-slate-100" onClick={saveAndExit}>
+                <Save className="w-4 h-4 mr-1.5" />
+                Kaydet ve Çık
+              </Button>
+            </>
           )}
-          <Badge variant="outline" className="text-sm">
+        </div>
+
+        {/* Sağ: ilerleme + süre */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-sm text-slate-500">
             {currentIndex + 1} / {questions.length}
-          </Badge>
+          </span>
           <Progress value={progress} className="w-32 h-2" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowAnswerSheet(true)}
-            className="text-indigo-600"
-          >
-            <Grid3x3 className="w-4 h-4 mr-2" />
-            Cevaplarım
-          </Button>
 
           {!isReviewMode && testStarted && (
             test?.is_timed && timeLeft !== null ? (
               isOvertime ? (
-                /* Süre aşımı sayacı */
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-100 text-rose-700 animate-pulse border border-rose-300">
+                <div className="flex items-center gap-1 text-rose-600 animate-pulse">
                   <Clock className="w-4 h-4" />
-                  <div className="flex flex-col leading-none">
-                    <span className="font-mono font-bold text-sm">+{formatTime(overtimeElapsed)}</span>
-                    <span className="text-xs font-normal">Süre aşıldı</span>
-                  </div>
+                  <span className="font-mono font-semibold text-sm">+{formatTime(overtimeElapsed)}</span>
+                  <span className="text-xs text-rose-400">aşıldı</span>
                 </div>
               ) : (
-              <div
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors",
-                  timeLeft < 60
-                    ? "bg-rose-100 text-rose-700 animate-pulse"
-                    : timeLeft < (test?.duration_minutes || 60) * 60 * 0.1
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-emerald-100 text-emerald-700"
-                )}
-              >
-                <Clock className="w-4 h-4" />
-                <span className="font-mono font-semibold">{formatTime(timeLeft)}</span>
-              </div>
+                <div
+                  className={cn(
+                    "flex items-center gap-1 font-mono font-semibold",
+                    timeLeft < 60
+                      ? "text-rose-600 animate-pulse"
+                      : timeLeft < (test?.duration_minutes || 60) * 60 * 0.1
+                      ? "text-amber-600"
+                      : "text-slate-700"
+                  )}
+                >
+                  <Clock className="w-4 h-4" />
+                  {formatTime(timeLeft)}
+                </div>
               )
             ) : (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
+              <div className="flex items-center gap-1 text-slate-600">
                 <Clock className="w-4 h-4" />
                 <span className="font-mono font-semibold">{formatTime(elapsedSec)}</span>
               </div>
             )
           )}
         </div>
-
-        <div className="flex items-center gap-3 flex-wrap">
-          {isReviewMode ? (
-            <Link to={createPageUrl("MyTests")}>
-              <Button variant="outline">Testlerime Dön</Button>
-            </Link>
-          ) : (
-            <>
-              <Button variant="outline" onClick={saveAndExit}>
-                Kaydet ve Çık
-              </Button>
-              <Button
-                variant="outline"
-                className="text-rose-600 border-rose-200 hover:bg-rose-50"
-                onClick={handleFinish}
-              >
-                Testi Bitir
-              </Button>
-            </>
-          )}
-        </div>
       </div>
 
-      <div className="relative bg-white rounded-2xl border border-slate-200 p-8 mb-6">
+      <div className="flex gap-4 mb-6">
+      <div className="flex-1 relative bg-white rounded-2xl border border-slate-200 p-8">
         <QuestionCanvas
           ref={canvasRef}
           isActive={isDrawingMode}
@@ -1022,6 +1070,79 @@ export default function TakeTest() {
         </div>
       </div>
 
+      {/* Soru navigasyon paneli — sağ sütun */}
+      <div className="hidden md:flex flex-col w-16 shrink-0">
+        <div
+          className="bg-white rounded-2xl border border-slate-200 flex flex-col sticky top-4"
+          style={{ maxHeight: "70vh" }}
+        >
+          {/* Yukarı ok */}
+          <button
+            onClick={() => {
+              const el = navScrollRef.current;
+              if (el) el.scrollBy({ top: -160, behavior: "smooth" });
+            }}
+            disabled={navAtTop}
+            className="flex items-center justify-center py-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20 transition-opacity border-b border-slate-100 rounded-t-2xl hover:bg-slate-50"
+          >
+            <ChevronUp className="w-4 h-4" />
+          </button>
+
+          {/* Soru listesi — scrollbar gizli */}
+          <div
+            ref={navScrollRef}
+            onScroll={() => {
+              const el = navScrollRef.current;
+              if (!el) return;
+              setNavAtTop(el.scrollTop === 0);
+              setNavAtBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 1);
+            }}
+            className="flex-1 overflow-y-scroll flex flex-col gap-1 px-2 py-1"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {questions.map((q, idx) => {
+              const ans = answers[q.id];
+              let cellClass = "bg-white text-slate-500";
+              if (isReviewMode && ans === q.correct_answer)
+                cellClass = "bg-emerald-500 text-white";
+              else if (isReviewMode && ans && ans !== q.correct_answer)
+                cellClass = "bg-rose-500 text-white";
+              else if (!isReviewMode && ans)
+                cellClass = "bg-indigo-600 text-white";
+              else if (flagged.has(q.id))
+                cellClass = "bg-amber-100 text-amber-700";
+              return (
+                <button
+                  key={q.id}
+                  data-nav-idx={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={cn(
+                    "w-full h-8 rounded-lg text-xs font-medium transition-all flex items-center justify-center shrink-0 border-b border-slate-100",
+                    idx === currentIndex && "ring-2 ring-indigo-600 ring-offset-1",
+                    cellClass
+                  )}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Aşağı ok */}
+          <button
+            onClick={() => {
+              const el = navScrollRef.current;
+              if (el) el.scrollBy({ top: 160, behavior: "smooth" });
+            }}
+            disabled={navAtBottom}
+            className="flex items-center justify-center py-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20 transition-opacity border-t border-slate-100 rounded-b-2xl hover:bg-slate-50"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      </div>{/* /flex wrapper */}
+
       <ReportQuestionModal
         open={showReportModal}
         onClose={() => setShowReportModal(false)}
@@ -1030,83 +1151,106 @@ export default function TakeTest() {
       />
 
       <Dialog open={showAnswerSheet} onOpenChange={setShowAnswerSheet}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Cevaplarım</DialogTitle>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <div className="flex items-center justify-between pr-6">
+              <DialogTitle>Cevaplarım</DialogTitle>
+              {(() => {
+                const total = questions.length;
+                if (isReviewMode) {
+                  const correct = questions.filter(q => answers[q.id] === q.correct_answer).length;
+                  const empty   = questions.filter(q => !answers[q.id]).length;
+                  const wrong   = total - correct - empty;
+                  return (
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="flex items-center gap-1 text-emerald-600 font-semibold">
+                        <CheckCircle className="w-4 h-4" />{correct}
+                      </span>
+                      <span className="flex items-center gap-1 text-slate-400 font-semibold">
+                        <span className="text-base leading-none">—</span>{empty}
+                      </span>
+                      <span className="flex items-center gap-1 text-rose-500 font-semibold">
+                        <XCircle className="w-4 h-4" />{wrong}
+                      </span>
+                    </div>
+                  );
+                }
+                const empty = questions.filter(q => !answers[q.id]).length;
+                return (
+                  <span className="text-sm text-slate-500">
+                    <span className="font-semibold text-amber-600">{empty}</span> boş soru
+                  </span>
+                );
+              })()}
+            </div>
           </DialogHeader>
-          <div className="mt-4 space-y-2">
-            {questions.map((q, idx) => {
-              const userAnswer = answers[q.id];
-              const isCorrect = isReviewMode && userAnswer === q.correct_answer;
-              const isWrong = isReviewMode && userAnswer && userAnswer !== q.correct_answer;
-              const isEmpty = !userAnswer;
 
-              return (
-                <button
-                  key={q.id}
-                  onClick={() => {
-                    setCurrentIndex(idx);
-                    setShowAnswerSheet(false);
-                  }}
-                  className={cn(
-                    "w-full p-4 rounded-lg border-2 transition-all text-left flex items-center gap-4",
-                    idx === currentIndex && "ring-2 ring-indigo-600 ring-offset-2",
-                    isReviewMode && isCorrect && "bg-emerald-50 border-emerald-200",
-                    isReviewMode && isWrong && "bg-rose-50 border-rose-200",
-                    isEmpty && "bg-slate-50 border-slate-200",
-                    !isReviewMode && userAnswer && "bg-indigo-50 border-indigo-200",
-                    !isReviewMode && !userAnswer && "bg-white border-slate-200 hover:border-slate-300"
-                  )}
-                >
-                  <div
+          {/* Başlık satırı */}
+          <div className="shrink-0 grid grid-cols-[3rem_2.5rem_2.5rem_auto] gap-x-1 px-1 pb-1 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+            <span className="text-right pr-2">No</span>
+            <span className="text-center">Cevap</span>
+            {isReviewMode && <span className="text-center text-emerald-600">Doğru</span>}
+          </div>
+
+          {/* Satır listesi — CSS columns ile yan sütunlara akar */}
+          <div
+            ref={answerSheetScrollRef}
+            className="overflow-y-auto mt-1"
+            style={{ scrollbarWidth: "thin" }}
+          >
+            <div className="columns-2 sm:columns-3 gap-x-4">
+              {questions.map((q, idx) => {
+                const ans = answers[q.id];
+                let rowClass = "hover:bg-slate-50";
+                let ansClass = "text-slate-300"; // boş
+                if (isReviewMode && ans === q.correct_answer) {
+                  rowClass = "bg-emerald-50 hover:bg-emerald-100";
+                  ansClass = "text-emerald-700 font-bold";
+                } else if (isReviewMode && ans && ans !== q.correct_answer) {
+                  rowClass = "bg-rose-50 hover:bg-rose-100";
+                  ansClass = "text-rose-700 font-bold";
+                } else if (!isReviewMode && ans) {
+                  rowClass = "hover:bg-indigo-50";
+                  ansClass = "text-indigo-700 font-bold";
+                }
+                return (
+                  <button
+                    key={q.id}
+                    data-sheet-idx={idx}
+                    onClick={() => { setCurrentIndex(idx); setShowAnswerSheet(false); }}
                     className={cn(
-                      "w-10 h-10 rounded-lg flex items-center justify-center font-semibold",
-                      isReviewMode && isCorrect && "bg-emerald-600 text-white",
-                      isReviewMode && isWrong && "bg-rose-600 text-white",
-                      isEmpty && "bg-slate-200 text-slate-600",
-                      !isReviewMode && userAnswer && "bg-indigo-600 text-white",
-                      !isReviewMode && !userAnswer && "bg-slate-100 text-slate-600"
+                      "w-full flex items-center gap-1 px-1 py-0.5 rounded transition-colors break-inside-avoid",
+                      idx === currentIndex && "ring-1 ring-inset ring-indigo-400",
+                      rowClass
                     )}
                   >
-                    {idx + 1}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-900 line-clamp-1">{q.question_text}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-slate-500">
-                        Cevabınız: <span className="font-semibold">{userAnswer || "Boş"}</span>
+                    {/* Soru no */}
+                    <span className="w-10 text-right text-xs text-slate-400 shrink-0">{idx + 1}</span>
+                    {/* Kullanıcı cevabı */}
+                    <span className={cn("w-7 text-center text-sm shrink-0", ansClass)}>
+                      {ans || "—"}
+                    </span>
+                    {/* Doğru cevap (gözden geçirme) */}
+                    {isReviewMode && (
+                      <span className="w-7 text-center text-xs text-emerald-600 shrink-0">
+                        {q.correct_answer}
                       </span>
-                      {isReviewMode && userAnswer && (
-                        <span className="text-xs text-slate-500">
-                          • Doğru: <span className="font-semibold">{q.correct_answer}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {isReviewMode && isCorrect && (
-                      <Badge className="bg-emerald-100 text-emerald-700">Doğru</Badge>
                     )}
-                    {isReviewMode && isWrong && (
-                      <Badge className="bg-rose-100 text-rose-700">Yanlış</Badge>
+                    {/* Bayrak */}
+                    {flagged.has(q.id) && (
+                      <Flag className="w-3 h-3 text-amber-500 ml-auto shrink-0" />
                     )}
-                    {isEmpty && (
-                      <Badge variant="outline" className="text-slate-500">
-                        Boş
-                      </Badge>
-                    )}
-                    {flagged.has(q.id) && <Flag className="w-4 h-4 text-amber-500" />}
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      <div className="flex items-center justify-between">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center justify-between">
         <Button
-          variant="outline"
+          variant="ghost"
           onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
           disabled={currentIndex === 0}
         >
@@ -1114,26 +1258,20 @@ export default function TakeTest() {
           Önceki
         </Button>
 
-        <div className="hidden md:flex gap-1 flex-wrap justify-center max-w-md">
-          {questions.map((q, idx) => (
-            <button
-              key={q.id}
-              onClick={() => setCurrentIndex(idx)}
-              className={cn(
-                "w-8 h-8 rounded-lg text-xs font-medium transition-all",
-                idx === currentIndex && "ring-2 ring-indigo-600 ring-offset-2",
-                answers[q.id] ? "bg-indigo-600 text-white" : flagged.has(q.id) ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"
-              )}
-            >
-              {idx + 1}
-            </button>
-          ))}
-        </div>
+        <Button
+          variant="ghost"
+          onClick={() => setShowAnswerSheet(true)}
+          className="text-indigo-600"
+        >
+          <Grid3x3 className="w-4 h-4 mr-2" />
+          Cevaplarım
+        </Button>
 
         <Button
+          variant="ghost"
           onClick={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))}
           disabled={currentIndex === questions.length - 1}
-          className="bg-indigo-600 hover:bg-indigo-700"
+          className="text-indigo-600 hover:bg-indigo-50"
         >
           Sonraki
           <ChevronRight className="w-4 h-4 ml-2" />

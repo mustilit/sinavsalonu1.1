@@ -14,12 +14,22 @@ export default function Layout({ children, currentPageName }) {
   const path = (location.pathname || "").replace(/\/+$/, "") || "/";
   const isAuthPage = AUTH_PAGES.includes(currentPageName) ||
     /^\/login$/i.test(path) || /^\/register$/i.test(path);
+  const isFullScreen = currentPageName === "TakeTest";
 
   // Login/Register: sadece içerik, sidebar yok
   if (isAuthPage) {
     return (
       <div className="min-h-screen bg-white">
         {children}
+      </div>
+    );
+  }
+
+  // Tam ekran (TakeTest vb.): sidebar yok, padding var
+  if (isFullScreen) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <div className="p-4 lg:p-8">{children}</div>
       </div>
     );
   }

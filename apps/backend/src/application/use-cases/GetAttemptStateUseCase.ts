@@ -80,6 +80,9 @@ export class GetAttemptStateUseCase {
         remainingSeconds,
         isInLast10Percent,
         isInLast3Minutes,
+        savedElapsedSeconds: (attempt as any).metadata != null
+          ? ((attempt as any).metadata as any)?.elapsedSeconds ?? null
+          : null,
       },
       test: {
         id: test.id,

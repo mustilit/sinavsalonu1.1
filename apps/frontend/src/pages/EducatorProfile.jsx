@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { createPageUrl } from '@/utils';
 import api from '@/lib/api/apiClient';
+import { entities } from '@/api/dalClient';
+import { useAuth } from '@/lib/AuthContext';
 import TestPackageCard from '@/components/ui/TestPackageCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +33,7 @@ function StarRating({ value, size = 'sm' }) {
 
 export default function EducatorProfile() {
   const navigate = useAppNavigate();
+  const { user } = useAuth();
   const urlParams = new URLSearchParams(window.location.search);
   const idOrEmail = urlParams.get('email') || urlParams.get('id') || '';
 
@@ -73,6 +76,32 @@ export default function EducatorProfile() {
     },
     enabled: !!data?.educator?.id,
     staleTime: 2 * 60 * 1000,
+  });
+
+  const { data: purchases = [] } = useQuery({
+    queryKey: ['purchases', user?.id],
+    queryFn: () => entities.Purchase.filter({}),
+    enabled: !!user,
+  });
+
+  const { data: myResults = [] } = useQuery({
+    queryKey: ['results', user?.email],
+    queryFn: () => entities.TestResult.filter({ user_email: user?.email }),
+    enabled: !!user,
+  });
+
+  const { data: testProgress = [] } = useQuery({
+    queryKey: ['testProgress', user?.id],
+    queryFn: () => entities.TestProgress.filter({ user_email: user?.email, is_completed: false }),
+    enabled: !!user,
+  });
+
+  const purchasedIds = new Set(purchases.map(p => p.test_package_id));
+  const completedIds = new Set(myResults.map(r => r.test_package_id));
+  const inProgressIds = new Set(testProgress.map(p => p.test_package_id));
+  const attemptByTestId = {};
+  purchases.forEach((p) => {
+    if (p.test_package_id && p.attempt) attemptByTestId[p.test_package_id] = p.attempt;
   });
 
   // Uzmanlık alanları — tüm hook'lardan sonra, early return'lardan önce hesaplanır
@@ -144,8 +173,12 @@ export default function EducatorProfile() {
       <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
         <div className="flex flex-col md:flex-row md:items-start gap-6">
           {/* Avatar */}
-          <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-violet-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <User className="w-10 h-10 text-indigo-600" />
+          <div className="w-20 h-20 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center">
+            {educator.avatarUrl ? (
+              <img src={educator.avatarUrl} alt={educator.displayName} className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-10 h-10 text-indigo-600" />
+            )}
           </div>
 
           <div className="flex-1 min-w-0">
@@ -223,8 +256,10 @@ export default function EducatorProfile() {
                 is_published: true,
                 is_active: true,
               }}
-              isPurchased={false}
-              isCompleted={false}
+              isPurchased={purchasedIds.has(t.id)}
+              isCompleted={completedIds.has(t.id)}
+              isInProgress={inProgressIds.has(t.id)}
+              attempt={attemptByTestId[t.id] ?? null}
               onBuy={() => navigate(buildPageUrl('TestDetail', { id: t.id }))}
             />
           ))}

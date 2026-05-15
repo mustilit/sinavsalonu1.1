@@ -61,6 +61,7 @@ import CreateTest from './pages/CreateTest';
 import EditTest from './pages/EditTest';
 import EducatorDashboard from './pages/EducatorDashboard';
 import EducatorProfile from './pages/EducatorProfile';
+import { EducatorRefunds } from './pages/EducatorRefunds';
 import EducatorSettings from './pages/EducatorSettings';
 import Educators from './pages/Educators';
 import ExamTypes from './pages/ExamTypes';
@@ -108,6 +109,7 @@ export const PAGES = {
     "EditTest": EditTest,
     "EducatorDashboard": EducatorDashboard,
     "EducatorProfile": EducatorProfile,
+    "EducatorRefunds": EducatorRefunds,
     "EducatorSettings": EducatorSettings,
     "Educators": Educators,
     "ExamTypes": ExamTypes,

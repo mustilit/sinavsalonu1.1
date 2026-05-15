@@ -8,13 +8,34 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { User, Save, Phone, MapPin, Globe, Linkedin, Undo2, Clock, CheckCircle2, XCircle, ShoppingBag, Filter, GraduationCap } from "lucide-react";
+import { User, Save, Phone, Globe, Linkedin, Undo2, Clock, CheckCircle2, XCircle, ShoppingBag, Filter, GraduationCap, AlertCircle, MessageSquare, Camera } from "lucide-react";
 import RefundRequestModal from "@/components/refund/RefundRequestModal";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+// Helper function to format phone number in Turkish format (05XX XXX XX XX)
+function formatPhone(raw) {
+  const d = String(raw ?? "").replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 4) return d;
+  if (d.length <= 7) return `${d.slice(0, 4)} ${d.slice(4)}`;
+  if (d.length <= 9) return `${d.slice(0, 4)} ${d.slice(4, 7)} ${d.slice(7)}`;
+  return `${d.slice(0, 4)} ${d.slice(4, 7)} ${d.slice(7, 9)} ${d.slice(9, 11)}`;
+}
+
+// Helper function to validate URLs
+function isValidUrl(url) {
+  if (!url) return true;
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 const defaultFormData = {
   phone: "",
-  city: "",
   website: "",
   linkedin: "",
   interested_exam_types: [],
@@ -26,15 +47,41 @@ const defaultFormData = {
   }
 };
 
+function resizeImageToBase64(file, maxPx = 256) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(maxPx / img.width, maxPx / img.height, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function ProfileSettings() {
   const { user: authUser } = useAuth();
   const [initialFormData, setInitialFormData] = useState(null);
   const [formData, setFormData] = useState({ ...defaultFormData });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [urlErrors, setUrlErrors] = useState({ website: false, linkedin: false });
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [searchPurchase, setSearchPurchase] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [searchFilter, setSearchFilter] = useState("");
+  const [appealOpen, setAppealOpen] = useState(false);
+  const [appealRefund, setAppealRefund] = useState(null);
+  const [appealReason, setAppealReason] = useState("");
   const queryClient = useQueryClient();
 
   const user = authUser;
@@ -57,6 +104,32 @@ export default function ProfileSettings() {
     queryFn: () => entities.ExamType.filter({ is_active: true }),
   });
 
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Lütfen JPG, PNG veya WebP formatında resim yükleyin");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Resim boyutu en fazla 5MB olabilir");
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const dataUrl = await resizeImageToBase64(file, 256);
+      await auth.updateMe({ profile_image_url: dataUrl });
+      setFormData(prev => ({ ...prev, profile_image_url: dataUrl }));
+      toast.success("Profil resmi güncellendi");
+    } catch {
+      toast.error("Resim yüklenemedi");
+    } finally {
+      setUploadingImage(false);
+      e.target.value = '';
+    }
+  };
+
   useEffect(() => {
     if (!authUser) return;
     const loadProfile = async () => {
@@ -64,14 +137,14 @@ export default function ProfileSettings() {
         const userData = await auth.me();
         const initialData = {
           phone: userData.phone || "",
-          city: userData.city || "",
           website: userData.website || "",
           linkedin: userData.linkedin || "",
           interested_exam_types: userData.interested_exam_types || [],
-          notification_preferences: userData.notification_preferences || defaultFormData.notification_preferences
+          notification_preferences: userData.notification_preferences || defaultFormData.notification_preferences,
+          profile_image_url: userData.profile_image_url || "",
         };
         setFormData(initialData);
-        setInitialFormData(initialData);
+        setInitialFormData({ ...initialData, profile_image_url: initialData.profile_image_url });
       } catch {
         setFormData({ ...defaultFormData });
         setInitialFormData({ ...defaultFormData });
@@ -96,15 +169,9 @@ export default function ProfileSettings() {
 
   const refundMutation = useMutation({
     mutationFn: (data) => entities.RefundRequest.create({
-      user_email: user.email,
-      user_name: user.full_name,
       purchase_id: selectedPurchase.id,
-      test_package_id: selectedPurchase.test_package_id,
-      test_package_title: selectedPurchase.test_package_title,
-      educator_email: selectedPurchase.educator_email,
-      amount: selectedPurchase.price_paid,
       reason: data.reason,
-      status: "pending"
+      description: data.description,
     }),
     onSuccess: () => {
       toast.success("İade talebi gönderildi");
@@ -112,8 +179,22 @@ export default function ProfileSettings() {
       setSelectedPurchase(null);
       queryClient.invalidateQueries({ queryKey: ["refundRequests"] });
     },
-    onError: () => {
-      toast.error("İade talebi gönderilemedi");
+    onError: (err) => {
+      toast.error(err?.response?.data?.message ?? "İade talebi gönderilemedi");
+    }
+  });
+
+  const appealMutation = useMutation({
+    mutationFn: () => entities.RefundRequest.appeal(appealRefund.id, appealReason.trim()),
+    onSuccess: () => {
+      toast.success("İtirazınız iletildi. Admin tarafından incelenecek.");
+      setAppealOpen(false);
+      setAppealRefund(null);
+      setAppealReason("");
+      queryClient.invalidateQueries({ queryKey: ["refundRequests"] });
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message ?? "İtiraz gönderilemedi");
     }
   });
 
@@ -134,12 +215,28 @@ export default function ProfileSettings() {
 
       <div className="bg-white rounded-2xl border border-slate-200 p-6 lg:p-8">
         <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-100">
-          <div className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-violet-100 rounded-full flex items-center justify-center">
-            <User className="w-8 h-8 text-indigo-600" />
+          <div className="relative group flex-shrink-0">
+            {formData.profile_image_url ? (
+              <img src={formData.profile_image_url} alt={user.full_name || user.username} className="w-16 h-16 rounded-full object-cover" />
+            ) : (
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-violet-100 rounded-full flex items-center justify-center">
+                <User className="w-8 h-8 text-indigo-600" />
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => document.getElementById('profile-avatar-upload').click()}
+              disabled={uploadingImage}
+              className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            >
+              <Camera className="w-5 h-5 text-white" />
+            </button>
+            <input id="profile-avatar-upload" type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
           </div>
           <div>
             <p className="text-lg font-semibold text-slate-900">{user.full_name || user.username || user.email || "Kullanıcı"}</p>
             <p className="text-sm text-slate-500">{user.email}</p>
+            <p className="text-xs text-slate-400 mt-0.5">Resme tıklayarak profil fotoğrafı ekle</p>
           </div>
         </div>
 
@@ -155,32 +252,21 @@ export default function ProfileSettings() {
           <TabsContent value="contact">
             <form onSubmit={(e) => { e.preventDefault(); updateMutation.mutate(); }} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
+                <div className="md:col-span-2">
                   <Label htmlFor="phone" className="flex items-center gap-2">
                     <Phone className="w-4 h-4" />
                     Telefon
                   </Label>
                   <Input
                     id="phone"
-                    placeholder="0532 123 45 67"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="mt-2"
+                    placeholder="05XX XXX XX XX"
+                    value={formatPhone(formData.phone)}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 11) })}
+                    className={`mt-2 ${formData.phone && formData.phone.length < 11 && formData.phone.length > 0 ? "border-rose-500" : ""}`}
                   />
-                </div>
-
-                <div>
-                  <Label htmlFor="city" className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    Şehir
-                  </Label>
-                  <Input
-                    id="city"
-                    placeholder="İstanbul"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="mt-2"
-                  />
+                  {formData.phone && formData.phone.length < 11 && formData.phone.length > 0 && (
+                    <p className="text-sm text-rose-600 mt-1">Geçersiz telefon numarası</p>
+                  )}
                 </div>
 
                 <div>
@@ -193,8 +279,12 @@ export default function ProfileSettings() {
                     placeholder="https://example.com"
                     value={formData.website}
                     onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                    className="mt-2"
+                    onBlur={() => setUrlErrors(e => ({ ...e, website: !isValidUrl(formData.website) }))}
+                    className={`mt-2 ${urlErrors.website ? "border-rose-500" : ""}`}
                   />
+                  {urlErrors.website && (
+                    <p className="text-sm text-rose-600 mt-1">Geçerli bir URL girin (https://...)</p>
+                  )}
                 </div>
 
                 <div>
@@ -207,15 +297,19 @@ export default function ProfileSettings() {
                     placeholder="https://linkedin.com/in/username"
                     value={formData.linkedin}
                     onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
-                    className="mt-2"
+                    onBlur={() => setUrlErrors(e => ({ ...e, linkedin: !isValidUrl(formData.linkedin) }))}
+                    className={`mt-2 ${urlErrors.linkedin ? "border-rose-500" : ""}`}
                   />
+                  {urlErrors.linkedin && (
+                    <p className="text-sm text-rose-600 mt-1">Geçerli bir URL girin (https://...)</p>
+                  )}
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="bg-indigo-600 hover:bg-indigo-700"
-                disabled={updateMutation.isPending || !hasChanges}
+                disabled={updateMutation.isPending || !hasChanges || urlErrors.website || urlErrors.linkedin}
               >
                 <Save className="w-4 h-4 mr-2" />
                 {updateMutation.isPending ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
@@ -454,15 +548,24 @@ export default function ProfileSettings() {
 
                   {/* İade Talepleri */}
                   {(filterType === "all" || filterType === "refunds") && refundRequests
-                    .filter((r) => r.test_package_title.toLowerCase().includes(searchFilter.toLowerCase()))
+                    .filter((r) => (r.test_package_title ?? "").toLowerCase().includes(searchFilter.toLowerCase()))
                     .map((request) => {
                       const statusConfig = {
+                        PENDING: { icon: Clock, color: "text-amber-600", bg: "bg-amber-50", label: "Eğitici İnceliyor" },
+                        EDUCATOR_APPROVED: { icon: CheckCircle2, color: "text-blue-600", bg: "bg-blue-50", label: "Eğitici Onayladı" },
+                        EDUCATOR_REJECTED: { icon: XCircle, color: "text-rose-600", bg: "bg-rose-50", label: "Eğitici Reddetti" },
+                        APPEAL_PENDING: { icon: AlertCircle, color: "text-purple-600", bg: "bg-purple-50", label: "İtiraz İnceleniyor" },
+                        ESCALATED: { icon: AlertCircle, color: "text-orange-600", bg: "bg-orange-50", label: "Admin İnceliyor" },
+                        APPROVED: { icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50", label: "İade Onaylandı" },
+                        REJECTED: { icon: XCircle, color: "text-slate-600", bg: "bg-slate-50", label: "Reddedildi" },
+                        // lowercase fallback (old data)
                         pending: { icon: Clock, color: "text-amber-600", bg: "bg-amber-50", label: "Beklemede" },
                         approved: { icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50", label: "Onaylandı" },
-                        rejected: { icon: XCircle, color: "text-rose-600", bg: "bg-rose-50", label: "Reddedildi" }
+                        rejected: { icon: XCircle, color: "text-rose-600", bg: "bg-rose-50", label: "Reddedildi" },
                       };
-                      const config = statusConfig[request.status] || statusConfig.pending;
+                      const config = statusConfig[request.status] ?? statusConfig.pending;
                       const Icon = config.icon;
+                      const canAppeal = request.status === "EDUCATOR_REJECTED";
 
                       return (
                         <div key={`refund-${request.id}`} className={`${config.bg} rounded-xl p-4 border border-slate-200`}>
@@ -475,10 +578,28 @@ export default function ProfileSettings() {
                               <p className="text-sm text-slate-600 mb-2">{request.reason}</p>
                               <div className="flex items-center gap-4 text-sm text-slate-500">
                                 <span>₺{request.amount}</span>
-                                <span>{new Date(request.created_date).toLocaleDateString('tr-TR')}</span>
+                                <span>{request.created_date ? new Date(request.created_date).toLocaleDateString('tr-TR') : '-'}</span>
                               </div>
+                              {canAppeal && (
+                                <p className="text-xs text-rose-600 mt-2">
+                                  Eğitici iadeyi reddetti. İtiraz talebinde bulunabilirsiniz.
+                                </p>
+                              )}
                             </div>
-                            <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
+                            <div className="flex flex-col items-end gap-2">
+                              <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
+                              {canAppeal && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-purple-600 border-purple-200 hover:bg-purple-50 text-xs"
+                                  onClick={() => { setAppealRefund(request); setAppealReason(""); setAppealOpen(true); }}
+                                >
+                                  <MessageSquare className="w-3 h-3 mr-1" />
+                                  İtiraz Et
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -555,6 +676,43 @@ export default function ProfileSettings() {
         onSubmit={(data) => refundMutation.mutate(data)}
         isLoading={refundMutation.isPending}
       />
+
+      {/* İtiraz Dialog */}
+      <Dialog open={appealOpen} onOpenChange={(o) => { if (!o) { setAppealOpen(false); setAppealRefund(null); setAppealReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>İtiraz Talebi</DialogTitle>
+          </DialogHeader>
+          {appealRefund && (
+            <div className="space-y-4 mt-2">
+              <div className="p-3 bg-slate-50 rounded-lg text-sm">
+                <p className="font-medium text-slate-900">{appealRefund.test_package_title}</p>
+                <p className="text-slate-500 mt-1">Eğitici bu iade talebini reddetti. İtiraz gerekçenizi yazarak admin incelemesine sunabilirsiniz.</p>
+              </div>
+              <Textarea
+                value={appealReason}
+                onChange={(e) => setAppealReason(e.target.value)}
+                placeholder="İtiraz gerekçenizi yazın (en az 5 karakter)..."
+                rows={4}
+              />
+              <div className="flex gap-3 justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setAppealOpen(false)}>
+                  İptal
+                </Button>
+                <Button
+                  className="bg-purple-600 hover:bg-purple-700"
+                  size="sm"
+                  disabled={appealMutation.isPending || appealReason.trim().length < 5}
+                  onClick={() => appealMutation.mutate()}
+                >
+                  <MessageSquare className="w-4 h-4 mr-1.5" />
+                  İtirazı Gönder
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

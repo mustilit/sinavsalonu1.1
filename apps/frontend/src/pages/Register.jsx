@@ -6,30 +6,31 @@ import { createPageUrl } from '@/utils';
 import { useAppNavigate } from '@/lib/navigation';
 import { Link } from 'react-router-dom';
 
-/**
- * Register (Kayıt Ol) sayfası — yeni kullanıcı kaydı için e-posta,
- * kullanıcı adı ve şifre formunu sunar. Başarılı kayıt sonrası
- * kullanıcı giriş sayfasına yönlendirilir.
- */
 export default function Register() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const roleParam = urlParams.get('role'); // 'candidate' | 'educator' | null
+  const isEducator = roleParam === 'educator';
+
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
-  // Form gönderim sırasında butonu devre dışı bırakmak için yüklenme durumu
   const [loading, setLoading] = useState(false);
   const navigate = useAppNavigate();
 
-  // Auth API'si üzerinden kayıt oluşturur; hata varsa ekranda gösterir
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await auth.register(email, username, password);
+      if (isEducator) {
+        await auth.registerEducator(email, username, password);
+      } else {
+        await auth.register(email, username, password);
+      }
       navigate(createPageUrl('Login'), { replace: true });
     } catch (err) {
-      setError(err?.response?.data?.error || 'Kayıt başarısız.');
+      setError(err?.response?.data?.error || err?.response?.data?.message || 'Kayıt başarısız.');
     } finally {
       setLoading(false);
     }
@@ -38,7 +39,14 @@ export default function Register() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-md">
-        <h1 className="text-2xl font-bold text-slate-900 mb-6 text-center">Kayıt Ol</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-2 text-center">Kayıt Ol</h1>
+
+        {roleParam && (
+          <div className={`mb-6 text-center text-sm font-medium px-4 py-2 rounded-xl ${isEducator ? 'bg-violet-50 text-violet-700' : 'bg-indigo-50 text-indigo-700'}`}>
+            {isEducator ? '🎓 Eğitici olarak kaydoluyorsunuz' : '📝 Aday olarak kaydoluyorsunuz'}
+          </div>
+        )}
+
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">E-posta</label>
@@ -78,6 +86,7 @@ export default function Register() {
             {loading ? 'Kaydediliyor...' : 'Kayıt Ol'}
           </Button>
         </form>
+
         <p className="mt-4 text-center text-sm text-slate-600">
           Zaten hesabınız var mı?{' '}
           <Link to={createPageUrl('Login')} className="text-indigo-600 hover:underline">

@@ -1,6 +1,6 @@
 ---
 name: payment-domain
-description: Ödeme sağlayıcı entegrasyonu için pattern — provider-agnostic interface, webhook idempotency, iade akışı, test modu. Stripe, iyzico, PayTR gibi bir sağlayıcıyla ödeme akışı kurulurken veya değiştirilirken referans alın.
+description: Ödeme sağlayıcı entegrasyonu için pattern — provider-agnostic interface, webhook idempotency, iade akışı, test modu. Stripe, iyzico, PayTR, amazonpay, googlepay gibi bir sağlayıcıyla ödeme akışı kurulurken veya değiştirilirken referans alın.
 ---
 
 # Ödeme Entegrasyonu — Sinav Salonu

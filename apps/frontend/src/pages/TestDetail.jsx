@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { entities } from "@/api/dalClient";
@@ -94,23 +94,27 @@ export default function TestDetail() {
 
   const hasCompletedTest = allTestResults.length > 0;
 
+  // Gerçek exam test ID — review işlemleri için package ID değil bu kullanılmalı
+  const reviewTestId = tests[0]?.id ?? null;
+
   const { data: existingTestReview } = useQuery({
-    queryKey: ["testReview", testId, user?.id],
-    queryFn: async () => {
-      const reviews = await entities.Review.filter({
-        test_package_id: testId,
-        reviewer_email: user.email,
-        review_type: "test",
-      });
-      return reviews[0] || null;
-    },
-    enabled: !!user?.id && !!testId,
+    queryKey: ["myTestReview", reviewTestId, user?.id],
+    queryFn: () => entities.Review.myReview(reviewTestId),
+    enabled: !!user?.id && !!reviewTestId,
   });
 
+  // Mevcut review yüklenince formu pre-fill et
+  useEffect(() => {
+    if (existingTestReview?.testRating) {
+      setTestRating(existingTestReview.testRating);
+      setTestComment(existingTestReview.comment ?? "");
+    }
+  }, [existingTestReview]);
+
   const { data: reviews = [] } = useQuery({
-    queryKey: ["reviews", testId],
-    queryFn: () => entities.Review.filter({ test_package_id: testId, review_type: "test" }, "-created_date", 10),
-    enabled: !!testId,
+    queryKey: ["reviews", reviewTestId],
+    queryFn: () => entities.Review.filter({ test_package_id: reviewTestId }, "-created_date", 10),
+    enabled: !!reviewTestId,
   });
 
   // Calculate average rating from reviews
@@ -161,23 +165,16 @@ export default function TestDetail() {
   };
 
   const handleSubmitTestReview = async () => {
-    if (testRating === 0) return;
+    if (testRating === 0 || !reviewTestId) return;
     try {
       await entities.Review.create({
-        reviewer_email: user.email,
-        reviewer_name: user.full_name,
-        review_type: "test",
-        test_package_id: testId,
-        test_package_title: test.title,
-        educator_email: test.educator_email,
-        educator_name: test.educator_name,
+        exam_test_id: reviewTestId,
         rating: testRating,
         comment: testComment,
       });
-      queryClient.invalidateQueries({ queryKey: ["testReview", testId, user?.id] });
-      toast.success("Test puanınız kaydedildi!");
-      setTestRating(0);
-      setTestComment("");
+      queryClient.invalidateQueries({ queryKey: ["myTestReview", reviewTestId, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["reviews", reviewTestId] });
+      toast.success(existingTestReview ? "Puanınız güncellendi!" : "Test puanınız kaydedildi!");
     } catch {
       toast.error("Bir hata oluştu!");
     }
@@ -258,10 +255,14 @@ export default function TestDetail() {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
           {/* Test Rating */}
-          {user && isPurchased && hasCompletedTest && !existingTestReview && (
+          {user && isPurchased && hasCompletedTest && (
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">Bu Testi Değerlendir</h2>
-              <p className="text-slate-600 mb-4">Bu testi tamamladınız. Deneyiminizi paylaşın!</p>
+              <h2 className="text-lg font-semibold text-slate-900 mb-1">Bu Testi Değerlendir</h2>
+              <p className="text-slate-500 text-sm mb-4">
+                {existingTestReview
+                  ? "Mevcut puanınızı güncelleyebilirsiniz."
+                  : "Bu testi tamamladınız. Deneyiminizi paylaşın!"}
+              </p>
               <div className="flex items-center gap-4 mb-4">
                 <StarRating value={testRating} onChange={setTestRating} size="lg" />
                 {testRating > 0 && (
@@ -277,10 +278,10 @@ export default function TestDetail() {
               />
               <Button
                 onClick={handleSubmitTestReview}
-                disabled={testRating === 0}
+                disabled={testRating === 0 || !reviewTestId}
                 className="bg-indigo-600 hover:bg-indigo-700"
               >
-                Puanı Gönder
+                {existingTestReview ? "Puanı Güncelle" : "Puanı Gönder"}
               </Button>
             </div>
           )}
@@ -417,8 +418,8 @@ export default function TestDetail() {
                   const isCompleted = !!testResult;
                   const isInProgress = !!testProgress;
                   
-                  let buttonStyle = { backgroundColor: '#10b981' };
-                  if (isCompleted) buttonStyle = { backgroundColor: '#f97316' };
+                  let buttonStyle = { backgroundColor: '#0000CD' };
+                  if (isCompleted) buttonStyle = { backgroundColor: '#64748b' };
                   else if (isInProgress) buttonStyle = { backgroundColor: '#f59e0b' };
                   
                   return (

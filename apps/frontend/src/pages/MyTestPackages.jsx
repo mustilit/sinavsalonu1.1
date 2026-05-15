@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { entities } from "@/api/dalClient";
@@ -18,7 +19,8 @@ import {
   Download,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Star,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -54,8 +56,6 @@ export default function MyTestPackages() {
   });
 
   const testsWithRealCounts = tests;
-
-
 
   const togglePublishMutation = useMutation({
     mutationFn: ({ id, is_published }) =>
@@ -112,25 +112,25 @@ export default function MyTestPackages() {
   };
 
   const exportToExcel = () => {
-    const csvContent = [
-      ["Başlık", "Durum", "Zorluk", "Soru Sayısı", "Süre (dk)", "Fiyat (₺)", "Satış", "Oluşturma Tarihi"],
+    const rows = [
+      ["Başlık", "Sınav Türü", "Durum", "Test Sayısı", "Soru Sayısı", "Fiyat (₺)", "Satış", "Puan", "Oluşturma Tarihi"],
       ...filteredTests.map(test => [
         test.title,
+        test.exam_type_name || "-",
         test.is_published ? "Yayında" : "Taslak",
-        difficultyLabels[test.difficulty]?.label || test.difficulty || "Belirtilmemiş",
+        (test.tests ?? []).length,
         test.question_count || 0,
-        test.duration ?? test.duration_minutes ?? 60,
         test.price,
         test.total_sales || 0,
-        (test.createdAt || test.created_date || "").toString().slice(0, 10)
-      ])
-    ].map(row => row.join(",")).join("\n");
+        test.average_rating != null ? Number(test.average_rating).toFixed(1) : "-",
+        (test.createdAt || test.created_date || "").toString().slice(0, 10),
+      ]),
+    ];
 
-    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `test-paketlerim-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Test Paketleri");
+    XLSX.writeFile(wb, `test-paketlerim-${new Date().toISOString().split('T')[0]}.xlsx`);
     toast.success("Excel dosyası indirildi");
   };
 
@@ -170,17 +170,6 @@ export default function MyTestPackages() {
                 <SelectItem value="all">Tüm Durumlar</SelectItem>
                 <SelectItem value="published">Yayında</SelectItem>
                 <SelectItem value="draft">Taslak</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
-              <SelectTrigger className="w-full lg:w-40">
-                <SelectValue placeholder="Zorluk" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tüm Zorluklar</SelectItem>
-                <SelectItem value="easy">Kolay</SelectItem>
-                <SelectItem value="medium">Orta</SelectItem>
-                <SelectItem value="hard">Zor</SelectItem>
               </SelectContent>
             </Select>
             <Select value={examTypeFilter} onValueChange={setExamTypeFilter}>
@@ -250,7 +239,7 @@ export default function MyTestPackages() {
             {paginatedTests.map((test) => {
             const safePrice = test.price ?? (test.priceCents != null ? test.priceCents / 100 : 0);
             return (
-              <div 
+              <div
                 key={test.id}
                 className="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-md transition-shadow"
               >
@@ -258,43 +247,51 @@ export default function MyTestPackages() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <h3 className="font-semibold text-lg text-slate-900">{test.title}</h3>
-                      <Badge className={test.is_published ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}>
-                        {test.is_published ? "Yayında" : "Taslak"}
-                      </Badge>
+                      {test.exam_type_name && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-medium">
+                          {test.exam_type_name}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-slate-500 text-sm line-clamp-1 mb-3">
-                      {test.description || "Açıklama yok"}
-                    </p>
                     <div className="flex items-center gap-6 text-sm text-slate-500">
-                      <span>{test.question_count || 0} soru</span>
+                      <span>{(test.tests ?? []).length} test · {test.question_count || 0} soru</span>
                       <span className="font-semibold text-slate-900">₺{safePrice}</span>
                       <span>{test.total_sales || 0} satış</span>
+                      {test.average_rating != null ? (
+                        <span className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                          <span className="text-slate-700">{Number(test.average_rating).toFixed(1)}</span>
+                          <span className="text-slate-400">({test.rating_count ?? 0})</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs">Henüz puan yok</span>
+                      )}
                     </div>
                   </div>
 
                   {/* Satır üstü aksiyonlar */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Link to={createPageUrl("EditTest") + `?id=${test.id}`}>
-                      <Button size="sm" variant="outline" className="gap-1.5">
+                    <Link to={createPageUrl("EditTest") + `?id=${test.id}`} title="Düzenle">
+                      <Button size="sm" variant="outline" className="w-8 h-8 p-0">
                         <Edit2 className="w-3.5 h-3.5" />
-                        Düzenle
                       </Button>
                     </Link>
                     <Button
                       size="sm"
                       variant="outline"
                       disabled={togglePublishMutation.isPending}
+                      title={test.is_published ? "Yayından Kaldır" : "Yayınla"}
                       className={test.is_published
-                        ? "gap-1.5 border-amber-200 text-amber-700 hover:bg-amber-50"
-                        : "gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50"}
+                        ? "w-8 h-8 p-0 border-amber-200 text-amber-700 hover:bg-amber-50"
+                        : "w-8 h-8 p-0 border-emerald-200 text-emerald-700 hover:bg-emerald-50"}
                       onClick={() => togglePublishMutation.mutate({
                         id: test.id,
                         is_published: !test.is_published,
                       })}
                     >
                       {test.is_published
-                        ? <><EyeOff className="w-3.5 h-3.5" />Yayından Kaldır</>
-                        : <><Eye className="w-3.5 h-3.5" />Yayınla</>}
+                        ? <EyeOff className="w-3.5 h-3.5" />
+                        : <Eye className="w-3.5 h-3.5" />}
                     </Button>
                   </div>
                 </div>
@@ -314,10 +311,9 @@ export default function MyTestPackages() {
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              
+
               <div className="flex items-center gap-1">
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                  // Show first, last, current, and surrounding pages
                   if (
                     page === 1 ||
                     page === totalPages ||

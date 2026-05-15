@@ -89,11 +89,24 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
       setIsAuthenticated(true);
     } catch (err) {
-      console.error('Auth check failed:', err);
-      clearAllAuthStorage();
-      queryClientInstance.clear();
-      setUser(null);
-      setIsAuthenticated(false);
+      const status = err?.response?.status ?? err?.status;
+      if (status === 401) {
+        // Token geçersiz veya süresi dolmuş — oturumu kapat
+        clearAllAuthStorage();
+        queryClientInstance.clear();
+        setUser(null);
+        setIsAuthenticated(false);
+      } else {
+        // Ağ hatası, timeout, sunucu geçici kapalı — saklanan oturumu koru
+        authLog('auth check transient error, preserving stored session', err?.message);
+        if (stored) {
+          setUser(stored.user);
+          setIsAuthenticated(true);
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      }
     } finally {
       setIsLoadingAuth(false);
     }

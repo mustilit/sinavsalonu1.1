@@ -18,6 +18,7 @@ export interface TestPackageTest {
   id: string;
   title: string;
   examTypeId: string | null;
+  examTypeName: string | null;
   isTimed: boolean;
   duration: number | null;
   durationSec: number | null;

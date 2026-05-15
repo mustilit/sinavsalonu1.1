@@ -102,6 +102,31 @@ function userAdapter(u) {
   };
 }
 
+function normalizeRefund(r) {
+  return {
+    id: r.id,
+    purchaseId: r.purchaseId ?? null,
+    candidateId: r.candidateId ?? null,
+    educatorId: r.educatorId ?? null,
+    testId: r.testId ?? null,
+    test_package_title: r.testTitle ?? r.test_package_title ?? '',
+    reason: r.reason ?? '',
+    description: r.description ?? '',
+    status: r.status ?? 'PENDING',
+    status_lower: (r.status ?? 'PENDING').toLowerCase(),
+    educator_deadline: r.educatorDeadline ?? null,
+    educator_decided_at: r.educatorDecidedAt ?? null,
+    appeal_reason: r.appealReason ?? '',
+    appealed_at: r.appealedAt ?? null,
+    decided_by: r.decidedBy ?? null,
+    decided_at: r.decidedAt ?? null,
+    admin_notes: r.adminNotes ?? '',
+    amount: r.amount ?? (r.amountCents != null ? r.amountCents / 100 : 0),
+    created_date: r.createdAt ?? r.created_date ?? null,
+    updated_date: r.updatedAt ?? null,
+  };
+}
+
 export const entities = {
   User: {
     list: async (sort = '-created_date', limit = 200) => {
@@ -247,6 +272,11 @@ export const entities = {
           attempt: p.attempt,
           payment_status: p.paymentStatus,
           test_package_snapshot: snapshot,
+          // ProfileSettings ve diğer sayfalar için düzleştirilmiş alanlar
+          test_package_title: p.package?.title ?? p.test?.title ?? '',
+          price_paid: p.amountCents != null ? p.amountCents / 100 : 0,
+          created_date: p.createdAt ?? null,
+          educator_email: p.test?.educatorId ?? null,
           // Paketten gelen ExamTest listesi — TestDetail'de test butonları için
           tests_snapshot: pkgId && p.test
             ? [{ id: p.test.id, title: p.test.title, duration_minutes: p.test.durationMinutes ?? 60, test_package_id: testPkgId }]
@@ -312,7 +342,11 @@ export const entities = {
             updatedAt: pkg.updatedAt,
             tests: pkg.tests ?? [],
             question_count: (pkg.tests ?? []).reduce((s, t) => s + (t.questionCount ?? 0), 0),
-            total_sales: 0,
+            exam_type_id: (pkg.tests ?? []).find((t) => t.examTypeId)?.examTypeId ?? null,
+            exam_type_name: (pkg.tests ?? []).find((t) => t.examTypeName)?.examTypeName ?? null,
+            total_sales: pkg.saleCount ?? 0,
+            average_rating: pkg.ratingAvg ?? null,
+            rating_count: pkg.ratingCount ?? 0,
           }));
         } catch (err) {
           console.warn('[dalClient] TestPackage.filter educator_owns failed:', err?.message || err);
@@ -433,20 +467,33 @@ export const entities = {
           if (opts.test_package_id && p.testId !== opts.test_package_id && p.packageId !== opts.test_package_id) continue;
           const attempt = p?.attempt ?? p?.attempts?.[0];
           if (attempt && (attempt.status === 'SUBMITTED' || attempt.status === 'TIMEOUT')) {
-            const started = attempt.startedAt ? new Date(attempt.startedAt).getTime() : 0;
-            const completed = attempt.completedAt ? new Date(attempt.completedAt).getTime() : 0;
-            const timeSpent = completed && started ? Math.floor((completed - started) / 1000) : 0;
+            // Gerçek çözüm süresi: önce checkpoint'ten kaydedilen elapsedSeconds,
+            // yoksa submittedAt-startedAt farkı (completedAt yerine submit kullan — daha güvenilir)
+            const correctCount = attempt.correctCount ?? attempt.correct_count ?? 0;
+            const wrongCount  = attempt.wrongCount  ?? attempt.wrong_count  ?? 0;
+            const emptyCount  = attempt.emptyCount  ?? attempt.empty_count  ?? 0;
             const test = p?.test ?? p?.testPackage ?? {};
+            const totalQ = test?._count?.questions ?? (correctCount + wrongCount + emptyCount);
+            const score = totalQ > 0 ? Math.round((correctCount / totalQ) * 100) : 0;
+            const metaElapsed = attempt.metadata?.elapsedSeconds ?? null;
+            const started = attempt.startedAt ? new Date(attempt.startedAt).getTime() : 0;
+            const submitted = (attempt.submittedAt ?? attempt.completedAt)
+              ? new Date(attempt.submittedAt ?? attempt.completedAt).getTime() : 0;
+            const calcTime = submitted && started ? Math.floor((submitted - started) / 1000) : 0;
+            const timeSpent = metaElapsed ?? calcTime;
             results.push({
               id: attempt.id,
               user_email: opts.user_email,
               test_package_id: pkgId,
               test_id: p.testId ?? p.test_id,
               test_package_title: test?.title ?? p?.testTitle ?? '',
-              score: attempt.score ?? 0,
-              correct_count: attempt.correctCount ?? attempt.correct_count ?? null,
-              wrong_count: attempt.wrongCount ?? attempt.wrong_count ?? null,
-              empty_count: attempt.emptyCount ?? attempt.empty_count ?? null,
+              exam_type_id: test?.examTypeId ?? p?.examTypeId ?? null,
+              exam_type_name: test?.examTypeName ?? p?.examTypeName ?? null,
+              score,
+              correct_count: correctCount,
+              wrong_count: wrongCount,
+              empty_count: emptyCount,
+              question_count: test?._count?.questions ?? null,
               time_spent_seconds: timeSpent,
               // Gecikmeli teslim süresi (saniye); null = zamanında
               overtime_seconds: attempt.overtimeSeconds ?? null,
@@ -508,13 +555,21 @@ export const entities = {
         created_date: r.createdAt,
       }));
     },
+    myReview: async (examTestId) => {
+      if (!examTestId) return null;
+      try {
+        const { data } = await api.get(`/tests/${examTestId}/my-review`);
+        return data ?? null;
+      } catch {
+        return null;
+      }
+    },
     create: async (body) => {
-      const testId = body.test_package_id ?? body.test_id;
-      const { data } = await api.post(`/tests/${testId}/reviews`, {
-        testRating: body.rating ?? body.testRating,
-        educatorRating: body.educator_rating,
-        comment: body.comment,
-      });
+      const testId = body.exam_test_id ?? body.test_package_id ?? body.test_id;
+      const payload = { comment: body.comment };
+      if (body.educator_rating != null) payload.educatorRating = body.educator_rating;
+      if (body.rating != null || body.testRating != null) payload.testRating = body.rating ?? body.testRating;
+      const { data } = await api.post(`/tests/${testId}/reviews`, payload);
       return data;
     },
   },
@@ -577,12 +632,57 @@ export const entities = {
 
   // RefundRequest
   RefundRequest: {
+    // Aday: kendi iade taleplerini listele
     filter: async (opts = {}) => {
       const { data } = await api.get('/me/refunds');
-      return Array.isArray(data) ? data : [];
+      const list = Array.isArray(data) ? data : [];
+      return list.map((r) => normalizeRefund(r));
     },
+    // Aday: iade talebi oluştur
     create: async (body) => {
-      const { data } = await api.post('/refunds', { purchaseId: body.purchase_id ?? body.purchaseId, reason: body.reason });
+      const { data } = await api.post('/refunds', {
+        purchaseId: body.purchase_id ?? body.purchaseId,
+        reason: body.reason,
+        description: body.description,
+      });
+      return data;
+    },
+    // Aday: EDUCATOR_REJECTED iade talebine itiraz
+    appeal: async (refundId, reason) => {
+      const { data } = await api.post(`/refunds/${refundId}/appeal`, { reason });
+      return data;
+    },
+    // Eğitici: kendi testlerine ait iade taleplerini listele
+    listForEducator: async () => {
+      const { data } = await api.get('/educator/refunds');
+      const list = Array.isArray(data) ? data : [];
+      return list.map((r) => normalizeRefund(r));
+    },
+    // Eğitici: iade talebini onayla → EDUCATOR_APPROVED
+    educatorApprove: async (refundId) => {
+      const { data } = await api.post(`/educator/refunds/${refundId}/approve`);
+      return data;
+    },
+    // Eğitici: iade talebini reddet → EDUCATOR_REJECTED
+    educatorReject: async (refundId, reason) => {
+      const { data } = await api.post(`/educator/refunds/${refundId}/reject`, { reason });
+      return data;
+    },
+    // Admin: iade taleplerini statüye göre listele
+    list: async (statusFilter) => {
+      const status = statusFilter ?? 'actionable';
+      const { data } = await api.get('/admin/refunds', { params: { status } });
+      const list = Array.isArray(data) ? data : [];
+      return list.map((r) => normalizeRefund(r));
+    },
+    // Admin: iade talebini onayla → APPROVED
+    adminApprove: async (refundId, adminNotes) => {
+      const { data } = await api.post(`/admin/refunds/${refundId}/approve`, { adminNotes });
+      return data;
+    },
+    // Admin: iade talebini reddet → REJECTED
+    adminReject: async (refundId, reason) => {
+      const { data } = await api.post(`/admin/refunds/${refundId}/reject`, { reason });
       return data;
     },
   },

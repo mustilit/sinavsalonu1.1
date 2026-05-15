@@ -499,22 +499,35 @@ model Objection {
 
 enum RefundStatus {
   PENDING
+  EDUCATOR_APPROVED
+  EDUCATOR_REJECTED
+  APPEAL_PENDING
+  ESCALATED
   APPROVED
   REJECTED
 }
 
 model RefundRequest {
-  id          String       @id @default(uuid())
-  purchaseId  String       @unique
-  candidateId String
-  testId      String
-  reason      String?
-  status      RefundStatus @default(PENDING)
-  decidedBy   String?
-  decidedAt   DateTime?
-  createdAt   DateTime     @default(now())
+  id                String       @id @default(uuid())
+  purchaseId        String       @unique
+  candidateId       String
+  educatorId        String
+  testId            String
+  reason            String?
+  description       String?
+  status            RefundStatus @default(PENDING)
+  educatorDeadline  DateTime?
+  educatorDecidedAt DateTime?
+  appealReason      String?
+  appealedAt        DateTime?
+  decidedBy         String?
+  decidedAt         DateTime?
+  adminNotes        String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   @@index([candidateId])
+  @@index([educatorId])
   @@index([testId])
   @@map("refund_requests")
 }

@@ -31,6 +31,7 @@ export class PrismaTestPackageRepository implements ITestPackageRepository {
       id: t.id,
       title: t.title,
       examTypeId: t.examTypeId ?? null,
+      examTypeName: t.examType?.name ?? null,
       isTimed: t.isTimed,
       duration: t.duration ?? null,
       durationSec: t.durationSec ?? null,
@@ -103,7 +104,10 @@ export class PrismaTestPackageRepository implements ITestPackageRepository {
         tests: {
           where: { deletedAt: null },
           orderBy: { createdAt: 'asc' },
-          include: { _count: { select: { questions: true } } },
+          include: {
+            _count: { select: { questions: true } },
+            examType: { select: { id: true, name: true } },
+          },
         },
       },
       orderBy: { createdAt: 'desc' },

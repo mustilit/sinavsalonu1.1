@@ -399,9 +399,9 @@ export default function Home() {
 
             <div className="mt-10 flex flex-wrap gap-6 text-white/90">
               {[
-                { icon: CheckCircle, label: "10,000+ Test" },
-                { icon: CheckCircle, label: "500+ Eğitici" },
-                { icon: CheckCircle, label: "100,000+ Aday" },
+                { icon: CheckCircle, label: "Özgün Testler" },
+                { icon: CheckCircle, label: "Tecrübeli Eğiticiler" },
+                { icon: CheckCircle, label: "Performans Takibi" },
               ].map(({ icon: Icon, label }) => (
                 <div key={label} className="flex items-center gap-2">
                   <Icon className="w-5 h-5 text-emerald-400" />
@@ -536,10 +536,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 divide-x divide-white/20">
             {[
-              { icon: Users, value: "100,000+", label: "Aktif Aday" },
-              { icon: BookOpen, value: "10,000+", label: "Test Paketi" },
-              { icon: GraduationCap, value: "500+", label: "Uzman Eğitici" },
-              { icon: TrendingUp, value: "%85", label: "Başarı Oranı" },
+              { icon: Users, value: "Canlı", label: "Testler" },
+              { icon: BookOpen, value: "Özgün", label: "Test İçeriği" },
+              { icon: GraduationCap, value: "Tecrübeli", label: "Eğiticiler" },
+              { icon: TrendingUp, value: "Performans", label: "Takibi" },
             ].map(({ icon: Icon, value, label }) => (
               <div key={label} className="text-center p-8">
                 <div className="w-14 h-14 mx-auto bg-white/20 rounded-2xl flex items-center justify-center mb-4">
@@ -586,8 +586,7 @@ export default function Home() {
                   className="bg-white hover:bg-slate-100"
                   style={{ color: "#0000CD" }}
                   onClick={() => {
-                    sessionStorage.setItem("preferred_user_type", type);
-                    navigate(createPageUrl("Login"));
+                    navigate(createPageUrl("Register") + `?role=${type}`);
                   }}
                 >
                   Hemen Başla

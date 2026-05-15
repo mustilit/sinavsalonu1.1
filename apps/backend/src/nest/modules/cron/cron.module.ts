@@ -9,6 +9,8 @@ import { QueueService } from '../../../infrastructure/queue/queue.service';
 import { SendWeeklyFollowDigestUseCase } from '../../../application/use-cases/SendWeeklyFollowDigestUseCase';
 import { SendMonthlyInactiveReminderUseCase } from '../../../application/use-cases/SendMonthlyInactiveReminderUseCase';
 import { EscalateOverdueObjectionsUseCase } from '../../../application/use-cases/EscalateOverdueObjectionsUseCase';
+import { EscalateOverdueRefundsUseCase } from '../../../application/use-cases/EscalateOverdueRefundsUseCase';
+import { PrismaRefundRepository } from '../../../infrastructure/repositories/PrismaRefundRepository';
 import { PrismaAuditLogRepository } from '../../../infrastructure/repositories/PrismaAuditLogRepository';
 
 @Module({
@@ -37,6 +39,12 @@ import { PrismaAuditLogRepository } from '../../../infrastructure/repositories/P
       provide: EscalateOverdueObjectionsUseCase,
       useFactory: (o: PrismaObjectionRepository, a: PrismaAuditLogRepository) => new EscalateOverdueObjectionsUseCase(o, a),
       inject: [PrismaObjectionRepository, PrismaAuditLogRepository],
+    },
+    PrismaRefundRepository,
+    {
+      provide: EscalateOverdueRefundsUseCase,
+      useFactory: (r: PrismaRefundRepository) => new EscalateOverdueRefundsUseCase(r),
+      inject: [PrismaRefundRepository],
     },
   ],
   exports: [CronService],

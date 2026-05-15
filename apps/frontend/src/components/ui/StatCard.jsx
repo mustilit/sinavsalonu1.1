@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-export default function StatCard({ title, value, icon: Icon, trend, trendUp, className, bgColor }) {
+export default function StatCard({ title, value, icon: Icon, trend, trendUp, className, iconColor }) {
   return (
     <div className={cn(
       "bg-white p-6 border-r border-indigo-200 last:border-r-0",
@@ -20,8 +20,8 @@ export default function StatCard({ title, value, icon: Icon, trend, trendUp, cla
           )}
         </div>
         {Icon && (
-          <div className={cn("p-3 rounded-xl", bgColor || "bg-gradient-to-br from-indigo-50 to-violet-50")}>
-            <Icon className="w-6 h-6 text-indigo-600" />
+          <div className="p-3 rounded-xl">
+            <Icon className={cn("w-6 h-6", iconColor || "text-indigo-500")} />
           </div>
         )}
       </div>

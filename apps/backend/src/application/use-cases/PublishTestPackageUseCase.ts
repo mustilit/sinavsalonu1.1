@@ -29,6 +29,10 @@ export class PublishTestPackageUseCase {
       throw new AppError('PACKAGE_EMPTY', 'Yayınlamak için pakette en az bir test olmalı', 400);
     }
 
+    if (!pkg.priceCents || pkg.priceCents <= 0) {
+      throw new AppError('INVALID_PRICE', 'Ücretsiz paket yayınlanamaz. Lütfen bir fiyat belirleyin.', 400);
+    }
+
     return this.repo.publish(packageId);
   }
 }

@@ -20,7 +20,25 @@
       "Bash(python3 -c ' *)",
       "Bash(git checkout *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "PowerShell(Stop-Process -Id 17836 -Force; Start-Sleep 2; Set-Location C:\\\\Users\\\\mtulu\\\\dal\\\\apps\\\\frontend; $env:PORT = \"5174\"; npm run dev -- --port 5174)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm run *)",
+      "Bash(ls /mnt/c/Users/mtulu/dal 2>/dev/null || ls ~/dal 2>/dev/null || echo \"path not found\")",
+      "Read(//mnt/**)",
+      "Bash(ls /c)",
+      "Bash(npm test *)",
+      "Bash(ls /c/Users/mtulu/dal/apps/backend 2>&1 || ls /cygdrive/c/Users/mtulu/dal/apps/backend 2>&1 || echo \"PATH_ISSUE\")",
+      "Bash(npx eslint *)",
+      "Bash(node --input-type=module --eval ' *)",
+      "Bash(npx vite *)",
+      "Bash(npm install *)",
+      "Bash(node -e ' *)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\mtulu\\\\dal\\\\apps\\\\backend\\\\prisma\\\\migrations\")",
+      "Bash(Select-Object Name)",
+      "Bash(Sort-Object Name)",
+      "Bash(Select-Object -Last 5)",
+      "Bash(npx tsx *)"
     ]
   }
 }

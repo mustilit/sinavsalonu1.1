@@ -29,7 +29,7 @@ export class PrismaAttemptRepository implements IAttemptRepository {
     // questionsSnapshot, prisma generate sonrası type'a eklenecek; şimdilik any cast
     const row: any = await (prisma.testAttempt as any).findUnique({
       where: { id: attemptId },
-      select: { id: true, candidateId: true, testId: true, status: true, score: true, startedAt: true, completedAt: true, submittedAt: true, questionsSnapshot: true },
+      select: { id: true, candidateId: true, testId: true, status: true, score: true, startedAt: true, completedAt: true, submittedAt: true, questionsSnapshot: true, metadata: true },
     });
     if (!row) return null;
     return {
@@ -42,6 +42,7 @@ export class PrismaAttemptRepository implements IAttemptRepository {
       score: row.score ?? null,
       submittedAt: row.submittedAt ?? null,
       questionsSnapshot: row.questionsSnapshot ?? null,
+      metadata: (row as any).metadata ?? null,
     };
   }
 

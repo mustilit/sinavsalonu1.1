@@ -1,4 +1,5 @@
 import { ReviewAggregationService } from '../services/ReviewAggregationService';
+import { PrismaUserPreferenceRepository } from '../../infrastructure/repositories/PrismaUserPreferenceRepository';
 
 /**
  * Eğitici profil sayfasını oluşturur: eğitici bilgisi, yayınlanan testler ve agregat puanlar.
@@ -8,7 +9,7 @@ import { ReviewAggregationService } from '../services/ReviewAggregationService';
  *   2. İstatistik eksik testler için ReviewAggregationService canlı hesaplar
  */
 export class GetEducatorPageUseCase {
-  constructor(private readonly usersRepo: any, private readonly examsRepo: any, private readonly statsRepo: any, private readonly reviewAgg: any = new ReviewAggregationService()) {}
+  constructor(private readonly usersRepo: any, private readonly examsRepo: any, private readonly statsRepo: any, private readonly reviewAgg: any = new ReviewAggregationService(), private readonly prefsRepo: { findByUserId(id: string): Promise<{ preferences: Record<string, unknown> } | null> } = new PrismaUserPreferenceRepository()) {}
 
   async execute(educatorId: string, opts?: { page?: number; limit?: number; examTypeId?: string; sortBy?: string; sortDir?: string }) {
     if (!educatorId) throw new Error('INVALID_INPUT');
@@ -18,6 +19,9 @@ export class GetEducatorPageUseCase {
 
     const educator = await this.usersRepo.findById(educatorId);
     if (!educator || educator.role !== 'EDUCATOR') throw new Error('EDUCATOR_NOT_FOUND');
+
+    const prefs = await this.prefsRepo.findByUserId(educatorId);
+    const avatarUrl: string | null = (prefs?.preferences as any)?.profile_image_url ?? null;
 
     // sortBy: dışarıdan 'PRICE' veya 'NEWEST' gelir; içeride kolon adına eşlenir
     const { items: tests, total } = await this.examsRepo.listPublishedByEducator({ educatorId, examTypeId: opts?.examTypeId, page, limit, sortBy: opts?.sortBy === 'PRICE' ? 'price' : opts?.sortBy === 'NEWEST' ? 'publishedAt' : 'publishedAt', order: opts?.sortDir ?? 'desc' });
@@ -65,7 +69,7 @@ export class GetEducatorPageUseCase {
     }));
 
     return {
-      educator: { id: educator.id, displayName: educator.username, bio: educator.bio ?? null, avatarUrl: null, isApproved: educator.status === 'ACTIVE' },
+      educator: { id: educator.id, displayName: educator.username, bio: educator.bio ?? null, avatarUrl, isApproved: educator.status === 'ACTIVE' },
       stats: { ratingAvg: ratingData.ratingAvg, ratingCount: ratingData.ratingCount, totalPublishedTests: total, totalPurchases: null },
       tests: { items, meta: { page, limit, total } },
     };

@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { SendWeeklyFollowDigestUseCase } from '../../../application/use-cases/SendWeeklyFollowDigestUseCase';
 import { SendMonthlyInactiveReminderUseCase } from '../../../application/use-cases/SendMonthlyInactiveReminderUseCase';
 import { EscalateOverdueObjectionsUseCase } from '../../../application/use-cases/EscalateOverdueObjectionsUseCase';
+import { EscalateOverdueRefundsUseCase } from '../../../application/use-cases/EscalateOverdueRefundsUseCase';
 
 @Injectable()
 export class CronService {
@@ -10,7 +11,8 @@ export class CronService {
   constructor(
     private readonly weekly: SendWeeklyFollowDigestUseCase,
     private readonly monthly: SendMonthlyInactiveReminderUseCase,
-    private readonly escalate: EscalateOverdueObjectionsUseCase
+    private readonly escalate: EscalateOverdueObjectionsUseCase,
+    private readonly escalateRefunds: EscalateOverdueRefundsUseCase,
   ) {}
 
   @Cron('0 0 20 * * 5') // Friday 20:00
@@ -46,6 +48,18 @@ export class CronService {
       this.logger.log(`Escalated count=${res.count}`);
     } catch (e) {
       this.logger.error('Escalation failed', e as any);
+    }
+  }
+
+  @Cron('0 30 2 * * *') // daily 02:30 for refund deadline escalation
+  async handleRefundEscalations() {
+    if (process.env.CRON_DISABLED === '1') return;
+    this.logger.log('Running refund educator deadline escalation');
+    try {
+      const res = await this.escalateRefunds.execute();
+      this.logger.log(`Refund escalated count=${res.escalated}`);
+    } catch (e) {
+      this.logger.error('Refund escalation failed', e as any);
     }
   }
 }

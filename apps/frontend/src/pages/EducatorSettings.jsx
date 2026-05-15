@@ -14,6 +14,27 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery } from "@tanstack/react-query";
 
+function resizeImageToBase64(file, maxPx = 256) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(maxPx / img.width, maxPx / img.height, 1);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function EducatorSettings() {
   const { user, checkAppState } = useAuth();
   const [initialFormData, setInitialFormData] = useState(null);
@@ -169,31 +190,27 @@ export default function EducatorSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check file type
     const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       toast.error("Lütfen JPG, PNG veya WebP formatında resim yükleyin");
       return;
     }
-
-    // Check file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Resim boyutu en fazla 2MB olabilir");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Resim boyutu en fazla 5MB olabilir");
       return;
     }
 
     setUploadingImage(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      const file_url = res.data.url || res.data.fileUrl || res.data.file_url;
-      setFormData({ ...formData, profile_image_url: file_url });
-      toast.success("Profil resmi başarıyla yüklendi");
-    } catch (error) {
+      const dataUrl = await resizeImageToBase64(file, 256);
+      await auth.updateMe({ profile_image_url: dataUrl });
+      setFormData(prev => ({ ...prev, profile_image_url: dataUrl }));
+      toast.success("Profil resmi güncellendi");
+    } catch {
       toast.error("Resim yüklenemedi");
     } finally {
       setUploadingImage(false);
+      e.target.value = '';
     }
   };
 

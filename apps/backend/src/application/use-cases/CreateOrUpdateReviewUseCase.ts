@@ -15,11 +15,12 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 export class CreateOrUpdateReviewUseCase {
   constructor(private readonly reviewRepo: IReviewRepository, private readonly purchaseRepo: IPurchaseRepository, private readonly attemptRepo: IAttemptRepository, private readonly auditRepo: IAuditLogRepository) {}
 
-  async execute(testId: string, candidateId: string, payload: { testRating: number; educatorRating?: number; comment?: string }) {
+  async execute(testId: string, candidateId: string, payload: { testRating?: number; educatorRating?: number; comment?: string }) {
     const { testRating, educatorRating, comment } = payload;
     if (!testId || !candidateId) throw new BadRequestException('INVALID_INPUT');
+    if (testRating === undefined && educatorRating === undefined) throw new BadRequestException('RATING_INVALID');
     // Puan 1–5 sınırı — yıldız sisteminin sınırları
-    if (testRating < 1 || testRating > 5) throw new BadRequestException('RATING_INVALID');
+    if (testRating !== undefined && (testRating < 1 || testRating > 5)) throw new BadRequestException('RATING_INVALID');
     if (educatorRating !== undefined && (educatorRating < 1 || educatorRating > 5)) throw new BadRequestException('RATING_INVALID');
 
     // Satın alma ve tamamlanmış deneme zorunlu — aksi hâlde değerlendirme anlamsız

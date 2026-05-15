@@ -47,8 +47,19 @@ export default function Explore() {
     enabled: !!user,
   });
 
+  const { data: testProgress = [] } = useQuery({
+    queryKey: ["testProgress", user?.id],
+    queryFn: () => entities.TestProgress.filter({ user_email: user?.email, is_completed: false }),
+    enabled: !!user,
+  });
+
   const purchasedIds = new Set(purchases.map(p => p.test_package_id));
   const completedIds = new Set(results.map(r => r.test_package_id));
+  const inProgressIds = new Set(testProgress.map(p => p.test_package_id));
+  const attemptByTestId = {};
+  purchases.forEach((p) => {
+    if (p.test_package_id && p.attempt) attemptByTestId[p.test_package_id] = p.attempt;
+  });
 
   // Filter tests
   const filteredTests = allTests.filter((test) => {
@@ -222,6 +233,8 @@ export default function Explore() {
                 test={test}
                 isPurchased={purchasedIds.has(test.id)}
                 isCompleted={completedIds.has(test.id)}
+                isInProgress={inProgressIds.has(test.id)}
+                attempt={attemptByTestId[test.id] ?? null}
                 onBuy={() => navigate(buildPageUrl("TestDetail", { id: test.id }))}
               />
             ))}

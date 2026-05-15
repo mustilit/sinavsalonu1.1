@@ -11,7 +11,7 @@ export type ReviewRecord = {
 };
 
 export interface IReviewRepository {
-  upsertReview(input: { testId: string; educatorId: string; candidateId: string; testRating: number; educatorRating?: number; comment?: string }): Promise<ReviewRecord>;
+  upsertReview(input: { testId: string; educatorId: string; candidateId: string; testRating?: number; educatorRating?: number; comment?: string }): Promise<ReviewRecord>;
   listReviewsForTest(testId: string, limit?: number, cursor?: string): Promise<{ items: ReviewRecord[]; nextCursor?: string }>;
   getAggregateForTest(testId: string): Promise<{ avg: number | null; count: number }>;
   getAggregateForEducator(educatorId: string): Promise<{ avg: number | null; count: number }>;
